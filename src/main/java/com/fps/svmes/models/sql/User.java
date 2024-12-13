@@ -1,4 +1,4 @@
-package com.fps.svmes.models.sql.user;
+package com.fps.svmes.models.sql;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;

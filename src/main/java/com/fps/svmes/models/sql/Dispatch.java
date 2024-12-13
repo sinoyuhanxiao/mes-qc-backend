@@ -9,6 +9,7 @@ import java.util.List;
  * Represents the configuration for dispatching QC tests.
  */
 @Entity
+@Table(name = "dispatch", schema = "quality_management")
 @Data
 public class Dispatch {
     @Id
@@ -23,14 +24,13 @@ public class Dispatch {
 
     private String timeOfDay; // Time of day in HH:mm format
 
-    private Integer intervalCount; // Number of intervals (e.g., every 2 units)
-
-    @Enumerated(EnumType.STRING)
-    private TimeUnit intervalUnit; // Unit of interval: MINUTES, HOURS, DAYS, WEEKS, MONTHS
-
-    private Integer repeatCount; // Number of times to repeat the interval
+    private Integer intervalMinutes; // Interval in minutes for periodic scheduling
 
     private LocalDateTime startTime; // Start time for interval-based schedules
+
+    private Integer repeatCount; // Number of times to repeat interval-based scheduling
+
+    private Integer executedCount = 0; // Tracks how many times the dispatch has been executed
 
     @ElementCollection
     private List<Long> formIds; // List of target form IDs to dispatch

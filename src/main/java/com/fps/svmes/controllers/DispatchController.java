@@ -31,7 +31,6 @@ public class DispatchController {
     @PostMapping
     public Dispatch createDispatch(@RequestBody Dispatch dispatch) {
         Dispatch savedDispatch = dispatchRepo.save(dispatch);
-        // Scheduling logic can be added here
         return savedDispatch;
     }
 

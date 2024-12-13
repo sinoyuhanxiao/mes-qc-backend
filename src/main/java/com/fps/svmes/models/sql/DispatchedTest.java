@@ -8,6 +8,7 @@ import java.time.LocalDateTime;
  * Represents a test dispatched to a specific personnel.
  */
 @Entity
+@Table(name = "dispatched_test", schema = "quality_management")
 @Data
 public class DispatchedTest {
     @Id

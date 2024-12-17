@@ -1,4 +1,4 @@
-package com.fps.svmes.models.sql;
+package com.fps.svmes.models.sql.task_schedule;
 
 /**
  * Enum for time units in intervals.

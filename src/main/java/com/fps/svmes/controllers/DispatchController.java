@@ -2,10 +2,6 @@ package com.fps.svmes.controllers;
 
 
 import com.fps.svmes.models.sql.task_schedule.Dispatch;
-import com.fps.svmes.models.sql.task_schedule.DispatchDay;
-import com.fps.svmes.models.sql.task_schedule.DispatchForm;
-import com.fps.svmes.models.sql.task_schedule.DispatchPersonnel;
-import com.fps.svmes.repositories.jpaRepo.DispatchRepository;
 import com.fps.svmes.services.DispatchService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -13,7 +9,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * REST Controller for managing dispatch configurations.

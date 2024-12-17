@@ -3,7 +3,6 @@ package com.fps.svmes.services;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-import com.fps.svmes.models.sql.User;
 import com.fps.svmes.models.sql.task_schedule.*;
 import com.fps.svmes.repositories.jpaRepo.DispatchRepository;
 import com.fps.svmes.repositories.jpaRepo.DispatchedTestRepository;
@@ -20,7 +19,6 @@ import org.mockito.MockitoAnnotations;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 class DispatchServiceImplTest {
 

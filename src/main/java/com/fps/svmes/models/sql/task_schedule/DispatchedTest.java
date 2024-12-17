@@ -45,7 +45,7 @@ public class DispatchedTest {
     @Column(name = "finished_at")
     private LocalDateTime finishedAt; // Timestamp when the test was marked as finished
 
-    @Column(name = "notes", length = 255)
+    @Column(name = "notes")
     private String notes; // Optional notes about edits or status changes
 }
 

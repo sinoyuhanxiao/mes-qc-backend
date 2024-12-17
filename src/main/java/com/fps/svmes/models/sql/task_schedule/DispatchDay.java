@@ -20,12 +20,6 @@ public class DispatchDay {
     @Column(name = "day", length = 10, nullable = false)
     private String day;
 
-    public DispatchDay(Long id, Dispatch dispatch, String specificDay) {
-        this.id = id;
-        this.dispatch = dispatch;
-        this.day = specificDay;
-    }
-
     public DispatchDay(Dispatch dispatch, String specificDay) {
         this.dispatch = dispatch;
         this.day = specificDay;

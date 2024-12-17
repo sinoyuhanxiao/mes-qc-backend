@@ -5,7 +5,6 @@ import jakarta.persistence.*;
 import lombok.Data;
 
 import lombok.NoArgsConstructor;
-import lombok.ToString;
 
 @Entity
 @Table(name = "dispatch_personnel", schema = "quality_management")

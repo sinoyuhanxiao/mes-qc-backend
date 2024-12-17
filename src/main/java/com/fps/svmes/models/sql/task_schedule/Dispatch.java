@@ -3,7 +3,6 @@ package com.fps.svmes.models.sql.task_schedule;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
-import lombok.ToString;
 
 import java.time.LocalDateTime;
 import java.util.List;

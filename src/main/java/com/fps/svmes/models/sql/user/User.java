@@ -26,4 +26,12 @@ public class User {
     @Column(name = "wecom_id")
     private String wecomId;
 
+    @JsonProperty("username")
+    @Column(name = "username")
+    private String username;
+
+    @JsonProperty("password")
+    @Column(name = "password")
+    private String password;
+
 }

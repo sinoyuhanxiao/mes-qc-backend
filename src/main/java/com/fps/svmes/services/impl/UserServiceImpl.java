@@ -55,6 +55,8 @@ public class UserServiceImpl implements UserService {
             existingUser.setName(userDTO.getName());
             existingUser.setRoleId(userDTO.getRoleId());
             existingUser.setWecomId(userDTO.getWecomId());
+            existingUser.setUsername(userDTO.getUsername());
+            existingUser.setPassword(userDTO.getPassword());
 
             User updatedUser = userRepository.save(existingUser);
             return modelMapper.map(updatedUser, UserDTO.class);

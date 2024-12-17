@@ -19,6 +19,7 @@ import org.mockito.MockitoAnnotations;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 class DispatchServiceImplTest {
 
@@ -85,9 +86,7 @@ class DispatchServiceImplTest {
 
             when(dispatchRepo.findById(dispatchId)).thenReturn(Optional.of(mockDispatch));
 
-            Exception exception = assertThrows(IllegalStateException.class, () -> {
-                dispatchService.executeDispatch(dispatchId);
-            });
+            Exception exception = assertThrows(IllegalStateException.class, () -> dispatchService.executeDispatch(dispatchId));
 
             assertEquals("Time of day is missing for SPECIFIC_DAYS schedule.", exception.getMessage());
             verify(testRepo, never()).saveAll(any());
@@ -160,9 +159,7 @@ class DispatchServiceImplTest {
             when(dispatchRepo.findById(dispatchId)).thenReturn(Optional.of(mockDispatch));
 
             // Act & Assert
-            Exception exception = assertThrows(IllegalStateException.class, () -> {
-                dispatchService.executeDispatch(dispatchId);
-            });
+            Exception exception = assertThrows(IllegalStateException.class, () -> dispatchService.executeDispatch(dispatchId));
 
             // Verify exception message
             assertEquals("Invalid INTERVAL configuration: Missing start time or interval minutes.", exception.getMessage());
@@ -361,9 +358,7 @@ class DispatchServiceImplTest {
             when(dispatchRepo.findById(dispatchId)).thenReturn(Optional.of(mockDispatch));
 
             // Act & Assert: Ensure the exception is thrown for empty timeOfDay
-            Exception exception = assertThrows(IllegalStateException.class, () -> {
-                dispatchService.executeDispatch(dispatchId);
-            });
+            Exception exception = assertThrows(IllegalStateException.class, () -> dispatchService.executeDispatch(dispatchId));
 
             // Verify the expected exception and message
             assertEquals("Time of day is missing for SPECIFIC_DAYS schedule.", exception.getMessage());
@@ -650,13 +645,13 @@ class DispatchServiceImplTest {
     }
 
     private List<DispatchPersonnel> createPersonnel(Dispatch dispatch, Integer... userIds) {
-        return List.of(userIds).stream()
+        return Stream.of(userIds)
                 .map(userId -> new DispatchPersonnel(1L, dispatch, userId))
                 .toList();
     }
 
     private List<DispatchForm> createForms(Dispatch dispatch, Long... formIds) {
-        return List.of(formIds).stream()
+        return Stream.of(formIds)
                 .map(formId -> new DispatchForm(1L, dispatch, formId))
                 .toList();
     }

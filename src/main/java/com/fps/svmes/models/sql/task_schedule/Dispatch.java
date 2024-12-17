@@ -54,7 +54,7 @@ public class Dispatch {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-    @Column(name = "time_of_day", nullable = true)
+    @Column(name = "time_of_day")
     private String timeOfDay;
 
     @Override

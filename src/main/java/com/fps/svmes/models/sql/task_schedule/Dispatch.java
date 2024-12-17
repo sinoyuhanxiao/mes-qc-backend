@@ -5,6 +5,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -22,13 +23,13 @@ public class Dispatch {
     private Long id;
 
     @OneToMany(mappedBy = "dispatch", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
-    private List<DispatchPersonnel> dispatchPersonnel;
+    private List<DispatchPersonnel> dispatchPersonnel = new ArrayList<>();
 
     @OneToMany(mappedBy = "dispatch", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
-    private List<DispatchForm> dispatchForms;
+    private List<DispatchForm> dispatchForms = new ArrayList<>();
 
     @OneToMany(mappedBy = "dispatch", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
-    private List<DispatchDay> dispatchDays;
+    private List<DispatchDay> dispatchDays = new ArrayList<>();
 
     @Column(name = "schedule_type")
     private String scheduleType;

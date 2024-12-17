@@ -1,6 +1,8 @@
 package com.fps.svmes.services;
 
+import com.fps.svmes.dto.requests.DispatchRequest;
 import com.fps.svmes.models.sql.task_schedule.Dispatch;
+import jakarta.validation.Valid;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -13,10 +15,10 @@ public interface DispatchService {
     void executeDispatch(Long dispatchId);
     void scheduleDispatches();
     boolean shouldDispatch(Dispatch dispatch, LocalDateTime now);
-    Dispatch createDispatch(Dispatch dispatch);
-    Optional<Dispatch> getDispatchById(Long id);
+    Dispatch createDispatch(@Valid DispatchRequest request);
+    Dispatch updateDispatch(Long id, @Valid DispatchRequest request);
+    Dispatch getDispatch(Long id);
     List<Dispatch> getAllDispatches();
-    Optional<Dispatch> updateDispatch(Long id, Dispatch updatedDispatch);
-    boolean deleteDispatch(Long id);
+    void deleteDispatch(Long id);
     boolean manualDispatch(Long id);
 }

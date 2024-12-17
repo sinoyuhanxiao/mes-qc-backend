@@ -1,9 +1,11 @@
 package com.fps.svmes.services.impl;
 
+import com.fps.svmes.dto.requests.DispatchRequest;
 import com.fps.svmes.models.sql.task_schedule.*;
 import com.fps.svmes.repositories.jpaRepo.DispatchRepository;
 import com.fps.svmes.repositories.jpaRepo.DispatchedTestRepository;
 import com.fps.svmes.services.DispatchService;
+import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -30,15 +32,18 @@ public class DispatchServiceImpl implements DispatchService {
     @Autowired
     private DispatchedTestRepository testRepo;
     private static final Logger logger = LoggerFactory.getLogger(DispatchServiceImpl.class);
-    // FOR WECOM LATER
-//    @Value("${wechat.api.url}")
-//    private String wechatApiUrl;
-//
-//    @Value("${wechat.access.token}")
-//    private String wechatAccessToken;
-//
-//    @Value("${wechat.template.id}")
-//    private String wechatTemplateId;
+
+    // FOR WECOM NOTIFICATION LATER
+    //    @Value("${wechat.api.url}")
+    //    private String wechatApiUrl;
+    //
+    //    @Value("${wechat.access.token}")
+    //    private String wechatAccessToken;
+    //
+    //    @Value("${wechat.template.id}")
+    //    private String wechatTemplateId;
+
+    // TEST DISPATCH SCHEDULING LOGIC --------------------------------------------------------------------------
 
     @Transactional
     @Override
@@ -57,7 +62,6 @@ public class DispatchServiceImpl implements DispatchService {
             }
         }
     }
-
 
     public boolean shouldDispatch(Dispatch dispatch, LocalDateTime now) {
         ScheduleType scheduleType;
@@ -105,8 +109,6 @@ public class DispatchServiceImpl implements DispatchService {
         }
         return false;
     }
-
-
 
     @Transactional
     @Override
@@ -168,43 +170,6 @@ public class DispatchServiceImpl implements DispatchService {
         }
     }
 
-
-    @Override
-    public Dispatch createDispatch(Dispatch dispatch) {
-        // Save the Dispatch entity and related middle-table entities
-        Dispatch savedDispatch = dispatchRepo.save(dispatch);
-        saveRelatedEntities(savedDispatch, dispatch);
-        return dispatchRepo.save(savedDispatch);
-    }
-
-    @Override
-    public Optional<Dispatch> getDispatchById(Long id) {
-        return dispatchRepo.findById(id);
-    }
-
-    @Override
-    public List<Dispatch> getAllDispatches() {
-        return dispatchRepo.findAll();
-    }
-
-    @Override
-    public Optional<Dispatch> updateDispatch(Long id, Dispatch updatedDispatch) {
-        return dispatchRepo.findById(id).map(existingDispatch -> {
-            updatedDispatch.setId(existingDispatch.getId());
-            saveRelatedEntities(existingDispatch, updatedDispatch);
-            return dispatchRepo.save(updatedDispatch);
-        });
-    }
-
-    @Override
-    public boolean deleteDispatch(Long id) {
-        if (dispatchRepo.existsById(id)) {
-            dispatchRepo.deleteById(id);
-            return true;
-        }
-        return false;
-    }
-
     @Override
     public boolean manualDispatch(Long id) {
         if (dispatchRepo.existsById(id)) {
@@ -213,6 +178,173 @@ public class DispatchServiceImpl implements DispatchService {
         }
         return false;
     }
+
+    // DISPATCH CRUD LOGIC --------------------------------------------------------------------------
+
+    @Transactional
+    public Dispatch createDispatch(DispatchRequest request) {
+        Dispatch dispatch = new Dispatch();
+
+        // Base Dispatch Fields
+        dispatch.setScheduleType(request.getScheduleType().name());
+        dispatch.setActive(request.getActive());
+        dispatch.setCreatedAt(LocalDateTime.now());
+        dispatch.setUpdatedAt(LocalDateTime.now());
+        dispatch.setExecutedCount(0);
+
+        // Handle SPECIFIC_DAYS Schedule
+        if (request.getScheduleType() == DispatchRequest.ScheduleType.SPECIFIC_DAYS) {
+            if (request.getSpecificDays() == null || request.getTimeOfDay() == null) {
+                throw new IllegalArgumentException("SpecificDays and TimeOfDay must be provided for SPECIFIC_DAYS schedule");
+            }
+
+            // Set specific days and time
+            List<DispatchDay> days = request.getSpecificDays().stream()
+                    .map(day -> new DispatchDay(dispatch, day))
+                    .collect(Collectors.toList());
+            dispatch.setDispatchDays(days);
+            dispatch.setTimeOfDay(request.getTimeOfDay());
+
+            // Nullify interval-specific fields
+            dispatch.setIntervalMinutes(null);
+            dispatch.setRepeatCount(null);
+        }
+
+        // Handle INTERVAL Schedule
+        else if (request.getScheduleType() == DispatchRequest.ScheduleType.INTERVAL) {
+            if (request.getIntervalMinutes() == null || request.getRepeatCount() == null) {
+                throw new IllegalArgumentException("IntervalMinutes and RepeatCount must be provided for INTERVAL schedule");
+            }
+
+            // Set interval fields
+            dispatch.setIntervalMinutes(request.getIntervalMinutes());
+            dispatch.setRepeatCount(request.getRepeatCount());
+
+            // Nullify specific-day fields
+            dispatch.setDispatchDays(null);
+            dispatch.setTimeOfDay(null);
+        }
+
+        // Handle DispatchForms
+        if (request.getFormIds() != null) {
+            List<DispatchForm> forms = request.getFormIds().stream()
+                    .map(formId -> new DispatchForm(dispatch, formId))
+                    .collect(Collectors.toList());
+            dispatch.setDispatchForms(forms);
+        }
+
+        // Handle DispatchPersonnel
+        if (request.getPersonnelIds() != null) {
+            List<DispatchPersonnel> personnel = request.getPersonnelIds().stream()
+                    .map(userId -> new DispatchPersonnel(dispatch, userId.intValue()))
+                    .collect(Collectors.toList());
+            dispatch.setDispatchPersonnel(personnel);
+        }
+
+        return dispatchRepo.save(dispatch);
+    }
+
+    @Transactional
+    public Dispatch updateDispatch(Long id, DispatchRequest request) {
+        // 1. Fetch the existing dispatch
+        Dispatch dispatch = dispatchRepo.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Dispatch with ID " + id + " not found"));
+
+        // 2. Update base Dispatch fields
+        dispatch.setScheduleType(request.getScheduleType().name());
+        dispatch.setActive(request.getActive());
+        dispatch.setUpdatedAt(LocalDateTime.now());
+
+        // 3. Update fields for SPECIFIC_DAYS schedule
+        if (request.getScheduleType() == DispatchRequest.ScheduleType.SPECIFIC_DAYS) {
+            if (request.getSpecificDays() == null || request.getTimeOfDay() == null) {
+                throw new IllegalArgumentException("SpecificDays and TimeOfDay must be provided for SPECIFIC_DAYS schedule");
+            }
+
+            // Set timeOfDay and clear/re-add specific days
+            dispatch.setTimeOfDay(request.getTimeOfDay());
+            dispatch.getDispatchDays().clear();
+            List<DispatchDay> days = request.getSpecificDays().stream()
+                    .map(day -> new DispatchDay(dispatch, day))
+                    .toList();
+            dispatch.getDispatchDays().addAll(days);
+
+            // Nullify interval fields
+            dispatch.setIntervalMinutes(null);
+            dispatch.setRepeatCount(null);
+        }
+        // 4. Update fields for INTERVAL schedule
+        else if (request.getScheduleType() == DispatchRequest.ScheduleType.INTERVAL) {
+            if (request.getIntervalMinutes() == null || request.getRepeatCount() == null) {
+                throw new IllegalArgumentException("IntervalMinutes and RepeatCount must be provided for INTERVAL schedule");
+            }
+
+            // Set interval fields and clear specific days
+            dispatch.setIntervalMinutes(request.getIntervalMinutes());
+            dispatch.setRepeatCount(request.getRepeatCount());
+            dispatch.setTimeOfDay(null);
+            dispatch.getDispatchDays().clear();
+        }
+
+        // 5. Update DispatchForm relationships
+        dispatch.getDispatchForms().clear();
+        if (request.getFormIds() != null) {
+            List<DispatchForm> forms = request.getFormIds().stream()
+                    .map(formId -> new DispatchForm(dispatch, formId))
+                    .toList();
+            dispatch.getDispatchForms().addAll(forms);
+        }
+
+        // 6. Update DispatchPersonnel relationships
+        dispatch.getDispatchPersonnel().clear();
+        if (request.getPersonnelIds() != null) {
+            List<DispatchPersonnel> personnel = request.getPersonnelIds().stream()
+                    .map(userId -> new DispatchPersonnel(dispatch, userId.intValue()))
+                    .toList();
+            dispatch.getDispatchPersonnel().addAll(personnel);
+        }
+
+        // 7. Save and return the updated dispatch
+        return dispatchRepo.save(dispatch);
+    }
+
+
+    /**
+     * Fetch a single dispatch by its ID.
+     * @param id The ID of the dispatch to fetch.
+     * @return The Dispatch entity with all related entities (days, forms, personnel).
+     */
+    public Dispatch getDispatch(Long id) {
+        return dispatchRepo.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Dispatch with ID " + id + " not found"));
+    }
+
+    /**
+     * Fetch all dispatches with their relationships.
+     * @return A list of all Dispatch entities.
+     */
+    public List<Dispatch> getAllDispatches() {
+        return dispatchRepo.findAll();
+    }
+
+
+    /**
+     * Delete a dispatch by its ID.
+     * @param id The ID of the dispatch to delete.
+     */
+    @Transactional
+    public void deleteDispatch(Long id) {
+        // Fetch the existing dispatch
+        Dispatch existingDispatch = dispatchRepo.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Dispatch with ID " + id + " not found"));
+
+        // Delete the dispatch
+        dispatchRepo.delete(existingDispatch);
+    }
+
+
+
+    // HELPER METHODS --------------------------------------------------------------------------
 
     private void saveRelatedEntities(Dispatch savedDispatch, Dispatch originalDispatch) {
         // Save middle table relationships for DispatchDays
@@ -246,7 +378,6 @@ public class DispatchServiceImpl implements DispatchService {
         }
     }
 
-
     private LocalDateTime getSpecificDaysDispatchTime(Dispatch dispatch) {
         if (dispatch.getTimeOfDay() == null || dispatch.getTimeOfDay().isEmpty()) {
             throw new IllegalStateException("Time of day is missing for SPECIFIC_DAYS schedule.");
@@ -273,7 +404,7 @@ public class DispatchServiceImpl implements DispatchService {
         return dispatch.getStartTime().plusMinutes((long) dispatch.getIntervalMinutes() * nextExecutedCount);
     }
 
-    // Helper: Create a single DispatchedTest object
+    // Create a single DispatchedTest object
     private DispatchedTest createDispatchedTest(Dispatch dispatch, Long formId, Integer personnelId, LocalDateTime dispatchTime) {
         DispatchedTest test = new DispatchedTest();
         test.setDispatch(dispatch);
@@ -284,13 +415,12 @@ public class DispatchServiceImpl implements DispatchService {
         return test;
     }
 
-    // Helper: Increment executed count and save the dispatch
+    // Increment executed count and save the dispatch
     private void incrementExecutedCount(Dispatch dispatch) {
         dispatch.setExecutedCount(dispatch.getExecutedCount() + 1);
         dispatchRepo.save(dispatch);
         logger.info("Dispatch {} executed count incremented to {}", dispatch.getId(), dispatch.getExecutedCount());
     }
-
 
     /**
      * Generates a unique URL for a form assigned to a personnel.
@@ -314,33 +444,33 @@ public class DispatchServiceImpl implements DispatchService {
     }
 
     // FOR LATER WECOM
-//    /**
-//     * Sends a WeChat notification to the personnel with the form URL.
-//     *
-//     * @param personnelId the ID of the personnel
-//     * @param formUrl the URL of the form
-//     */
-//    private void notifyPersonnel(Long personnelId, String formUrl) {
-//        String url = wechatApiUrl + "/cgi-bin/message/template/send?access_token=" + wechatAccessToken;
-//        RestTemplate restTemplate = new RestTemplate();
-//
-//        var payload = new java.util.HashMap<String, Object>();
-//        payload.put("touser", "wechat-id-for-personnel-" + personnelId); // Replace with actual retrieval of WeChat ID
-//
-//        payload.put("template_id", wechatTemplateId);
-//        payload.put("url", formUrl);
-//        payload.put("data", java.util.Map.of(
-//                "first", java.util.Map.of("value", "You have a new QC test assignment."),
-//                "keyword1", java.util.Map.of("value", "Form Link"),
-//                "keyword2", java.util.Map.of("value", "High Priority"),
-//                "remark", java.util.Map.of("value", "Please complete it as soon as possible.")
-//        ));
-//
-//        try {
-//            restTemplate.postForObject(url, payload, String.class);
-//            System.out.println("WeChat notification sent for Personnel ID: " + personnelId);
-//        } catch (Exception e) {
-//            System.err.println("Failed to send WeChat notification: " + e.getMessage());
-//        }
-//    }
+    //    /**
+    //     * Sends a WeChat notification to the personnel with the form URL.
+    //     *
+    //     * @param personnelId the ID of the personnel
+    //     * @param formUrl the URL of the form
+    //     */
+    //    private void notifyPersonnel(Long personnelId, String formUrl) {
+    //        String url = wechatApiUrl + "/cgi-bin/message/template/send?access_token=" + wechatAccessToken;
+    //        RestTemplate restTemplate = new RestTemplate();
+    //
+    //        var payload = new java.util.HashMap<String, Object>();
+    //        payload.put("touser", "wechat-id-for-personnel-" + personnelId); // Replace with actual retrieval of WeChat ID
+    //
+    //        payload.put("template_id", wechatTemplateId);
+    //        payload.put("url", formUrl);
+    //        payload.put("data", java.util.Map.of(
+    //                "first", java.util.Map.of("value", "You have a new QC test assignment."),
+    //                "keyword1", java.util.Map.of("value", "Form Link"),
+    //                "keyword2", java.util.Map.of("value", "High Priority"),
+    //                "remark", java.util.Map.of("value", "Please complete it as soon as possible.")
+    //        ));
+    //
+    //        try {
+    //            restTemplate.postForObject(url, payload, String.class);
+    //            System.out.println("WeChat notification sent for Personnel ID: " + personnelId);
+    //        } catch (Exception e) {
+    //            System.err.println("Failed to send WeChat notification: " + e.getMessage());
+    //        }
+    //    }
 }

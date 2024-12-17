@@ -3,11 +3,13 @@ package com.fps.svmes.services;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+import com.fps.svmes.dto.requests.DispatchRequest;
 import com.fps.svmes.models.sql.task_schedule.*;
 import com.fps.svmes.repositories.jpaRepo.DispatchRepository;
 import com.fps.svmes.repositories.jpaRepo.DispatchedTestRepository;
 import com.fps.svmes.services.impl.DispatchServiceImpl;
 
+import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -17,6 +19,8 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
@@ -240,7 +244,6 @@ class DispatchServiceImplTest {
         }
 
 
-
         @Test
         void testExecuteDispatchSpecificDaysCreatesTests() {
             // Arrange
@@ -290,7 +293,6 @@ class DispatchServiceImplTest {
             assertFalse(shouldDispatch, "Dispatch should not execute on the wrong day.");
             verify(testRepo, never()).saveAll(any());
         }
-
 
 
         @Test
@@ -366,7 +368,7 @@ class DispatchServiceImplTest {
             // Ensure no tests are saved
             verify(testRepo, never()).saveAll(any());
         }
-
+    }
 
         // === Group: SHOULD DISPATCH ===
     @Nested
@@ -469,153 +471,363 @@ class DispatchServiceImplTest {
     @Nested
     @DisplayName("CRUD Operations Tests")
     class CrudTests {
+        @Nested
+        class CreateDispatch {
+            @Test
+            void testCreateDispatch_SpecificDays() {
+                // Prepare input
+                DispatchRequest request = new DispatchRequest();
+                request.setScheduleType(DispatchRequest.ScheduleType.SPECIFIC_DAYS);
+                request.setSpecificDays(Arrays.asList("MONDAY", "TUESDAY"));
+                request.setTimeOfDay("08:00");
+                request.setActive(true);
+                request.setFormIds(Arrays.asList(101L, 102L));
+                request.setPersonnelIds(Arrays.asList(501L, 502L));
 
-        @Test
-        @DisplayName("Should create dispatch successfully")
-        void testCreateDispatch() {
-            Dispatch newDispatch = new Dispatch();
-            Dispatch savedDispatch = new Dispatch();
-            savedDispatch.setId(1L);
+                // Mock repository save behavior
+                when(dispatchRepo.save(any(Dispatch.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-            when(dispatchRepo.save(any())).thenReturn(savedDispatch);
+                // Call the method
+                Dispatch savedDispatch = dispatchService.createDispatch(request);
 
-            Dispatch result = dispatchService.createDispatch(newDispatch);
-            assertNotNull(result);
-            assertEquals(1L, result.getId());
+                // Verify repository interactions
+                verify(dispatchRepo, times(1)).save(any(Dispatch.class));
+
+                // Assertions
+                assertNotNull(savedDispatch);
+                assertEquals("SPECIFIC_DAYS", savedDispatch.getScheduleType());
+                assertEquals("08:00", savedDispatch.getTimeOfDay());
+                assertEquals(2, savedDispatch.getDispatchDays().size());
+                assertEquals(2, savedDispatch.getDispatchForms().size());
+                assertEquals(2, savedDispatch.getDispatchPersonnel().size());
+
+                // Verify DispatchDay entries
+                List<DispatchDay> days = savedDispatch.getDispatchDays();
+                assertEquals("MONDAY", days.get(0).getDay());
+                assertEquals("TUESDAY", days.get(1).getDay());
+            }
+
+            @Test
+            void testCreateDispatch_Interval() {
+                // Prepare input
+                DispatchRequest request = new DispatchRequest();
+                request.setScheduleType(DispatchRequest.ScheduleType.INTERVAL);
+                request.setIntervalMinutes(30);
+                request.setRepeatCount(5);
+                request.setActive(true);
+                request.setFormIds(Arrays.asList(201L, 202L));
+                request.setPersonnelIds(Arrays.asList(601L, 602L));
+
+                // Mock repository save behavior
+                when(dispatchRepo.save(any(Dispatch.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+                // Call the method
+                Dispatch savedDispatch = dispatchService.createDispatch(request);
+
+                // Verify repository interactions
+                verify(dispatchRepo, times(1)).save(any(Dispatch.class));
+
+                // Assertions
+                assertNotNull(savedDispatch);
+                assertEquals("INTERVAL", savedDispatch.getScheduleType());
+                assertEquals(30, savedDispatch.getIntervalMinutes());
+                assertEquals(5, savedDispatch.getRepeatCount());
+                assertEquals(2, savedDispatch.getDispatchForms().size());
+                assertEquals(2, savedDispatch.getDispatchPersonnel().size());
+                assertNull(savedDispatch.getDispatchDays()); // Specific days should not be set
+                assertNull(savedDispatch.getTimeOfDay());
+            }
+
+            @Test
+            void testCreateDispatch_InvalidSpecificDays() {
+                // Prepare invalid input for SPECIFIC_DAYS without required fields
+                DispatchRequest request = new DispatchRequest();
+                request.setScheduleType(DispatchRequest.ScheduleType.SPECIFIC_DAYS);
+                request.setActive(true);
+                request.setSpecificDays(null);
+                request.setTimeOfDay(null);
+
+                // Expect exception
+                IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
+                    dispatchService.createDispatch(request);
+                });
+
+                assertEquals("SpecificDays and TimeOfDay must be provided for SPECIFIC_DAYS schedule", exception.getMessage());
+            }
+
+            @Test
+            void testCreateDispatch_InvalidInterval() {
+                // Prepare invalid input for INTERVAL without required fields
+                DispatchRequest request = new DispatchRequest();
+                request.setScheduleType(DispatchRequest.ScheduleType.INTERVAL);
+                request.setActive(true);
+                request.setIntervalMinutes(null);
+                request.setRepeatCount(null);
+
+                // Expect exception
+                IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
+                    dispatchService.createDispatch(request);
+                });
+
+                assertEquals("IntervalMinutes and RepeatCount must be provided for INTERVAL schedule", exception.getMessage());
+            }
         }
 
-        @Test
-        @DisplayName("Should delete dispatch successfully")
-        void testDeleteDispatchSuccess() {
-            when(dispatchRepo.existsById(1L)).thenReturn(true);
-            assertTrue(dispatchService.deleteDispatch(1L));
+        @Nested
+        class UpdateSpecificDaysDispatch {
+            private Dispatch existingDispatch;
+
+            @BeforeEach
+            void initSpecificDaysDispatch() {
+                existingDispatch = new Dispatch();
+                existingDispatch.setId(1L);
+                existingDispatch.setScheduleType("SPECIFIC_DAYS");
+                existingDispatch.setTimeOfDay("09:00");
+                existingDispatch.setActive(true);
+                existingDispatch.setCreatedAt(LocalDateTime.now());
+                existingDispatch.setUpdatedAt(LocalDateTime.now());
+
+                // Use mutable lists instead of Arrays.asList
+                existingDispatch.setDispatchDays(new ArrayList<>(Arrays.asList(
+                        new DispatchDay(existingDispatch, "MONDAY"),
+                        new DispatchDay(existingDispatch, "TUESDAY")
+                )));
+                existingDispatch.setDispatchForms(new ArrayList<>(List.of(
+                        new DispatchForm(existingDispatch, 101L)
+                )));
+                existingDispatch.setDispatchPersonnel(new ArrayList<>(List.of(
+                        new DispatchPersonnel(existingDispatch, 201)
+                )));
+            }
+
+            @Test
+            void testUpdateDispatch_SuccessfulSpecificDaysUpdate() {
+                DispatchRequest request = new DispatchRequest();
+                request.setScheduleType(DispatchRequest.ScheduleType.SPECIFIC_DAYS);
+                request.setSpecificDays(Arrays.asList("WEDNESDAY", "FRIDAY"));
+                request.setTimeOfDay("10:30");
+                request.setActive(true);
+                request.setFormIds(Arrays.asList(103L, 104L));
+                request.setPersonnelIds(Arrays.asList(301L, 302L));
+
+                when(dispatchRepo.findById(1L)).thenReturn(Optional.of(existingDispatch));
+                when(dispatchRepo.save(any(Dispatch.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+                Dispatch updatedDispatch = dispatchService.updateDispatch(1L, request);
+
+                assertEquals("SPECIFIC_DAYS", updatedDispatch.getScheduleType());
+                assertEquals("10:30", updatedDispatch.getTimeOfDay());
+                assertEquals(2, updatedDispatch.getDispatchDays().size());
+                assertEquals("WEDNESDAY", updatedDispatch.getDispatchDays().get(0).getDay());
+                assertEquals("FRIDAY", updatedDispatch.getDispatchDays().get(1).getDay());
+                verify(dispatchRepo, times(1)).save(updatedDispatch);
+            }
+
+            @Test
+            void testUpdateDispatch_InvalidSpecificDays() {
+                DispatchRequest request = new DispatchRequest();
+                request.setScheduleType(DispatchRequest.ScheduleType.SPECIFIC_DAYS);
+                request.setSpecificDays(Arrays.asList("MONDAY", "FRIDAY"));
+                request.setTimeOfDay(null);
+
+                when(dispatchRepo.findById(1L)).thenReturn(Optional.of(existingDispatch));
+
+                IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
+                    dispatchService.updateDispatch(1L, request);
+                });
+
+                assertEquals("SpecificDays and TimeOfDay must be provided for SPECIFIC_DAYS schedule", exception.getMessage());
+                verify(dispatchRepo, never()).save(any());
+            }
         }
 
-        @Test
-        @DisplayName("testCreateDispatchWithNullLists")
-        void testCreateDispatchWithNullLists() {
-            // Arrange
-            Dispatch inputDispatch = new Dispatch();
-            inputDispatch.setId(2L);
-            inputDispatch.setDispatchDays(null); // Null list
-            inputDispatch.setDispatchForms(null);
-            inputDispatch.setDispatchPersonnel(null);
+        @Nested
+        class UpdateIntervalDispatch {
+            private Dispatch existingDispatch;
 
-            Dispatch savedDispatch = new Dispatch();
-            savedDispatch.setId(2L);
+            @BeforeEach
+            void initIntervalDispatch() {
+                existingDispatch = new Dispatch();
+                existingDispatch.setId(2L);
+                existingDispatch.setScheduleType("INTERVAL");
+                existingDispatch.setIntervalMinutes(30);
+                existingDispatch.setRepeatCount(3);
+                existingDispatch.setActive(true);
+                existingDispatch.setCreatedAt(LocalDateTime.now());
+                existingDispatch.setUpdatedAt(LocalDateTime.now());
+            }
 
-            when(dispatchRepo.save(any(Dispatch.class))).thenReturn(savedDispatch);
+            @Test
+            void testUpdateDispatch_SuccessfulIntervalUpdate() {
+                DispatchRequest request = new DispatchRequest();
+                request.setScheduleType(DispatchRequest.ScheduleType.INTERVAL);
+                request.setIntervalMinutes(45);
+                request.setRepeatCount(5);
+                request.setActive(false);
+                request.setFormIds(Arrays.asList(201L, 202L));
+                request.setPersonnelIds(Arrays.asList(401L, 402L));
 
-            // Act
-            Dispatch result = dispatchService.createDispatch(inputDispatch);
+                when(dispatchRepo.findById(2L)).thenReturn(Optional.of(existingDispatch));
+                when(dispatchRepo.save(any(Dispatch.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-            // Assert
-            assertNotNull(result);
-            assertEquals(2L, result.getId());
-            verify(dispatchRepo, times(2)).save(any(Dispatch.class)); // Initial and final saves
-        }
-        @Test
-        void testGetDispatchByIdSuccess() {
-            // Arrange
-            Dispatch mockDispatch = new Dispatch();
-            mockDispatch.setId(1L);
+                Dispatch updatedDispatch = dispatchService.updateDispatch(2L, request);
 
-            when(dispatchRepo.findById(1L)).thenReturn(Optional.of(mockDispatch));
+                assertEquals("INTERVAL", updatedDispatch.getScheduleType());
+                assertEquals(45, updatedDispatch.getIntervalMinutes());
+                assertEquals(5, updatedDispatch.getRepeatCount());
+                assertNull(updatedDispatch.getTimeOfDay());
+                verify(dispatchRepo, times(1)).save(updatedDispatch);
+            }
 
-            // Act
-            Optional<Dispatch> result = dispatchService.getDispatchById(1L);
+            @Test
+            void testUpdateDispatch_InvalidInterval() {
+                DispatchRequest request = new DispatchRequest();
+                request.setScheduleType(DispatchRequest.ScheduleType.INTERVAL);
+                request.setIntervalMinutes(null);
+                request.setRepeatCount(null);
 
-            // Assert
-            assertTrue(result.isPresent());
-            assertEquals(1L, result.get().getId());
-            verify(dispatchRepo, times(1)).findById(1L);
-        }
+                when(dispatchRepo.findById(2L)).thenReturn(Optional.of(existingDispatch));
 
-        @Test
-        void testGetDispatchByIdNotFound() {
-            // Arrange
-            when(dispatchRepo.findById(1L)).thenReturn(Optional.empty());
+                IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
+                    dispatchService.updateDispatch(2L, request);
+                });
 
-            // Act
-            Optional<Dispatch> result = dispatchService.getDispatchById(1L);
-
-            // Assert
-            assertFalse(result.isPresent());
-            verify(dispatchRepo, times(1)).findById(1L);
-        }
-
-        @Test
-        void testGetAllDispatches() {
-            // Arrange
-            List<Dispatch> mockDispatches = List.of(
-                    new Dispatch(),
-                    new Dispatch()
-            );
-
-            when(dispatchRepo.findAll()).thenReturn(mockDispatches);
-
-            // Act
-            List<Dispatch> result = dispatchService.getAllDispatches();
-
-            // Assert
-            assertNotNull(result);
-            assertEquals(2, result.size());
-            verify(dispatchRepo, times(1)).findAll();
+                assertEquals("IntervalMinutes and RepeatCount must be provided for INTERVAL schedule", exception.getMessage());
+                verify(dispatchRepo, never()).save(any());
+            }
         }
 
-        @Test
-        void testUpdateDispatchSuccess() {
-            // Arrange
-            Dispatch existingDispatch = new Dispatch();
-            existingDispatch.setId(1L);
+        @Nested
+        class GetDispatchTests {
+            private Dispatch mockDispatch;
+            @BeforeEach
+            void setUp() {
+                MockitoAnnotations.openMocks(this);
 
-            Dispatch updatedDispatch = new Dispatch();
-            updatedDispatch.setScheduleType("SPECIFIC_DAYS");
+                // Create a mock Dispatch
+                mockDispatch = new Dispatch();
+                mockDispatch.setId(1L);
+                mockDispatch.setScheduleType("SPECIFIC_DAYS");
+                mockDispatch.setActive(true);
+            }
 
-            when(dispatchRepo.findById(1L)).thenReturn(Optional.of(existingDispatch));
-            when(dispatchRepo.save(any(Dispatch.class))).thenReturn(updatedDispatch);
+            @Test
+            void testGetDispatch_Successful() {
+                when(dispatchRepo.findById(1L)).thenReturn(Optional.of(mockDispatch));
 
-            // Act
-            Optional<Dispatch> result = dispatchService.updateDispatch(1L, updatedDispatch);
+                Dispatch result = dispatchService.getDispatch(1L);
 
-            // Assert
-            assertTrue(result.isPresent());
-            assertEquals("SPECIFIC_DAYS", result.get().getScheduleType());
-            verify(dispatchRepo, times(1)).findById(1L);
-            verify(dispatchRepo, times(1)).save(any(Dispatch.class));
+                assertNotNull(result);
+                assertEquals(1L, result.getId());
+                assertEquals("SPECIFIC_DAYS", result.getScheduleType());
+                assertTrue(result.getActive());
+                verify(dispatchRepo, times(1)).findById(1L);
+            }
+
+            @Test
+            void testGetDispatch_NotFound() {
+                when(dispatchRepo.findById(1L)).thenReturn(Optional.empty());
+
+                EntityNotFoundException exception = assertThrows(EntityNotFoundException.class, () -> {
+                    dispatchService.getDispatch(1L);
+                });
+
+                assertEquals("Dispatch with ID 1 not found", exception.getMessage());
+                verify(dispatchRepo, times(1)).findById(1L);
+            }
         }
 
-        @Test
-        void testUpdateDispatchNotFound() {
-            // Arrange
-            Dispatch updatedDispatch = new Dispatch();
-            updatedDispatch.setScheduleType("SPECIFIC_DAYS");
+        @Nested
+        class GetAllDispatchTests {
+            private Dispatch mockDispatch;
+            @BeforeEach
+            void setUp() {
+                MockitoAnnotations.openMocks(this);
 
-            when(dispatchRepo.findById(1L)).thenReturn(Optional.empty());
+                // Create a mock Dispatch
+                mockDispatch = new Dispatch();
+                mockDispatch.setId(1L);
+                mockDispatch.setScheduleType("SPECIFIC_DAYS");
+                mockDispatch.setActive(true);
+            }
 
-            // Act
-            Optional<Dispatch> result = dispatchService.updateDispatch(1L, updatedDispatch);
+            @Test
+            void testGetAllDispatches_Successful() {
+                Dispatch secondDispatch = new Dispatch();
+                secondDispatch.setId(2L);
+                secondDispatch.setScheduleType("INTERVAL");
+                secondDispatch.setActive(false);
 
-            // Assert
-            assertFalse(result.isPresent());
-            verify(dispatchRepo, times(1)).findById(1L);
-            verify(dispatchRepo, times(0)).save(any(Dispatch.class));
+                List<Dispatch> mockDispatches = Arrays.asList(mockDispatch, secondDispatch);
+
+                when(dispatchRepo.findAll()).thenReturn(mockDispatches);
+
+                List<Dispatch> result = dispatchService.getAllDispatches();
+
+                assertNotNull(result);
+                assertEquals(2, result.size());
+
+                assertEquals(1L, result.get(0).getId());
+                assertEquals("SPECIFIC_DAYS", result.get(0).getScheduleType());
+
+                assertEquals(2L, result.get(1).getId());
+                assertEquals("INTERVAL", result.get(1).getScheduleType());
+
+                verify(dispatchRepo, times(1)).findAll();
+            }
+
+            @Test
+            void testGetAllDispatches_EmptyList() {
+                when(dispatchRepo.findAll()).thenReturn(List.of());
+
+                List<Dispatch> result = dispatchService.getAllDispatches();
+
+                assertNotNull(result);
+                assertTrue(result.isEmpty());
+
+                verify(dispatchRepo, times(1)).findAll();
+            }
         }
 
+        @Nested
+        class DeleteDispatchTests {
 
+            @Test
+            void testDeleteDispatch_Successful() {
+                // Initialize Dispatch only for this test
+                Dispatch mockDispatch = new Dispatch();
+                mockDispatch.setId(1L);
+                mockDispatch.setScheduleType("SPECIFIC_DAYS");
+                mockDispatch.setActive(true);
 
-        @Test
-        void testDeleteDispatchNotFound() {
-            // Arrange
-            when(dispatchRepo.existsById(1L)).thenReturn(false);
+                // Mock repository behavior
+                when(dispatchRepo.findById(1L)).thenReturn(Optional.of(mockDispatch));
+                doNothing().when(dispatchRepo).delete(mockDispatch);
 
-            // Act
-            boolean result = dispatchService.deleteDispatch(1L);
+                // Call the service method
+                assertDoesNotThrow(() -> dispatchService.deleteDispatch(1L));
 
-            // Assert
-            assertFalse(result);
-            verify(dispatchRepo, times(1)).existsById(1L);
-            verify(dispatchRepo, times(0)).deleteById(1L);
+                // Verify interactions
+                verify(dispatchRepo, times(1)).findById(1L);
+                verify(dispatchRepo, times(1)).delete(mockDispatch);
+            }
+
+            @Test
+            void testDeleteDispatch_NotFound() {
+                // Mock repository behavior for missing Dispatch
+                when(dispatchRepo.findById(1L)).thenReturn(Optional.empty());
+
+                // Expect EntityNotFoundException
+                EntityNotFoundException exception = assertThrows(EntityNotFoundException.class, () -> {
+                    dispatchService.deleteDispatch(1L);
+                });
+
+                assertEquals("Dispatch with ID 1 not found", exception.getMessage());
+
+                // Verify interactions
+                verify(dispatchRepo, times(1)).findById(1L);
+                verify(dispatchRepo, never()).delete(any());
+            }
         }
 
     }
@@ -656,5 +868,5 @@ class DispatchServiceImplTest {
                 .toList();
     }
 
-    }
+
 }

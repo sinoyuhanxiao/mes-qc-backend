@@ -1,6 +1,8 @@
 package com.fps.svmes.controllers;
 
 
+import com.fps.svmes.dto.requests.DispatchRequest;
+import com.fps.svmes.dto.responses.ResponseResult;
 import com.fps.svmes.models.sql.task_schedule.Dispatch;
 import com.fps.svmes.services.DispatchService;
 import jakarta.validation.Valid;
@@ -14,61 +16,54 @@ import java.util.List;
  * REST Controller for managing dispatch configurations.
  */
 @RestController
-@RequestMapping("/api/dispatches")
+@RequestMapping("/dispatch")
 public class DispatchController {
 
     @Autowired
     private DispatchService dispatchService;
 
-    /**
-     * Creates a new dispatch configuration.
-     */
     @PostMapping
-    public ResponseEntity<Dispatch> createDispatch(@RequestBody @Valid Dispatch dispatch) {
-        Dispatch createdDispatch = dispatchService.createDispatch(dispatch);
-        return ResponseEntity.status(201).body(createdDispatch);
+    public ResponseEntity<?> createDispatch(@RequestBody @Valid DispatchRequest request) {
+        Dispatch dispatch = dispatchService.createDispatch(request);
+        return ResponseEntity.ok(dispatch);
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<?> updateDispatch(@PathVariable Long id, @RequestBody @Valid DispatchRequest request) {
+        Dispatch updatedDispatch = dispatchService.updateDispatch(id, request);
+        return ResponseEntity.ok(updatedDispatch);
     }
 
     /**
-     * Retrieves all dispatch configurations.
+     * Delete a dispatch by ID.
+     * @param id The ID of the dispatch.
+     * @return Success message.
+     */
+    @DeleteMapping("/{id}")
+    public ResponseEntity<String> deleteDispatch(@PathVariable Long id) {
+        dispatchService.deleteDispatch(id);
+        return ResponseEntity.ok("Dispatch with ID " + id + " deleted successfully.");
+    }
+
+    /**
+     * Get a single dispatch by ID.
+     * @param id The ID of the dispatch.
+     * @return The Dispatch entity.
+     */
+    @GetMapping("/{id}")
+    public ResponseEntity<Dispatch> getDispatch(@PathVariable Long id) {
+        Dispatch dispatch = dispatchService.getDispatch(id);
+        return ResponseEntity.ok(dispatch);
+    }
+
+    /**
+     * Get all dispatch records.
+     * @return A list of all dispatch entities.
      */
     @GetMapping
     public ResponseEntity<List<Dispatch>> getAllDispatches() {
-        return ResponseEntity.ok(dispatchService.getAllDispatches());
-    }
-
-    /**
-     * Retrieves a specific dispatch configuration by ID.
-     */
-    @GetMapping("/{id}")
-    public ResponseEntity<Dispatch> getDispatchById(@PathVariable Long id) {
-        return dispatchService.getDispatchById(id)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
-    }
-
-    /**
-     * Updates an existing dispatch configuration.
-     */
-    @PutMapping("/{id}")
-    public ResponseEntity<Dispatch> updateDispatch(
-            @PathVariable Long id,
-            @RequestBody @Valid Dispatch dispatch) {
-        return dispatchService.updateDispatch(id, dispatch)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
-    }
-
-    /**
-     * Deletes a dispatch configuration by ID.
-     */
-    @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteDispatch(@PathVariable Long id) {
-        if (dispatchService.deleteDispatch(id)) {
-            return ResponseEntity.noContent().build();
-        } else {
-            return ResponseEntity.notFound().build();
-        }
+        List<Dispatch> dispatches = dispatchService.getAllDispatches();
+        return ResponseEntity.ok(dispatches);
     }
 
     /**

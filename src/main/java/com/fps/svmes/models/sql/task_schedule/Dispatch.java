@@ -1,5 +1,6 @@
 package com.fps.svmes.models.sql.task_schedule;
 
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -22,12 +23,15 @@ public class Dispatch {
     @Column(name = "id")
     private Long id;
 
+    @JsonManagedReference
     @OneToMany(mappedBy = "dispatch", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<DispatchPersonnel> dispatchPersonnel = new ArrayList<>();
 
+    @JsonManagedReference
     @OneToMany(mappedBy = "dispatch", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<DispatchForm> dispatchForms = new ArrayList<>();
 
+    @JsonManagedReference
     @OneToMany(mappedBy = "dispatch", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<DispatchDay> dispatchDays = new ArrayList<>();
 

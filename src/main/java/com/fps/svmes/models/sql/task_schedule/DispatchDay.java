@@ -1,5 +1,6 @@
 package com.fps.svmes.models.sql.task_schedule;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -15,6 +16,7 @@ public class DispatchDay {
 
     @ManyToOne
     @JoinColumn(name = "dispatch_id", nullable = false)
+    @JsonBackReference
     private Dispatch dispatch;
 
     @Column(name = "day", length = 10, nullable = false)

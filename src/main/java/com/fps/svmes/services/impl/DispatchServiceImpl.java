@@ -1,5 +1,6 @@
 package com.fps.svmes.services.impl;
 
+import com.fps.svmes.dto.dtos.dispatch.DispatchDTO;
 import com.fps.svmes.dto.requests.DispatchRequest;
 import com.fps.svmes.models.sql.task_schedule.*;
 import com.fps.svmes.repositories.jpaRepo.DispatchRepository;
@@ -14,7 +15,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.Optional;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -182,7 +182,7 @@ public class DispatchServiceImpl implements DispatchService {
     // DISPATCH CRUD LOGIC --------------------------------------------------------------------------
 
     @Transactional
-    public Dispatch createDispatch(DispatchRequest request) {
+    public DispatchDTO createDispatch(DispatchRequest request) {
         Dispatch dispatch = new Dispatch();
 
         // Base Dispatch Fields
@@ -198,14 +198,11 @@ public class DispatchServiceImpl implements DispatchService {
                 throw new IllegalArgumentException("SpecificDays and TimeOfDay must be provided for SPECIFIC_DAYS schedule");
             }
 
-            // Set specific days and time
             List<DispatchDay> days = request.getSpecificDays().stream()
                     .map(day -> new DispatchDay(dispatch, day))
                     .collect(Collectors.toList());
             dispatch.setDispatchDays(days);
             dispatch.setTimeOfDay(request.getTimeOfDay());
-
-            // Nullify interval-specific fields
             dispatch.setIntervalMinutes(null);
             dispatch.setRepeatCount(null);
         }
@@ -215,12 +212,9 @@ public class DispatchServiceImpl implements DispatchService {
             if (request.getIntervalMinutes() == null || request.getRepeatCount() == null) {
                 throw new IllegalArgumentException("IntervalMinutes and RepeatCount must be provided for INTERVAL schedule");
             }
-
-            // Set interval fields
             dispatch.setIntervalMinutes(request.getIntervalMinutes());
             dispatch.setRepeatCount(request.getRepeatCount());
-
-            // Nullify specific-day fields
+            dispatch.setStartTime(request.getStartTime());
             dispatch.setDispatchDays(null);
             dispatch.setTimeOfDay(null);
         }
@@ -229,7 +223,7 @@ public class DispatchServiceImpl implements DispatchService {
         if (request.getFormIds() != null) {
             List<DispatchForm> forms = request.getFormIds().stream()
                     .map(formId -> new DispatchForm(dispatch, formId))
-                    .collect(Collectors.toList());
+                    .toList();
             dispatch.setDispatchForms(forms);
         }
 
@@ -237,15 +231,17 @@ public class DispatchServiceImpl implements DispatchService {
         if (request.getPersonnelIds() != null) {
             List<DispatchPersonnel> personnel = request.getPersonnelIds().stream()
                     .map(userId -> new DispatchPersonnel(dispatch, userId.intValue()))
-                    .collect(Collectors.toList());
+                    .toList();
             dispatch.setDispatchPersonnel(personnel);
         }
 
-        return dispatchRepo.save(dispatch);
+        // Save entity and return DTO
+        Dispatch savedDispatch = dispatchRepo.save(dispatch);
+        return convertToDTO(savedDispatch);
     }
 
     @Transactional
-    public Dispatch updateDispatch(Long id, DispatchRequest request) {
+    public DispatchDTO updateDispatch(Long id, DispatchRequest request) {
         // 1. Fetch the existing dispatch
         Dispatch dispatch = dispatchRepo.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Dispatch with ID " + id + " not found"));
@@ -261,7 +257,7 @@ public class DispatchServiceImpl implements DispatchService {
                 throw new IllegalArgumentException("SpecificDays and TimeOfDay must be provided for SPECIFIC_DAYS schedule");
             }
 
-            // Set timeOfDay and clear/re-add specific days
+            // Update specificDays and timeOfDay
             dispatch.setTimeOfDay(request.getTimeOfDay());
             dispatch.getDispatchDays().clear();
             List<DispatchDay> days = request.getSpecificDays().stream()
@@ -269,9 +265,10 @@ public class DispatchServiceImpl implements DispatchService {
                     .toList();
             dispatch.getDispatchDays().addAll(days);
 
-            // Nullify interval fields
+            // Reset irrelevant fields
             dispatch.setIntervalMinutes(null);
             dispatch.setRepeatCount(null);
+            dispatch.setExecutedCount(0);
         }
         // 4. Update fields for INTERVAL schedule
         else if (request.getScheduleType() == DispatchRequest.ScheduleType.INTERVAL) {
@@ -279,9 +276,12 @@ public class DispatchServiceImpl implements DispatchService {
                 throw new IllegalArgumentException("IntervalMinutes and RepeatCount must be provided for INTERVAL schedule");
             }
 
-            // Set interval fields and clear specific days
+            // Set interval fields
             dispatch.setIntervalMinutes(request.getIntervalMinutes());
             dispatch.setRepeatCount(request.getRepeatCount());
+            dispatch.setExecutedCount(0); // Optionally reset executed count if interval is changed
+
+            // Reset irrelevant fields
             dispatch.setTimeOfDay(null);
             dispatch.getDispatchDays().clear();
         }
@@ -305,7 +305,8 @@ public class DispatchServiceImpl implements DispatchService {
         }
 
         // 7. Save and return the updated dispatch
-        return dispatchRepo.save(dispatch);
+        Dispatch updatedDispatch = dispatchRepo.save(dispatch);
+        return convertToDTO(updatedDispatch);
     }
 
 
@@ -314,17 +315,67 @@ public class DispatchServiceImpl implements DispatchService {
      * @param id The ID of the dispatch to fetch.
      * @return The Dispatch entity with all related entities (days, forms, personnel).
      */
-    public Dispatch getDispatch(Long id) {
-        return dispatchRepo.findById(id)
+    @Transactional(readOnly = true)
+    public DispatchDTO getDispatch(Long id) {
+        Dispatch dispatch = dispatchRepo.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Dispatch with ID " + id + " not found"));
+
+        DispatchDTO dto = new DispatchDTO();
+        dto.setId(dispatch.getId());
+        dto.setScheduleType(dispatch.getScheduleType());
+        dto.setTimeOfDay(dispatch.getTimeOfDay());
+        dto.setIntervalMinutes(dispatch.getIntervalMinutes());
+        dto.setRepeatCount(dispatch.getRepeatCount());
+        dto.setStartTime(dispatch.getStartTime()); // Set start_time
+        dto.setExecutedCount(dispatch.getExecutedCount()); // Set executed_count
+        dto.setActive(dispatch.getActive()); // Set active flag
+        dto.setCreatedAt(dispatch.getCreatedAt()); // Set created_at
+        dto.setUpdatedAt(dispatch.getUpdatedAt()); // Set updated_at
+
+        // Map related entities to DTO
+        dto.setDispatchDays(dispatch.getDispatchDays().stream()
+                .map(DispatchDay::getDay).toList());
+        dto.setFormIds(dispatch.getDispatchForms().stream()
+                .map(DispatchForm::getFormId).toList());
+        dto.setPersonnelIds(dispatch.getDispatchPersonnel().stream()
+                .map(personnel -> Long.valueOf(personnel.getUser().getId())).toList());
+
+        return dto;
     }
 
-    /**
-     * Fetch all dispatches with their relationships.
-     * @return A list of all Dispatch entities.
-     */
-    public List<Dispatch> getAllDispatches() {
-        return dispatchRepo.findAll();
+
+    @Transactional(readOnly = true)
+    public List<DispatchDTO> getAllDispatches() {
+        return dispatchRepo.findAll().stream().map(dispatch -> {
+            DispatchDTO dto = new DispatchDTO();
+
+            // Base fields
+            dto.setId(dispatch.getId());
+            dto.setScheduleType(dispatch.getScheduleType());
+            dto.setTimeOfDay(dispatch.getTimeOfDay());
+            dto.setIntervalMinutes(dispatch.getIntervalMinutes());
+            dto.setRepeatCount(dispatch.getRepeatCount());
+            dto.setStartTime(dispatch.getStartTime());
+            dto.setExecutedCount(dispatch.getExecutedCount());
+            dto.setActive(dispatch.getActive());
+            dto.setCreatedAt(dispatch.getCreatedAt());
+            dto.setUpdatedAt(dispatch.getUpdatedAt());
+
+            // Map related entities
+            dto.setDispatchDays(dispatch.getDispatchDays().stream()
+                    .map(DispatchDay::getDay)
+                    .collect(Collectors.toList()));
+
+            dto.setFormIds(dispatch.getDispatchForms().stream()
+                    .map(DispatchForm::getFormId)
+                    .collect(Collectors.toList()));
+
+            dto.setPersonnelIds(dispatch.getDispatchPersonnel().stream()
+                    .map(personnel -> Long.valueOf(personnel.getUser().getId()))
+                    .collect(Collectors.toList()));
+
+            return dto;
+        }).collect(Collectors.toList());
     }
 
 
@@ -346,37 +397,40 @@ public class DispatchServiceImpl implements DispatchService {
 
     // HELPER METHODS --------------------------------------------------------------------------
 
-    private void saveRelatedEntities(Dispatch savedDispatch, Dispatch originalDispatch) {
-        // Save middle table relationships for DispatchDays
-        if (originalDispatch.getDispatchDays() != null) {
-            savedDispatch.setDispatchDays(originalDispatch.getDispatchDays()
-                    .stream()
-                    .map(day -> new DispatchDay(savedDispatch, day.getDay()))
-                    .collect(Collectors.toList()));
-        } else {
-            savedDispatch.setDispatchDays(List.of());
+    private DispatchDTO convertToDTO(Dispatch dispatch) {
+        DispatchDTO dto = new DispatchDTO();
+        dto.setId(dispatch.getId());
+        dto.setScheduleType(dispatch.getScheduleType());
+        dto.setIntervalMinutes(dispatch.getIntervalMinutes());
+        dto.setRepeatCount(dispatch.getRepeatCount());
+        dto.setStartTime(dispatch.getStartTime());
+        dto.setTimeOfDay(dispatch.getTimeOfDay());
+        dto.setActive(dispatch.getActive());
+
+        // Convert DispatchDays to specificDays
+        if (dispatch.getDispatchDays() != null) {
+            dto.setDispatchDays(dispatch.getDispatchDays().stream()
+                    .map(DispatchDay::getDay)
+                    .toList());
         }
 
-        // Save middle table relationships for DispatchForms
-        if (originalDispatch.getDispatchForms() != null) {
-            savedDispatch.setDispatchForms(originalDispatch.getDispatchForms()
-                    .stream()
-                    .map(form -> new DispatchForm(savedDispatch, form.getFormId()))
-                    .collect(Collectors.toList()));
-        } else {
-            savedDispatch.setDispatchForms(List.of());
+        // Convert DispatchForms to formIds
+        if (dispatch.getDispatchForms() != null) {
+            dto.setFormIds(dispatch.getDispatchForms().stream()
+                    .map(DispatchForm::getFormId)
+                    .toList());
         }
 
-        // Save middle table relationships for DispatchPersonnel
-        if (originalDispatch.getDispatchPersonnel() != null) {
-            savedDispatch.setDispatchPersonnel(originalDispatch.getDispatchPersonnel()
-                    .stream()
-                    .map(personnel -> new DispatchPersonnel(savedDispatch, personnel.getUser().getId()))
-                    .collect(Collectors.toList()));
-        } else {
-            savedDispatch.setDispatchPersonnel(List.of());
+        // Convert DispatchPersonnel to personnelIds
+        if (dispatch.getDispatchPersonnel() != null) {
+            dto.setPersonnelIds(dispatch.getDispatchPersonnel().stream()
+                    .map(personnel -> Long.valueOf(personnel.getUser().getId()))
+                    .toList());
         }
+
+        return dto;
     }
+
 
     private LocalDateTime getSpecificDaysDispatchTime(Dispatch dispatch) {
         if (dispatch.getTimeOfDay() == null || dispatch.getTimeOfDay().isEmpty()) {

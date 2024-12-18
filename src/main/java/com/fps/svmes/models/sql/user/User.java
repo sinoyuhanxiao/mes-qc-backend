@@ -3,6 +3,7 @@ package com.fps.svmes.models.sql.user;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.Getter;
 
 @Entity
 @Table(name = "user", schema = "quality_management")
@@ -25,5 +26,13 @@ public class User {
     @JsonProperty("wecom_id")
     @Column(name = "wecom_id")
     private String wecomId;
+
+    @JsonProperty("username")
+    @Column(name = "username")
+    private String username;
+
+    @JsonProperty("password")
+    @Column(name = "password")
+    private String password;
 
 }

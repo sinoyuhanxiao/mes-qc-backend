@@ -17,4 +17,10 @@ public class UserDTO {
 
     @JsonProperty("wecom_id")
     private String wecomId;
+
+    @JsonProperty("username")
+    private String username;
+
+    @JsonProperty("password")
+    private String password;
 }

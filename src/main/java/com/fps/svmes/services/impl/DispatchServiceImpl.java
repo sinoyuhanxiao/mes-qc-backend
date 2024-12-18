@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -36,19 +37,25 @@ public class DispatchServiceImpl implements DispatchService {
     // TEST DISPATCH SCHEDULING LOGIC --------------------------------------------------------------------------
 
     @Transactional
-    @Override
     @Scheduled(fixedRate = 60000) // Run every 60 seconds
+    @Override
     public void scheduleDispatches() {
         logger.info("Running scheduled dispatches check.");
         List<Dispatch> activeDispatches = dispatchRepo.findByActiveTrue();
         LocalDateTime now = LocalDateTime.now();
 
         for (Dispatch dispatch : activeDispatches) {
-            if (shouldDispatch(dispatch, now)) {
-                logger.info("Dispatch {} is scheduled for execution.", dispatch.getId());
-                executeDispatch(dispatch.getId());
-            } else {
-                logger.debug("Dispatch {} skipped: Not eligible for execution at {}", dispatch.getId(), now);
+            try {
+                if (shouldDispatch(dispatch, now)) {
+                    logger.info("Dispatch {} is scheduled for execution.", dispatch.getId());
+                    executeDispatch(dispatch.getId());
+                } else {
+                    logger.debug("Dispatch {} skipped: Not eligible for execution at {}", dispatch.getId(), now);
+                }
+            } catch (IllegalStateException e) {
+                logger.warn("Skipping dispatch {} due to configuration issue: {}", dispatch.getId(), e.getMessage());
+            } catch (Exception e) {
+                logger.error("Error processing dispatch {}: {}", dispatch.getId(), e.getMessage(), e);
             }
         }
     }
@@ -62,42 +69,60 @@ public class DispatchServiceImpl implements DispatchService {
             return false;
         }
 
-        if (scheduleType == ScheduleType.SPECIFIC_DAYS) {
-            String currentDay = now.getDayOfWeek().name();
-            String currentTime = now.format(DateTimeFormatter.ofPattern("HH:mm"));
-
-            // Check if specific days list is null or empty
-            List<DispatchDay> specificDays = dispatch.getDispatchDays();
-            if (specificDays == null || specificDays.isEmpty()) {
-                logger.warn("Dispatch {} has no specific days configured.", dispatch.getId());
+        switch (scheduleType) {
+            case SPECIFIC_DAYS -> {
+                return checkSpecificDaysSchedule(dispatch, now);
+            }
+            case INTERVAL -> {
+                return checkIntervalSchedule(dispatch, now);
+            }
+            default -> {
+                logger.warn("Unsupported schedule type for dispatch {}: {}", dispatch.getId(), scheduleType);
                 return false;
             }
-            boolean shouldDispatch = specificDays.stream()
-                    .anyMatch(day -> day.getDay().equalsIgnoreCase(currentDay)) &&
-                    currentTime.equals(dispatch.getTimeOfDay());
-
-            logger.debug("Dispatch {} shouldDispatch result: {}", dispatch.getId(), shouldDispatch);
-            return shouldDispatch;
-
-        } else if (scheduleType == ScheduleType.INTERVAL) {
-            if (dispatch.getIntervalMinutes() == null || dispatch.getStartTime() == null) {
-                logger.warn("Dispatch {} has missing interval configuration.", dispatch.getId());
-                return false;
-            }
-
-            if (dispatch.getRepeatCount() != null &&
-                    dispatch.getExecutedCount() >= dispatch.getRepeatCount()) {
-                logger.info("Dispatch {} already executed maximum times: {}", dispatch.getId(), dispatch.getRepeatCount());
-                return false;
-            }
-
-            LocalDateTime nextDispatchTime = dispatch.getStartTime().plusMinutes(
-                    (long) dispatch.getIntervalMinutes() * dispatch.getExecutedCount());
-            boolean shouldDispatch = !now.isBefore(nextDispatchTime);
-            logger.debug("Dispatch {} next execution time: {}, shouldDispatch result: {}", dispatch.getId(), nextDispatchTime, shouldDispatch);
-            return shouldDispatch;
         }
-        return false;
+    }
+
+    private boolean checkSpecificDaysSchedule(Dispatch dispatch, LocalDateTime now) {
+        String currentDay = now.getDayOfWeek().name();
+        String currentTime = now.format(DateTimeFormatter.ofPattern("HH:mm"));
+
+        List<DispatchDay> specificDays = dispatch.getDispatchDays();
+        if (specificDays == null || specificDays.isEmpty()) {
+            logger.warn("Dispatch {} has no specific days configured.", dispatch.getId());
+            return false;
+        }
+
+        boolean shouldDispatch = specificDays.stream()
+                .anyMatch(day -> day.getDay().equalsIgnoreCase(currentDay)) &&
+                currentTime.equals(dispatch.getTimeOfDay());
+
+        logger.debug("Dispatch {} shouldDispatch result: {}", dispatch.getId(), shouldDispatch);
+        return shouldDispatch;
+    }
+
+    private boolean checkIntervalSchedule(Dispatch dispatch, LocalDateTime now) {
+        if (dispatch.getIntervalMinutes() == null || dispatch.getStartTime() == null) {
+            logger.warn("Dispatch {} has missing interval configuration.", dispatch.getId());
+            return false;
+        }
+
+        if (dispatch.getRepeatCount() != null &&
+                dispatch.getExecutedCount() >= dispatch.getRepeatCount()) {
+            // Deactivate the dispatch if it has reached its max executions
+            dispatch.setActive(false);
+            dispatch.setUpdatedAt(LocalDateTime.now());
+            dispatchRepo.save(dispatch);
+            logger.info("Dispatch {} deactivated: Executed maximum times.", dispatch.getId());
+            return false;
+        }
+
+        LocalDateTime nextDispatchTime = dispatch.getStartTime().plusMinutes(
+                (long) dispatch.getIntervalMinutes() * dispatch.getExecutedCount());
+        boolean shouldDispatch = !now.isBefore(nextDispatchTime);
+
+        logger.debug("Dispatch {} next execution time: {}, shouldDispatch result: {}", dispatch.getId(), nextDispatchTime, shouldDispatch);
+        return shouldDispatch;
     }
 
     @Transactional
@@ -106,57 +131,88 @@ public class DispatchServiceImpl implements DispatchService {
         Dispatch dispatch = dispatchRepo.findById(dispatchId).orElseThrow();
         logger.info("Executing dispatch {}.", dispatchId);
 
-        // Validate and fetch personnel list
+        try {
+            // Validate interval-specific fields
+            if (isIntervalSchedule(dispatch)) {
+                if (dispatch.getStartTime() == null || dispatch.getIntervalMinutes() == null) {
+                    throw new IllegalStateException("Invalid INTERVAL configuration: Missing start time or interval minutes.");
+                }
+            }
+
+            // Validate and fetch personnel and forms
+            List<Integer> personnelList = validateAndGetPersonnel(dispatch, dispatchId);
+            List<Long> formIds = validateAndGetForms(dispatch, dispatchId);
+
+            // Simulate incremented count for calculation but avoid persistence yet
+            int simulatedExecutedCount = dispatch.getExecutedCount();
+            if (isIntervalSchedule(dispatch)) {
+                simulatedExecutedCount++; // Simulate increment for dispatch calculation
+            }
+
+            // Determine dispatch time
+            LocalDateTime calculatedDispatchTime = calculateDispatchTime(dispatch, simulatedExecutedCount);
+
+            logger.debug("Dispatch {} calculated dispatch time: {}", dispatchId, calculatedDispatchTime);
+
+            // Create dispatched tests
+            List<DispatchedTest> dispatchedTests = formIds.stream()
+                    .flatMap(formId -> personnelList.stream()
+                            .map(personnelId -> createDispatchedTest(dispatch, formId, personnelId, calculatedDispatchTime)))
+                    .toList();
+
+            // Save dispatched tests
+            testRepo.saveAll(dispatchedTests);
+            logger.info("Dispatch {} created {} tests.", dispatchId, dispatchedTests.size());
+
+            // Send notifications
+            dispatchedTests.forEach(test -> simulateNotification(
+                    test.getPersonnelId().intValue(),
+                    generateFormUrl(test.getPersonnelId().intValue(), test.getFormId())
+            ));
+
+            // Persist incremented executed count
+            if (isIntervalSchedule(dispatch)) {
+                incrementExecutedCount(dispatch); // Increment persisted value
+            }
+        } catch (IllegalStateException e) {
+            logger.warn("Skipping execution of dispatch {}: {}", dispatchId, e.getMessage());
+        }
+    }
+
+    private List<Integer> validateAndGetPersonnel(Dispatch dispatch, Long dispatchId) {
         List<DispatchPersonnel> personnel = dispatch.getDispatchPersonnel();
         if (personnel == null || personnel.isEmpty()) {
             logger.warn("Dispatch {} skipped: Personnel list is null or empty.", dispatchId);
-            return;
+            throw new IllegalStateException("Personnel list is required.");
         }
-        List<Integer> personnelList = personnel.stream()
+        return personnel.stream()
                 .map(dp -> dp.getUser().getId())
                 .toList();
+    }
 
-        // Validate and fetch form list
+    private List<Long> validateAndGetForms(Dispatch dispatch, Long dispatchId) {
         List<DispatchForm> forms = dispatch.getDispatchForms();
         if (forms == null || forms.isEmpty()) {
             logger.warn("Dispatch {} skipped: Forms list is null or empty.", dispatchId);
-            return;
+            throw new IllegalStateException("Forms list is required.");
         }
-        List<Long> formIds = forms.stream()
+        return forms.stream()
                 .map(DispatchForm::getFormId)
                 .toList();
+    }
 
-        // Determine dispatch time based on schedule type
-        LocalDateTime calculatedDispatchTime;
+    private LocalDateTime calculateDispatchTime(Dispatch dispatch, int simulatedExecutedCount) {
         if (isIntervalSchedule(dispatch)) {
-            calculatedDispatchTime = calculateDispatchTime(dispatch);
+            if (dispatch.getStartTime() == null || dispatch.getIntervalMinutes() == null) {
+                throw new IllegalStateException("Invalid INTERVAL configuration: Missing start time or interval minutes.");
+            }
+            return dispatch.getStartTime().plusMinutes(
+                    (long) dispatch.getIntervalMinutes() * simulatedExecutedCount);
         } else {
             if (dispatch.getTimeOfDay() == null || dispatch.getTimeOfDay().trim().isEmpty()) {
                 throw new IllegalStateException("Time of day is missing for SPECIFIC_DAYS schedule.");
             }
-            calculatedDispatchTime = getSpecificDaysDispatchTime(dispatch);
-        }
-        logger.debug("Dispatch {} calculated dispatch time: {}", dispatchId, calculatedDispatchTime);
-
-        // Create dispatched tests
-        List<DispatchedTest> dispatchedTests = formIds.stream()
-                .flatMap(formId -> personnelList.stream()
-                        .map(personnelId -> createDispatchedTest(dispatch, formId, personnelId, calculatedDispatchTime)))
-                .toList();
-
-        // Batch save dispatched tests
-        testRepo.saveAll(dispatchedTests);
-        logger.info("Dispatch {} created {} tests.", dispatchId, dispatchedTests.size());
-
-        // Send notifications
-        dispatchedTests.forEach(test -> simulateNotification(
-                test.getPersonnelId().intValue(),
-                generateFormUrl(test.getPersonnelId().intValue(), test.getFormId())
-        ));
-
-        // Increment executed count only for INTERVAL schedule
-        if (isIntervalSchedule(dispatch)) {
-            incrementExecutedCount(dispatch);
+            return LocalDateTime.now().with(LocalTime.parse(dispatch.getTimeOfDay()));
         }
     }
 
@@ -440,13 +496,6 @@ public class DispatchServiceImpl implements DispatchService {
         return ScheduleType.INTERVAL.name().equals(dispatch.getScheduleType());
     }
 
-    private LocalDateTime calculateDispatchTime(Dispatch dispatch) {
-        if (dispatch.getStartTime() == null || dispatch.getIntervalMinutes() == null) {
-            throw new IllegalStateException("Invalid INTERVAL configuration: Missing start time or interval minutes.");
-        }
-        int nextExecutedCount = dispatch.getExecutedCount() + 1; // Use the next count
-        return dispatch.getStartTime().plusMinutes((long) dispatch.getIntervalMinutes() * nextExecutedCount);
-    }
 
     // Create a single DispatchedTest object
     private DispatchedTest createDispatchedTest(Dispatch dispatch, Long formId, Integer personnelId, LocalDateTime dispatchTime) {

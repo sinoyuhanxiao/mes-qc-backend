@@ -81,41 +81,57 @@ class DispatchServiceImplTest {
         }
 
         @Test
-        @DisplayName("Should throw exception for missing timeOfDay in SPECIFIC_DAYS")
+        @DisplayName("Should skip execution for missing timeOfDay in SPECIFIC_DAYS")
         void testExecuteDispatchSpecificDaysWithNullTimeOfDay() {
             Long dispatchId = 7L;
 
-            Dispatch mockDispatch = createSpecificDaysDispatch(dispatchId, "MONDAY", null);
+            Dispatch mockDispatch = createSpecificDaysDispatch(dispatchId, "MONDAY", null); // Null timeOfDay
             mockDispatch.setDispatchPersonnel(createPersonnel(mockDispatch, 201));
             mockDispatch.setDispatchForms(createForms(mockDispatch, 101L));
 
             when(dispatchRepo.findById(dispatchId)).thenReturn(Optional.of(mockDispatch));
 
-            Exception exception = assertThrows(IllegalStateException.class, () -> dispatchService.executeDispatch(dispatchId));
+            // Act
+            dispatchService.executeDispatch(dispatchId);
 
-            assertEquals("Time of day is missing for SPECIFIC_DAYS schedule.", exception.getMessage());
+            // Assert: Ensure no tests are saved, and dispatch is not updated
             verify(testRepo, never()).saveAll(any());
+            verify(dispatchRepo, never()).save(mockDispatch);
         }
 
         @Test
         @DisplayName("Should create correct dispatch time for interval-based dispatch")
         void testExecuteDispatchIntervalCreatesCorrectDispatchTime() {
             Long dispatchId = 1L;
-
-            Dispatch mockDispatch = getIntervalDispatch(dispatchId, 2, 15);
+            int original_count = 15;
+            // Arrange: Interval-based dispatch with start time and interval configuration
+            Dispatch mockDispatch = getIntervalDispatch(dispatchId, original_count, 2);
             mockDispatch.setDispatchPersonnel(createPersonnel(mockDispatch, 201, 202));
             mockDispatch.setDispatchForms(createForms(mockDispatch, 101L, 102L));
 
             when(dispatchRepo.findById(dispatchId)).thenReturn(Optional.of(mockDispatch));
 
+            // Capture the current executed count for the calculation
+            int simulatedExecutedCount = mockDispatch.getExecutedCount() + 1;
+
+            // Act
             dispatchService.executeDispatch(dispatchId);
 
+            // Assert: Verify that the correct dispatch time is used
             verify(testRepo, times(1)).saveAll(argThat(tests -> {
                 List<DispatchedTest> testList = (List<DispatchedTest>) tests;
+
+                // Calculate the expected time using the simulated count
                 LocalDateTime expectedTime = mockDispatch.getStartTime()
-                        .plusMinutes((long) mockDispatch.getIntervalMinutes() * mockDispatch.getExecutedCount());
+                        .plusMinutes((long) mockDispatch.getIntervalMinutes() * simulatedExecutedCount);
+
+                // Ensure all dispatched tests have the correct `dispatchTime`
                 return testList.stream().allMatch(test -> expectedTime.equals(test.getDispatchTime()));
             }));
+
+            // Ensure executedCount is incremented after successful execution
+            assertEquals(original_count + 1, mockDispatch.getExecutedCount());
+
         }
 
         @Test
@@ -133,46 +149,27 @@ class DispatchServiceImplTest {
         }
 
         @Test
-        @DisplayName("Execute Dispatch Interval With Missing Start Time")
+        @DisplayName("Should skip execution for interval-based dispatch with missing start time")
         void testExecuteDispatchIntervalWithMissingStartTime() {
-            // Arrange
             Long dispatchId = 3L;
 
-            // Create a mock Dispatch with missing start time
+            // Arrange: Create an interval-based dispatch missing start time
             Dispatch mockDispatch = new Dispatch();
             mockDispatch.setId(dispatchId);
             mockDispatch.setScheduleType("INTERVAL");
             mockDispatch.setIntervalMinutes(15);
             mockDispatch.setExecutedCount(0);
             mockDispatch.setStartTime(null); // Missing start time
-            List<DispatchPersonnel> personnelList = List.of(
-                    new DispatchPersonnel(mockDispatch, 201),
-                    new DispatchPersonnel(mockDispatch, 202)
-            );
+            mockDispatch.setDispatchPersonnel(createPersonnel(mockDispatch, 201, 202));
+            mockDispatch.setDispatchForms(createForms(mockDispatch, 101L, 102L));
 
-            // Add sample forms to DispatchForm list
-            List<DispatchForm> formList = List.of(
-                    new DispatchForm(mockDispatch, 101L),
-                    new DispatchForm(mockDispatch, 102L)
-            );
-
-            // Assign personnel and forms to mockDispatch
-            mockDispatch.setDispatchPersonnel(personnelList);
-            mockDispatch.setDispatchForms(formList);
-
-            // Mock repository behavior
             when(dispatchRepo.findById(dispatchId)).thenReturn(Optional.of(mockDispatch));
 
-            // Act & Assert
-            Exception exception = assertThrows(IllegalStateException.class, () -> dispatchService.executeDispatch(dispatchId));
+            // Act
+            dispatchService.executeDispatch(dispatchId);
 
-            // Verify exception message
-            assertEquals("Invalid INTERVAL configuration: Missing start time or interval minutes.", exception.getMessage());
-
-            // Verify that no tests are created
-            verify(testRepo, never()).save(any(DispatchedTest.class));
-
-            // Verify that the Dispatch entity is not updated
+            // Assert: Ensure no tests are saved, and dispatch is not updated
+            verify(testRepo, never()).saveAll(any());
             verify(dispatchRepo, never()).save(mockDispatch);
         }
 
@@ -349,7 +346,7 @@ class DispatchServiceImplTest {
         }
 
         @Test
-        @DisplayName("Should throw exception for empty timeOfDay in SPECIFIC_DAYS")
+        @DisplayName("Should skip execution for empty timeOfDay in SPECIFIC_DAYS")
         void testExecuteDispatchSpecificDaysWithEmptyTimeOfDay() {
             Long dispatchId = 9L;
 
@@ -360,14 +357,15 @@ class DispatchServiceImplTest {
 
             when(dispatchRepo.findById(dispatchId)).thenReturn(Optional.of(mockDispatch));
 
-            // Act & Assert: Ensure the exception is thrown for empty timeOfDay
-            Exception exception = assertThrows(IllegalStateException.class, () -> dispatchService.executeDispatch(dispatchId));
+            // Act
+            dispatchService.executeDispatch(dispatchId);
 
-            // Verify the expected exception and message
-            assertEquals("Time of day is missing for SPECIFIC_DAYS schedule.", exception.getMessage());
-
-            // Ensure no tests are saved
+            // Assert: Ensure no tests are saved, and dispatch is not updated
             verify(testRepo, never()).saveAll(any());
+            verify(dispatchRepo, never()).save(mockDispatch);
+
+            // Verify log output for the skipped dispatch (if logging is testable)
+            // This can be done with a logging framework like LogCaptor or custom log testing.
         }
     }
 

@@ -179,43 +179,6 @@ public class DispatchServiceImpl implements DispatchService {
         }
     }
 
-    private List<Integer> validateAndGetPersonnel(Dispatch dispatch, Long dispatchId) {
-        List<DispatchPersonnel> personnel = dispatch.getDispatchPersonnel();
-        if (personnel == null || personnel.isEmpty()) {
-            logger.warn("Dispatch {} skipped: Personnel list is null or empty.", dispatchId);
-            throw new IllegalStateException("Personnel list is required.");
-        }
-        return personnel.stream()
-                .map(dp -> dp.getUser().getId())
-                .toList();
-    }
-
-    private List<Long> validateAndGetForms(Dispatch dispatch, Long dispatchId) {
-        List<DispatchForm> forms = dispatch.getDispatchForms();
-        if (forms == null || forms.isEmpty()) {
-            logger.warn("Dispatch {} skipped: Forms list is null or empty.", dispatchId);
-            throw new IllegalStateException("Forms list is required.");
-        }
-        return forms.stream()
-                .map(DispatchForm::getFormId)
-                .toList();
-    }
-
-    private LocalDateTime calculateDispatchTime(Dispatch dispatch, int simulatedExecutedCount) {
-        if (isIntervalSchedule(dispatch)) {
-            if (dispatch.getStartTime() == null || dispatch.getIntervalMinutes() == null) {
-                throw new IllegalStateException("Invalid INTERVAL configuration: Missing start time or interval minutes.");
-            }
-            return dispatch.getStartTime().plusMinutes(
-                    (long) dispatch.getIntervalMinutes() * simulatedExecutedCount);
-        } else {
-            if (dispatch.getTimeOfDay() == null || dispatch.getTimeOfDay().trim().isEmpty()) {
-                throw new IllegalStateException("Time of day is missing for SPECIFIC_DAYS schedule.");
-            }
-            return LocalDateTime.now().with(LocalTime.parse(dispatch.getTimeOfDay()));
-        }
-    }
-
     @Override
     public boolean manualDispatch(Long id) {
         if (dispatchRepo.existsById(id)) {
@@ -477,20 +440,43 @@ public class DispatchServiceImpl implements DispatchService {
         return dto;
     }
 
-
-    private LocalDateTime getSpecificDaysDispatchTime(Dispatch dispatch) {
-        if (dispatch.getTimeOfDay() == null || dispatch.getTimeOfDay().isEmpty()) {
-            throw new IllegalStateException("Time of day is missing for SPECIFIC_DAYS schedule.");
+    private List<Integer> validateAndGetPersonnel(Dispatch dispatch, Long dispatchId) {
+        List<DispatchPersonnel> personnel = dispatch.getDispatchPersonnel();
+        if (personnel == null || personnel.isEmpty()) {
+            logger.warn("Dispatch {} skipped: Personnel list is null or empty.", dispatchId);
+            throw new IllegalStateException("Personnel list is required.");
         }
-
-        LocalDateTime now = LocalDateTime.now();
-        String[] timeParts = dispatch.getTimeOfDay().split(":");
-
-        return now.withHour(Integer.parseInt(timeParts[0]))
-                .withMinute(Integer.parseInt(timeParts[1]))
-                .withSecond(0)
-                .withNano(0);
+        return personnel.stream()
+                .map(dp -> dp.getUser().getId())
+                .toList();
     }
+
+    private List<Long> validateAndGetForms(Dispatch dispatch, Long dispatchId) {
+        List<DispatchForm> forms = dispatch.getDispatchForms();
+        if (forms == null || forms.isEmpty()) {
+            logger.warn("Dispatch {} skipped: Forms list is null or empty.", dispatchId);
+            throw new IllegalStateException("Forms list is required.");
+        }
+        return forms.stream()
+                .map(DispatchForm::getFormId)
+                .toList();
+    }
+
+    private LocalDateTime calculateDispatchTime(Dispatch dispatch, int simulatedExecutedCount) {
+        if (isIntervalSchedule(dispatch)) {
+            if (dispatch.getStartTime() == null || dispatch.getIntervalMinutes() == null) {
+                throw new IllegalStateException("Invalid INTERVAL configuration: Missing start time or interval minutes.");
+            }
+            return dispatch.getStartTime().plusMinutes(
+                    (long) dispatch.getIntervalMinutes() * simulatedExecutedCount);
+        } else {
+            if (dispatch.getTimeOfDay() == null || dispatch.getTimeOfDay().trim().isEmpty()) {
+                throw new IllegalStateException("Time of day is missing for SPECIFIC_DAYS schedule.");
+            }
+            return LocalDateTime.now().with(LocalTime.parse(dispatch.getTimeOfDay()));
+        }
+    }
+
 
     private boolean isIntervalSchedule(Dispatch dispatch) {
         return ScheduleType.INTERVAL.name().equals(dispatch.getScheduleType());
@@ -536,34 +522,4 @@ public class DispatchServiceImpl implements DispatchService {
         logger.info("Simulating notification to Personnel ID: {} with Form URL: {}", personnelId, formUrl);
     }
 
-    // FOR LATER WECOM
-    //    /**
-    //     * Sends a WeChat notification to the personnel with the form URL.
-    //     *
-    //     * @param personnelId the ID of the personnel
-    //     * @param formUrl the URL of the form
-    //     */
-    //    private void notifyPersonnel(Long personnelId, String formUrl) {
-    //        String url = wechatApiUrl + "/cgi-bin/message/template/send?access_token=" + wechatAccessToken;
-    //        RestTemplate restTemplate = new RestTemplate();
-    //
-    //        var payload = new java.util.HashMap<String, Object>();
-    //        payload.put("touser", "wechat-id-for-personnel-" + personnelId); // Replace with actual retrieval of WeChat ID
-    //
-    //        payload.put("template_id", wechatTemplateId);
-    //        payload.put("url", formUrl);
-    //        payload.put("data", java.util.Map.of(
-    //                "first", java.util.Map.of("value", "You have a new QC test assignment."),
-    //                "keyword1", java.util.Map.of("value", "Form Link"),
-    //                "keyword2", java.util.Map.of("value", "High Priority"),
-    //                "remark", java.util.Map.of("value", "Please complete it as soon as possible.")
-    //        ));
-    //
-    //        try {
-    //            restTemplate.postForObject(url, payload, String.class);
-    //            System.out.println("WeChat notification sent for Personnel ID: " + personnelId);
-    //        } catch (Exception e) {
-    //            System.err.println("Failed to send WeChat notification: " + e.getMessage());
-    //        }
-    //    }
 }

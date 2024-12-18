@@ -558,9 +558,7 @@ class DispatchServiceImplTest {
                 request.setTimeOfDay(null);
 
                 // Expect exception
-                IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
-                    dispatchService.createDispatch(request);
-                });
+                IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> dispatchService.createDispatch(request));
 
                 assertEquals("SpecificDays and TimeOfDay must be provided for SPECIFIC_DAYS schedule", exception.getMessage());
             }
@@ -575,9 +573,7 @@ class DispatchServiceImplTest {
                 request.setRepeatCount(null);
 
                 // Expect exception
-                IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
-                    dispatchService.createDispatch(request);
-                });
+                IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> dispatchService.createDispatch(request));
 
                 assertEquals("IntervalMinutes and RepeatCount must be provided for INTERVAL schedule", exception.getMessage());
             }
@@ -623,8 +619,7 @@ class DispatchServiceImplTest {
 
                 when(dispatchRepo.findById(1L)).thenReturn(Optional.of(existingDispatch));
                 when(dispatchRepo.save(any(Dispatch.class))).thenAnswer(invocation -> {
-                    Dispatch dispatch = invocation.getArgument(0);
-                    return dispatch;
+                    return invocation.<Dispatch>getArgument(0);
                 });
 
                 DispatchDTO updatedDispatchDTO = dispatchService.updateDispatch(1L, request);

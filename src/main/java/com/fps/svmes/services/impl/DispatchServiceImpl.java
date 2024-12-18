@@ -33,16 +33,6 @@ public class DispatchServiceImpl implements DispatchService {
     private DispatchedTestRepository testRepo;
     private static final Logger logger = LoggerFactory.getLogger(DispatchServiceImpl.class);
 
-    // FOR WECOM NOTIFICATION LATER
-    //    @Value("${wechat.api.url}")
-    //    private String wechatApiUrl;
-    //
-    //    @Value("${wechat.access.token}")
-    //    private String wechatAccessToken;
-    //
-    //    @Value("${wechat.template.id}")
-    //    private String wechatTemplateId;
-
     // TEST DISPATCH SCHEDULING LOGIC --------------------------------------------------------------------------
 
     @Transactional

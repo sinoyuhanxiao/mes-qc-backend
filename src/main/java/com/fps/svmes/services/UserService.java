@@ -13,4 +13,8 @@ public interface UserService {
     UserDTO updateUser(Integer id, UserDTO userDTO);
 
     void deleteUser(Integer id);
+
+    boolean validateCredentials(String username, String password);
+
+    UserDTO getUserByUsername(String username);
 }

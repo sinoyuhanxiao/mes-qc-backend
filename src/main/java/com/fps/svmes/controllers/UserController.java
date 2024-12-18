@@ -10,10 +10,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.net.Inet4Address;
 import java.util.List;
 
 @RestController
@@ -81,4 +79,46 @@ public class UserController {
             return ResponseResult.fail("Error deleting QC user", e);
         }
     }
+
+    // POST - Validate username and password
+    @PostMapping("/validate")
+    @Operation(summary = "Validate User Credentials", description = "Validates the provided username and password")
+    public ResponseResult<String> validateUser(@RequestParam String username, @RequestParam String password) {
+        try {
+            boolean isValid = userService.validateCredentials(username, password);
+
+            if (isValid) {
+                logger.info("User validation successful for username: {}", username);
+                return ResponseResult.success("User validated successfully");
+            } else {
+                logger.warn("Invalid credentials for username: {}", username);
+                return ResponseResult.fail("Invalid username or password");
+            }
+        } catch (Exception e) {
+            logger.error("Error validating user credentials", e);
+            return ResponseResult.fail("Error validating user credentials", e);
+        }
+    }
+
+    // New Method - Get User Information by Username
+    @GetMapping("/info")
+    @Operation(summary = "Get User Information", description = "Fetches user information by username")
+    public ResponseResult<UserDTO> getUserByUsername(@RequestParam String username) {
+        try {
+            UserDTO userDTO = userService.getUserByUsername(username);
+
+            if (userDTO != null) {
+                logger.info("User information retrieved for username: {}", username);
+                return ResponseResult.success(userDTO);
+            } else {
+                logger.warn("No user found with username: {}", username);
+                return ResponseResult.fail("User not found");
+            }
+        } catch (Exception e) {
+            logger.error("Error retrieving user information for username: {}", username, e);
+            return ResponseResult.fail("Error retrieving user information", e);
+        }
+    }
+
+
 }

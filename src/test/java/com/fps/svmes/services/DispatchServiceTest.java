@@ -6,8 +6,8 @@ import static org.mockito.Mockito.*;
 import com.fps.svmes.dto.dtos.dispatch.DispatchDTO;
 import com.fps.svmes.dto.requests.DispatchRequest;
 import com.fps.svmes.models.sql.task_schedule.*;
-import com.fps.svmes.repositories.jpaRepo.DispatchRepository;
-import com.fps.svmes.repositories.jpaRepo.DispatchedTestRepository;
+import com.fps.svmes.repositories.jpaRepo.dispatch.DispatchRepository;
+import com.fps.svmes.repositories.jpaRepo.dispatch.DispatchedTestRepository;
 import com.fps.svmes.services.impl.DispatchServiceImpl;
 
 import jakarta.persistence.EntityNotFoundException;

@@ -1,7 +1,7 @@
 package com.fps.svmes.models.sql.task_schedule;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
-import com.fps.svmes.models.sql.User;
+import com.fps.svmes.models.sql.user.User;
 import jakarta.persistence.*;
 import lombok.Data;
 

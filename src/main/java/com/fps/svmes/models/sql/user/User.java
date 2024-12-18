@@ -1,9 +1,8 @@
-package com.fps.svmes.models.sql;
+package com.fps.svmes.models.sql.user;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import lombok.Data;
-import lombok.Getter;
 
 @Entity
 @Table(name = "user", schema = "quality_management")

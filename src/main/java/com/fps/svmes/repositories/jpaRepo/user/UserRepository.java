@@ -1,6 +1,6 @@
-package com.fps.svmes.repositories.jpaRepo;
+package com.fps.svmes.repositories.jpaRepo.user;
 
-import com.fps.svmes.models.sql.User;
+import com.fps.svmes.models.sql.user.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 

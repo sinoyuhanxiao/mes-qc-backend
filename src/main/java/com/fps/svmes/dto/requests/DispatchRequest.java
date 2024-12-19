@@ -22,6 +22,10 @@ public class DispatchRequest {
         SPECIFIC_DAYS, INTERVAL
     }
 
+    @NotNull(message = "Name cannot be null")
+    @Schema(description = "Name of the dispatch", example = "QC DISPATCH #1")
+    private String name;
+
     @NotNull(message = "Schedule type cannot be null")
     @Schema(description = "Type of schedule", example = "INTERVAL")
     private ScheduleType scheduleType;

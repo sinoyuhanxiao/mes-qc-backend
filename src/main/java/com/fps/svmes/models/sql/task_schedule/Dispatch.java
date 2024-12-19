@@ -23,6 +23,9 @@ public class Dispatch {
     @Column(name = "id")
     private Long id;
 
+    @Column(name = "name", nullable = false)
+    private String name;
+
     @JsonManagedReference
     @OneToMany(mappedBy = "dispatch", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<DispatchPersonnel> dispatchPersonnel = new ArrayList<>();

@@ -39,7 +39,7 @@ public class DispatchServiceImpl implements DispatchService {
     @Transactional
     @Scheduled(fixedRate = 60000) // Run every 60 seconds
     @Override
-    public void scheduleDispatches() {
+    public synchronized void scheduleDispatches() {
         logger.info("Running scheduled dispatches check.");
         List<Dispatch> activeDispatches = dispatchRepo.findByActiveTrue();
         LocalDateTime now = LocalDateTime.now();
@@ -195,6 +195,7 @@ public class DispatchServiceImpl implements DispatchService {
         Dispatch dispatch = new Dispatch();
 
         // Base Dispatch Fields
+        dispatch.setName(request.getName());
         dispatch.setScheduleType(request.getScheduleType().name());
         dispatch.setActive(request.getActive());
         dispatch.setCreatedAt(LocalDateTime.now());
@@ -256,6 +257,7 @@ public class DispatchServiceImpl implements DispatchService {
                 .orElseThrow(() -> new IllegalArgumentException("Dispatch with ID " + id + " not found"));
 
         // 2. Update base Dispatch fields
+        dispatch.setName(request.getName());
         dispatch.setScheduleType(request.getScheduleType().name());
         dispatch.setActive(request.getActive());
         dispatch.setUpdatedAt(LocalDateTime.now());
@@ -331,6 +333,7 @@ public class DispatchServiceImpl implements DispatchService {
 
         DispatchDTO dto = new DispatchDTO();
         dto.setId(dispatch.getId());
+        dto.setName(dispatch.getName());
         dto.setScheduleType(dispatch.getScheduleType());
         dto.setTimeOfDay(dispatch.getTimeOfDay());
         dto.setIntervalMinutes(dispatch.getIntervalMinutes());
@@ -360,6 +363,7 @@ public class DispatchServiceImpl implements DispatchService {
 
             // Base fields
             dto.setId(dispatch.getId());
+            dto.setName(dispatch.getName());
             dto.setScheduleType(dispatch.getScheduleType());
             dto.setTimeOfDay(dispatch.getTimeOfDay());
             dto.setIntervalMinutes(dispatch.getIntervalMinutes());
@@ -409,6 +413,7 @@ public class DispatchServiceImpl implements DispatchService {
     private DispatchDTO convertToDTO(Dispatch dispatch) {
         DispatchDTO dto = new DispatchDTO();
         dto.setId(dispatch.getId());
+        dto.setName(dispatch.getName());
         dto.setScheduleType(dispatch.getScheduleType());
         dto.setIntervalMinutes(dispatch.getIntervalMinutes());
         dto.setRepeatCount(dispatch.getRepeatCount());

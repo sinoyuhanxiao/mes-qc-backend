@@ -11,6 +11,9 @@ public class DispatchDTO {
     @JsonProperty("id")
     private Long id;
 
+    @JsonProperty("name")
+    private String name;
+
     @JsonProperty("schedule_type")
     private String scheduleType;
 

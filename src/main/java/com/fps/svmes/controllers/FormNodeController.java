@@ -18,19 +18,27 @@ public class FormNodeController {
     @Autowired
     private FormNodeService service;
 
-    // Create or update a node
-    @PostMapping
-    public FormNode createOrUpdateNode(@RequestBody FormNode node) {
-        return service.saveNode(node);
-    }
-
-    // Get all top-level nodes
+    // GET /form-nodes: Get all top-level nodes
     @GetMapping
     public List<FormNode> getAllNodes() {
         return service.getAllNodes();
     }
 
-    // Get a node by ID (ObjectId or UUID)
+    // POST /form-nodes/top-level: Add a new top-level node (new document)
+    @PostMapping("/top-level")
+    public FormNode createTopLevelNode(@RequestBody FormNode node) {
+        return service.saveNode(node);
+    }
+
+    // POST /form-nodes/child: Add a child node to an existing node
+    @PostMapping("/child")
+    public ResponseEntity<FormNode> addChildNode(@RequestParam String parentId, @RequestBody FormNode childNode) {
+        Optional<FormNode> createdChild = service.addChildNode(parentId, childNode);
+        return createdChild.map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    // GET /form-nodes/{id}: Get a node by ID (traversing if necessary)
     @GetMapping("/{id}")
     public ResponseEntity<FormNode> getNodeById(@PathVariable String id) {
         Optional<FormNode> node = service.getNodeByIdOrUuid(id);
@@ -38,7 +46,7 @@ public class FormNodeController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    // Delete a node by ID (ObjectId or UUID)
+    // DELETE /form-nodes/{id}: Delete a node by ID (traversing if necessary)
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteNode(@PathVariable String id) {
         boolean deleted = service.deleteNodeByIdOrUuid(id);

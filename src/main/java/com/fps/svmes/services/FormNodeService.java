@@ -6,8 +6,9 @@ import java.util.List;
 import java.util.Optional;
 
 public interface FormNodeService {
-    FormNode saveNode(FormNode node);
     List<FormNode> getAllNodes();
+    FormNode saveNode(FormNode node);
+    Optional<FormNode> addChildNode(String parentId, FormNode childNode);
     Optional<FormNode> getNodeByIdOrUuid(String id);
     boolean deleteNodeByIdOrUuid(String id);
 }

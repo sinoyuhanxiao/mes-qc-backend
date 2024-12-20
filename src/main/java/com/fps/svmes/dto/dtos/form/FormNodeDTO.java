@@ -19,5 +19,4 @@ public class FormNodeDTO {
     @JsonProperty("children")
     private List<FormNodeDTO> children;
 
-
 }

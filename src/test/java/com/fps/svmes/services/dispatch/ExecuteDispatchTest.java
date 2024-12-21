@@ -13,7 +13,6 @@ import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
 
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -77,9 +76,9 @@ public class ExecuteDispatchTest {
 
             // Assert
             verify(testRepo, times(1)).saveAll(argThat(dispatchedTests -> {
-                List<DispatchedTest> tests = (List<DispatchedTest>) dispatchedTests;
+                List<DispatchedTask> tests = (List<DispatchedTask>) dispatchedTests;
                 assertEquals(4, tests.size()); // 2 personnel x 2 forms
-                for (DispatchedTest test : tests) {
+                for (DispatchedTask test : tests) {
                     assertEquals(now, test.getDispatchTime()); // Ensure proper time
                 }
                 return true;
@@ -114,7 +113,7 @@ public class ExecuteDispatchTest {
 
         // Assert
         verify(testRepo, times(1)).saveAll(argThat(dispatchedTests -> {
-            List<DispatchedTest> tests = (List<DispatchedTest>) dispatchedTests;
+            List<DispatchedTask> tests = (List<DispatchedTask>) dispatchedTests;
             assertEquals(4, tests.size()); // 2 personnel x 2 forms
             return true;
         }));
@@ -221,7 +220,7 @@ public class ExecuteDispatchTest {
 
         // Assert: Verify that the correct dispatch time is used
         verify(testRepo, times(1)).saveAll(argThat(tests -> {
-            List<DispatchedTest> testList = (List<DispatchedTest>) tests;
+            List<DispatchedTask> testList = (List<DispatchedTask>) tests;
 
             // Calculate the expected time using the simulated count
             LocalDateTime expectedTime = mockDispatch.getStartTime()
@@ -294,20 +293,20 @@ public class ExecuteDispatchTest {
 
         // Assert
         verify(testRepo, times(1)).saveAll(argThat(tests -> {
-            List<DispatchedTest> testList = (List<DispatchedTest>) tests;
+            List<DispatchedTask> testList = (List<DispatchedTask>) tests;
 
             // Verify size
             assertEquals(4, testList.size(), "4 tests should be created (2 personnel x 2 forms)");
 
             // Verify mapping
             List<Long> personnelIds = testList.stream()
-                    .map(DispatchedTest::getPersonnelId)
+                    .map(DispatchedTask::getPersonnelId)
                     .distinct()
                     .toList();
             assertTrue(personnelIds.containsAll(List.of(201L, 202L)), "Personnel IDs should match.");
 
             List<Long> formIds = testList.stream()
-                    .map(DispatchedTest::getFormId)
+                    .map(DispatchedTask::getFormId)
                     .distinct()
                     .toList();
             assertTrue(formIds.containsAll(List.of(101L, 102L)), "Form IDs should match.");
@@ -406,7 +405,7 @@ public class ExecuteDispatchTest {
         // Assert
         assertTrue(shouldDispatch, "Dispatch should execute on specific day and time.");
         verify(testRepo, times(1)).saveAll(argThat(tests -> {
-            List<DispatchedTest> testList = (List<DispatchedTest>) tests;
+            List<DispatchedTask> testList = (List<DispatchedTask>) tests;
             return testList.size() == 4; // 2 personnel x 2 forms
         }));
         verify(dispatchRepo, never()).save(any(Dispatch.class)); // No increment for specific_days

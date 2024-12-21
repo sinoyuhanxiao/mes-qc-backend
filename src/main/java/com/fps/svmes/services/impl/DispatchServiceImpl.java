@@ -1,6 +1,7 @@
 package com.fps.svmes.services.impl;
 
 import com.fps.svmes.dto.dtos.dispatch.DispatchDTO;
+import com.fps.svmes.dto.dtos.dispatch.DispatchedTaskDTO;
 import com.fps.svmes.dto.requests.DispatchRequest;
 import com.fps.svmes.models.sql.task_schedule.*;
 import com.fps.svmes.repositories.jpaRepo.dispatch.DispatchRepository;
@@ -31,7 +32,7 @@ public class DispatchServiceImpl implements DispatchService {
     private DispatchRepository dispatchRepo;
 
     @Autowired
-    private DispatchedTestRepository testRepo;
+    private DispatchedTestRepository dispatchedTaskRepo;
     private static final Logger logger = LoggerFactory.getLogger(DispatchServiceImpl.class);
 
     // TEST DISPATCH SCHEDULING LOGIC --------------------------------------------------------------------------
@@ -155,17 +156,17 @@ public class DispatchServiceImpl implements DispatchService {
             logger.debug("Dispatch {} calculated dispatch time: {}", dispatchId, calculatedDispatchTime);
 
             // Create dispatched tests
-            List<DispatchedTest> dispatchedTests = formIds.stream()
+            List<DispatchedTask> dispatchedTasks = formIds.stream()
                     .flatMap(formId -> personnelList.stream()
                             .map(personnelId -> createDispatchedTest(dispatch, formId, personnelId, calculatedDispatchTime)))
                     .toList();
 
             // Save dispatched tests
-            testRepo.saveAll(dispatchedTests);
-            logger.info("Dispatch {} created {} tests.", dispatchId, dispatchedTests.size());
+            dispatchedTaskRepo.saveAll(dispatchedTasks);
+            logger.info("Dispatch {} created {} tests.", dispatchId, dispatchedTasks.size());
 
             // Send notifications
-            dispatchedTests.forEach(test -> simulateNotification(
+            dispatchedTasks.forEach(test -> simulateNotification(
                     test.getPersonnelId().intValue(),
                     generateFormUrl(test.getPersonnelId().intValue(), test.getFormId())
             ));
@@ -391,6 +392,26 @@ public class DispatchServiceImpl implements DispatchService {
         }).collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
+    public List<DispatchedTaskDTO> getAllDispatchedTasks() {
+        return dispatchedTaskRepo.findAll().stream().map(dispatchedTask -> {
+            DispatchedTaskDTO dto = new DispatchedTaskDTO();
+
+            // Base fields
+            dto.setId(dispatchedTask.getId());
+            dto.setDispatchId(dispatchedTask.getId());
+            dto.setPersonnelId(dispatchedTask.getPersonnelId());
+            dto.setFormId(dispatchedTask.getFormId());
+            dto.setDispatchTime(dispatchedTask.getDispatchTime());
+            dto.setStatus(dispatchedTask.getStatus());
+            dto.setNotes(dispatchedTask.getNotes());
+            dto.setLastUpdated(dispatchedTask.getLastUpdated());
+            dto.setFinishedAt(dispatchedTask.getFinishedAt());
+
+            return dto;
+        }).collect(Collectors.toList());
+    }
+
 
     /**
      * Delete a dispatch by its ID.
@@ -489,8 +510,8 @@ public class DispatchServiceImpl implements DispatchService {
 
 
     // Create a single DispatchedTest object
-    private DispatchedTest createDispatchedTest(Dispatch dispatch, Long formId, Integer personnelId, LocalDateTime dispatchTime) {
-        DispatchedTest test = new DispatchedTest();
+    private DispatchedTask createDispatchedTest(Dispatch dispatch, Long formId, Integer personnelId, LocalDateTime dispatchTime) {
+        DispatchedTask test = new DispatchedTask();
         test.setDispatch(dispatch);
         test.setFormId(formId);
         test.setPersonnelId(Long.valueOf(personnelId));

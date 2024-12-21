@@ -13,9 +13,9 @@ import java.time.LocalDateTime;
  */
 @EqualsAndHashCode(callSuper = false)
 @Entity
-@Table(name = "dispatched_test", schema = "quality_management")
+@Table(name = "dispatched_task", schema = "quality_management")
 @Data
-public class DispatchedTest {
+public class DispatchedTask {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id")

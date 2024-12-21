@@ -59,15 +59,27 @@ public class FormNodeServiceImpl implements FormNodeService {
     // Delete a node by ID or UUID (traverse if necessary)
     @Override
     public boolean deleteNodeByIdOrUuid(String id) {
+        // Fetch all top-level nodes
         List<FormNode> nodes = repository.findAll();
-        for (FormNode node : nodes) {
-            if (deleteNodeByIdOrUuid(node, id)) {
-                repository.save(node);
+
+        // Iterate over root nodes
+        for (int i = 0; i < nodes.size(); i++) {
+            // Check if the root node's ID matches the given ID
+            if (nodes.get(i).getId().equals(id)) {
+                nodes.remove(i); // Remove the root node
+                repository.deleteById(id); // Persist the deletion
+                return true; // Successfully deleted
+            }
+
+            // Recursively check within the children
+            if (deleteNodeByIdOrUuid(nodes.get(i), id)) {
+                repository.save(nodes.get(i)); // Persist changes to the updated tree
                 return true;
             }
         }
-        return false;
+        return false; // Node not found
     }
+
 
     // Recursive method to find a node by ID or UUID
     private Optional<FormNode> findNodeByIdOrUuid(FormNode currentNode, String id) {
@@ -90,15 +102,17 @@ public class FormNodeServiceImpl implements FormNodeService {
         if (currentNode.getChildren() != null) {
             for (int i = 0; i < currentNode.getChildren().size(); i++) {
                 if (currentNode.getChildren().get(i).getId().equals(id)) {
-                    currentNode.getChildren().remove(i);
-                    return true;
+                    currentNode.getChildren().remove(i); // Remove the matching child node
+                    return true; // Successfully deleted
                 }
+
+                // Recursively search deeper
                 if (deleteNodeByIdOrUuid(currentNode.getChildren().get(i), id)) {
                     return true;
                 }
             }
         }
-        return false;
+        return false; // Node not found in this subtree
     }
 
     // Recursive method to add a child node to a node with the given parentId

@@ -17,8 +17,16 @@ public class FormNode {
 
     @Id
     private String id;
+
     @Field("label")
     private String label;
+
+    @Field("node_type")
+    private String nodeType;
+
+    @Field("qc_form_template_id")
+    private String qcFormTemplateId;
+
     @Field("children")
     private List<FormNode> children;
 

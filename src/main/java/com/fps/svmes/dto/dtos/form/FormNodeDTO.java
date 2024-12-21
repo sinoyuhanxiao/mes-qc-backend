@@ -16,6 +16,12 @@ public class FormNodeDTO {
     @JsonProperty("label")
     private String label;
 
+    @JsonProperty("node_type")
+    private String nodeType;
+
+    @JsonProperty("qc_form_template_id")
+    private String qcFormTemplateId;
+
     @JsonProperty("children")
     private List<FormNodeDTO> children;
 

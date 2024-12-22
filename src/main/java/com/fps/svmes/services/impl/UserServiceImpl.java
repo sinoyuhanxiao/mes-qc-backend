@@ -51,12 +51,23 @@ public class UserServiceImpl implements UserService {
 
         if (optionalUser.isPresent()) {
             User existingUser = optionalUser.get();
-            // Update fields
-            existingUser.setName(userDTO.getName());
-            existingUser.setRoleId(userDTO.getRoleId());
-            existingUser.setWecomId(userDTO.getWecomId());
-            existingUser.setUsername(userDTO.getUsername());
-            existingUser.setPassword(userDTO.getPassword());
+
+            // Update fields only if they are not null
+            if (userDTO.getName() != null) {
+                existingUser.setName(userDTO.getName());
+            }
+            if (userDTO.getRoleId() != null) {
+                existingUser.setRoleId(userDTO.getRoleId());
+            }
+            if (userDTO.getWecomId() != null) {
+                existingUser.setWecomId(userDTO.getWecomId());
+            }
+            if (userDTO.getUsername() != null) {
+                existingUser.setUsername(userDTO.getUsername());
+            }
+            if (userDTO.getPassword() != null) {
+                existingUser.setPassword(userDTO.getPassword());
+            }
 
             User updatedUser = userRepository.save(existingUser);
             return modelMapper.map(updatedUser, UserDTO.class);
@@ -64,6 +75,7 @@ public class UserServiceImpl implements UserService {
             throw new RuntimeException("User with ID " + id + " not found");
         }
     }
+
 
     // Delete a user by ID
     @Override

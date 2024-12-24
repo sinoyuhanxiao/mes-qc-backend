@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -44,8 +45,7 @@ public class Dispatch {
     @Column(name = "interval_minutes")
     private Integer intervalMinutes;
 
-    @Column(name = "start_time")
-    private LocalDateTime startTime;
+
 
     @Column(name = "repeat_count")
     private Integer repeatCount;
@@ -57,10 +57,13 @@ public class Dispatch {
     private Boolean active;
 
     @Column(name = "created_at", updatable = false)
-    private LocalDateTime createdAt;
+    private OffsetDateTime createdAt;
 
     @Column(name = "updated_at")
-    private LocalDateTime updatedAt;
+    private OffsetDateTime updatedAt;
+
+    @Column(name = "start_time")
+    private OffsetDateTime startTime;
 
     @Column(name = "time_of_day")
     private String timeOfDay;

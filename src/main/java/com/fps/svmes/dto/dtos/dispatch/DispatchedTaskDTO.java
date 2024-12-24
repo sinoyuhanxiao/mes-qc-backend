@@ -4,7 +4,7 @@ package com.fps.svmes.dto.dtos.dispatch;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 
 @Data
 public class DispatchedTaskDTO {
@@ -21,7 +21,7 @@ public class DispatchedTaskDTO {
     private Long formId;
 
     @JsonProperty("dispatch_time")
-    private LocalDateTime dispatchTime;
+    private OffsetDateTime dispatchTime;
 
     @JsonProperty("status")
     private String status;
@@ -29,9 +29,6 @@ public class DispatchedTaskDTO {
     @JsonProperty("notes")
     private String notes;
 
-    @JsonProperty("last_updated")
-    private LocalDateTime lastUpdated;
-
-    @JsonProperty("finished_at")
-    private LocalDateTime finishedAt;
+    @JsonProperty("updated_at")
+    private OffsetDateTime  updatedAt;
 }

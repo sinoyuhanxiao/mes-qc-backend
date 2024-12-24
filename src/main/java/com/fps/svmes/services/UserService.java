@@ -17,4 +17,6 @@ public interface UserService {
     boolean validateCredentials(String username, String password);
 
     UserDTO getUserByUsername(String username);
+
+    UserDTO getUserById(Integer id);
 }

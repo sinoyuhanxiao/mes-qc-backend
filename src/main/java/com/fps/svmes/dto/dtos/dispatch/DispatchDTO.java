@@ -1,9 +1,11 @@
 package com.fps.svmes.dto.dtos.dispatch;
 
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.List;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fps.svmes.dto.dtos.user.UserDTO;
 import lombok.Data;
 
 @Data
@@ -30,16 +32,16 @@ public class DispatchDTO {
     private Integer executedCount;
 
     @JsonProperty("start_time")
-    private LocalDateTime startTime;
+    private OffsetDateTime startTime;
+
+    @JsonProperty("created_at")
+    private OffsetDateTime createdAt; // Added created_at
+
+    @JsonProperty("updated_at")
+    private OffsetDateTime updatedAt; // Added updated_at
 
     @JsonProperty("active")
     private Boolean active;
-
-    @JsonProperty("created_at")
-    private LocalDateTime createdAt; // Added created_at
-
-    @JsonProperty("updated_at")
-    private LocalDateTime updatedAt; // Added updated_at
 
     @JsonProperty("dispatch_days")
     private List<String> dispatchDays;
@@ -48,5 +50,5 @@ public class DispatchDTO {
     private List<Long> formIds;
 
     @JsonProperty("dispatch_personnel")
-    private List<Long> personnelIds;
+    private List<UserDTO> personnel;
 }

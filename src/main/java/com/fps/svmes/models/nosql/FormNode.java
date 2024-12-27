@@ -25,7 +25,7 @@ public class FormNode {
     private String nodeType;
 
     @Field("qc_form_template_id")
-    private String qcFormTemplateId;
+    private Long qcFormTemplateId;
 
     @Field("children")
     private List<FormNode> children;

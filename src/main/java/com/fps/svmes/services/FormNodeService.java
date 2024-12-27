@@ -11,4 +11,6 @@ public interface FormNodeService {
     Optional<FormNode> addChildNode(String parentId, FormNode childNode);
     Optional<FormNode> getNodeByIdOrUuid(String id);
     boolean deleteNodeByIdOrUuid(String id);
+
+    Optional<FormNode> updateNodeById(String id, FormNode updatedNode);
 }

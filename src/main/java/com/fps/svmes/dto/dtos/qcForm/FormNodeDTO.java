@@ -20,7 +20,7 @@ public class FormNodeDTO {
     private String nodeType;
 
     @JsonProperty("qc_form_template_id")
-    private String qcFormTemplateId;
+    private Long qcFormTemplateId;
 
     @JsonProperty("children")
     private List<FormNodeDTO> children;

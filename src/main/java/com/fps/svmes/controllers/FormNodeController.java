@@ -52,4 +52,13 @@ public class FormNodeController {
         boolean deleted = service.deleteNodeByIdOrUuid(id);
         return deleted ? ResponseEntity.noContent().build() : ResponseEntity.notFound().build();
     }
+
+    // PATCH /form-nodes/{id}: Update a node by ID
+    @PatchMapping("/{id}")
+    public ResponseEntity<FormNode> updateNode(@PathVariable String id, @RequestBody FormNode updatedNode) {
+        Optional<FormNode> updated = service.updateNodeById(id, updatedNode);
+        return updated.map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
 }

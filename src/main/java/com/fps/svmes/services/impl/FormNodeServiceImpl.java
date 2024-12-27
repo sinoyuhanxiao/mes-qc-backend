@@ -138,4 +138,41 @@ public class FormNodeServiceImpl implements FormNodeService {
         }
         return Optional.empty();
     }
+
+    @Override
+    public Optional<FormNode> updateNodeById(String id, FormNode updatedNode) {
+        List<FormNode> nodes = repository.findAll(); // Fetch all top-level nodes
+
+        for (FormNode root : nodes) {
+            Optional<FormNode> updated = findAndUpdateNodeRecursively(root, id, updatedNode);
+            if (updated.isPresent()) {
+                repository.save(root); // Save the updated top-level document
+                return updated;       // Return the updated node
+            }
+        }
+        return Optional.empty(); // Node not found
+    }
+
+    // Helper method for recursive traversal
+    private Optional<FormNode> findAndUpdateNodeRecursively(FormNode currentNode, String id, FormNode updatedNode) {
+        if (currentNode.getId().equals(id)) {
+            // Update node properties
+            if (updatedNode.getLabel() != null) currentNode.setLabel(updatedNode.getLabel());
+            if (updatedNode.getNodeType() != null) currentNode.setNodeType(updatedNode.getNodeType());
+            if (updatedNode.getChildren() != null) currentNode.setChildren(updatedNode.getChildren());
+            if (updatedNode.getQcFormTemplateId() != null) currentNode.setQcFormTemplateId(updatedNode.getQcFormTemplateId());
+            return Optional.of(currentNode);
+        }
+        if (currentNode.getChildren() != null) {
+            for (FormNode child : currentNode.getChildren()) {
+                Optional<FormNode> result = findAndUpdateNodeRecursively(child, id, updatedNode);
+                if (result.isPresent()) {
+                    return result;
+                }
+            }
+        }
+        return Optional.empty(); // Node not found in this subtree
+    }
+
+
 }

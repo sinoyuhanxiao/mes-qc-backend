@@ -140,6 +140,4 @@ public class QcFormTemplateController {
         return now.getYear() + String.format("%02d", now.getMonthValue());
     }
 
-
-
 }

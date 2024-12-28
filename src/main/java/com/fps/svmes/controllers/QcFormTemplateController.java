@@ -24,7 +24,7 @@ import java.util.Optional;
 @Slf4j
 @RequestMapping("/qc-form-templates")
 @RequiredArgsConstructor
-@Tag(name = "QC Form Templates", description = "API for QC Form Templates")
+@Tag(name = "QC Form Templates API", description = "API for QC Form Templates")
 public class QcFormTemplateController {
 
     private final QcFormTemplateService service;

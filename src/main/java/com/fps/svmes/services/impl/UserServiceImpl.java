@@ -114,4 +114,16 @@ public class UserServiceImpl implements UserService {
         }
     }
 
+    @Transactional(readOnly = true)
+    public UserDTO getUserById(Integer id) {
+        Optional<User> userOptional = userRepository.findById(id);
+
+        if (userOptional.isPresent()) {
+            User user = userOptional.get();
+            return modelMapper.map(user, UserDTO.class);
+        } else {
+            throw new RuntimeException("User with id " + id  + " not found");
+        }
+    }
+
 }

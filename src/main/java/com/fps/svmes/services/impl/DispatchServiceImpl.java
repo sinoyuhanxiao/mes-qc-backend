@@ -1,6 +1,8 @@
 package com.fps.svmes.services.impl;
 
 import com.fps.svmes.dto.dtos.dispatch.DispatchDTO;
+import com.fps.svmes.dto.dtos.dispatch.DispatchedTaskDTO;
+import com.fps.svmes.dto.dtos.user.UserDTO;
 import com.fps.svmes.dto.requests.DispatchRequest;
 import com.fps.svmes.models.sql.task_schedule.*;
 import com.fps.svmes.repositories.jpaRepo.dispatch.DispatchRepository;
@@ -12,7 +14,10 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
+import org.modelmapper.ModelMapper;
+
+import java.time.LocalTime;
+import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -30,30 +35,40 @@ public class DispatchServiceImpl implements DispatchService {
     private DispatchRepository dispatchRepo;
 
     @Autowired
-    private DispatchedTestRepository testRepo;
+    private DispatchedTestRepository dispatchedTaskRepo;
     private static final Logger logger = LoggerFactory.getLogger(DispatchServiceImpl.class);
+
+    @Autowired
+    private ModelMapper modelMapper;
 
     // TEST DISPATCH SCHEDULING LOGIC --------------------------------------------------------------------------
 
     @Transactional
-    @Override
     @Scheduled(fixedRate = 60000) // Run every 60 seconds
-    public void scheduleDispatches() {
-        logger.info("Running scheduled dispatches check.");
+    @Override
+    public synchronized void scheduleDispatches() {
+        logger.debug("Running scheduled dispatches check.");
         List<Dispatch> activeDispatches = dispatchRepo.findByActiveTrue();
-        LocalDateTime now = LocalDateTime.now();
-
+        OffsetDateTime now = OffsetDateTime.now();
+        logger.debug("Number of active dispatches: {}.", activeDispatches.size());
         for (Dispatch dispatch : activeDispatches) {
-            if (shouldDispatch(dispatch, now)) {
-                logger.info("Dispatch {} is scheduled for execution.", dispatch.getId());
-                executeDispatch(dispatch.getId());
-            } else {
-                logger.debug("Dispatch {} skipped: Not eligible for execution at {}", dispatch.getId(), now);
+            try {
+                logger.debug("Checking Dispatch id: {}", dispatch.getId());
+                if (shouldDispatch(dispatch, now)) {
+                    logger.debug("Dispatch {} is scheduled for execution.", dispatch.getId());
+                    executeDispatch(dispatch.getId());
+                } else {
+                    logger.debug("Dispatch {} skipped: Not eligible for execution at {}", dispatch.getId(), now);
+                }
+            } catch (IllegalStateException e) {
+                logger.warn("Skipping dispatch {} due to configuration issue: {}", dispatch.getId(), e.getMessage());
+            } catch (Exception e) {
+                logger.error("Error processing dispatch {}: {}", dispatch.getId(), e.getMessage(), e);
             }
         }
     }
 
-    public boolean shouldDispatch(Dispatch dispatch, LocalDateTime now) {
+    public boolean shouldDispatch(Dispatch dispatch, OffsetDateTime now) {
         ScheduleType scheduleType;
         try {
             scheduleType = ScheduleType.valueOf(dispatch.getScheduleType());
@@ -62,101 +77,113 @@ public class DispatchServiceImpl implements DispatchService {
             return false;
         }
 
-        if (scheduleType == ScheduleType.SPECIFIC_DAYS) {
-            String currentDay = now.getDayOfWeek().name();
-            String currentTime = now.format(DateTimeFormatter.ofPattern("HH:mm"));
-
-            // Check if specific days list is null or empty
-            List<DispatchDay> specificDays = dispatch.getDispatchDays();
-            if (specificDays == null || specificDays.isEmpty()) {
-                logger.warn("Dispatch {} has no specific days configured.", dispatch.getId());
+        switch (scheduleType) {
+            case SPECIFIC_DAYS -> {
+                return checkSpecificDaysSchedule(dispatch, now);
+            }
+            case INTERVAL -> {
+                return checkIntervalSchedule(dispatch, now);
+            }
+            default -> {
+                logger.warn("Unsupported schedule type for dispatch {}: {}", dispatch.getId(), scheduleType);
                 return false;
             }
-            boolean shouldDispatch = specificDays.stream()
-                    .anyMatch(day -> day.getDay().equalsIgnoreCase(currentDay)) &&
-                    currentTime.equals(dispatch.getTimeOfDay());
-
-            logger.debug("Dispatch {} shouldDispatch result: {}", dispatch.getId(), shouldDispatch);
-            return shouldDispatch;
-
-        } else if (scheduleType == ScheduleType.INTERVAL) {
-            if (dispatch.getIntervalMinutes() == null || dispatch.getStartTime() == null) {
-                logger.warn("Dispatch {} has missing interval configuration.", dispatch.getId());
-                return false;
-            }
-
-            if (dispatch.getRepeatCount() != null &&
-                    dispatch.getExecutedCount() >= dispatch.getRepeatCount()) {
-                logger.info("Dispatch {} already executed maximum times: {}", dispatch.getId(), dispatch.getRepeatCount());
-                return false;
-            }
-
-            LocalDateTime nextDispatchTime = dispatch.getStartTime().plusMinutes(
-                    (long) dispatch.getIntervalMinutes() * dispatch.getExecutedCount());
-            boolean shouldDispatch = !now.isBefore(nextDispatchTime);
-            logger.debug("Dispatch {} next execution time: {}, shouldDispatch result: {}", dispatch.getId(), nextDispatchTime, shouldDispatch);
-            return shouldDispatch;
         }
-        return false;
+    }
+
+    private boolean checkSpecificDaysSchedule(Dispatch dispatch, OffsetDateTime now) {
+        String currentDay = now.getDayOfWeek().name();
+        String currentTime = now.toLocalTime().format(DateTimeFormatter.ofPattern("HH:mm"));
+
+        List<DispatchDay> specificDays = dispatch.getDispatchDays();
+        if (specificDays == null || specificDays.isEmpty()) {
+            logger.warn("Dispatch {} has no specific days configured.", dispatch.getId());
+            return false;
+        }
+
+        boolean shouldDispatch = specificDays.stream()
+                .anyMatch(day -> day.getDay().equalsIgnoreCase(currentDay)) &&
+                currentTime.equals(dispatch.getTimeOfDay());
+
+        logger.debug("Dispatch {} shouldDispatch result: {}", dispatch.getId(), shouldDispatch);
+        return shouldDispatch;
+    }
+
+    private boolean checkIntervalSchedule(Dispatch dispatch, OffsetDateTime now) {
+        if (dispatch.getIntervalMinutes() == null || dispatch.getStartTime() == null) {
+            logger.warn("Dispatch {} has missing interval configuration.", dispatch.getId());
+            return false;
+        }
+
+        if (dispatch.getRepeatCount() != null &&
+                dispatch.getExecutedCount() >= dispatch.getRepeatCount()) {
+            // Deactivate the dispatch if it has reached its max executions
+            dispatch.setActive(false);
+            dispatch.setUpdatedAt(OffsetDateTime.now());
+            dispatchRepo.save(dispatch);
+            logger.debug("Dispatch {} deactivated: Executed maximum times.", dispatch.getId());
+            return false;
+        }
+
+        OffsetDateTime nextDispatchTime = dispatch.getStartTime().plusMinutes(
+                (long) dispatch.getIntervalMinutes() * dispatch.getExecutedCount());
+        boolean shouldDispatch = !now.isBefore(nextDispatchTime);
+
+        logger.debug("Dispatch {} next execution time: {}, shouldDispatch result: {}", dispatch.getId(), nextDispatchTime, shouldDispatch);
+        return shouldDispatch;
     }
 
     @Transactional
     @Override
     public void executeDispatch(Long dispatchId) {
         Dispatch dispatch = dispatchRepo.findById(dispatchId).orElseThrow();
-        logger.info("Executing dispatch {}.", dispatchId);
+        logger.debug("Executing dispatch {}.", dispatchId);
 
-        // Validate and fetch personnel list
-        List<DispatchPersonnel> personnel = dispatch.getDispatchPersonnel();
-        if (personnel == null || personnel.isEmpty()) {
-            logger.warn("Dispatch {} skipped: Personnel list is null or empty.", dispatchId);
-            return;
-        }
-        List<Integer> personnelList = personnel.stream()
-                .map(dp -> dp.getUser().getId())
-                .toList();
-
-        // Validate and fetch form list
-        List<DispatchForm> forms = dispatch.getDispatchForms();
-        if (forms == null || forms.isEmpty()) {
-            logger.warn("Dispatch {} skipped: Forms list is null or empty.", dispatchId);
-            return;
-        }
-        List<Long> formIds = forms.stream()
-                .map(DispatchForm::getFormId)
-                .toList();
-
-        // Determine dispatch time based on schedule type
-        LocalDateTime calculatedDispatchTime;
-        if (isIntervalSchedule(dispatch)) {
-            calculatedDispatchTime = calculateDispatchTime(dispatch);
-        } else {
-            if (dispatch.getTimeOfDay() == null || dispatch.getTimeOfDay().trim().isEmpty()) {
-                throw new IllegalStateException("Time of day is missing for SPECIFIC_DAYS schedule.");
+        try {
+            // Validate interval-specific fields
+            if (isIntervalSchedule(dispatch)) {
+                if (dispatch.getStartTime() == null || dispatch.getIntervalMinutes() == null) {
+                    throw new IllegalStateException("Invalid INTERVAL configuration: Missing start time or interval minutes.");
+                }
             }
-            calculatedDispatchTime = getSpecificDaysDispatchTime(dispatch);
-        }
-        logger.debug("Dispatch {} calculated dispatch time: {}", dispatchId, calculatedDispatchTime);
 
-        // Create dispatched tests
-        List<DispatchedTest> dispatchedTests = formIds.stream()
-                .flatMap(formId -> personnelList.stream()
-                        .map(personnelId -> createDispatchedTest(dispatch, formId, personnelId, calculatedDispatchTime)))
-                .toList();
+            // Validate and fetch personnel and forms
+            List<Integer> personnelList = validateAndGetPersonnel(dispatch, dispatchId);
+            List<Long> formIds = validateAndGetForms(dispatch, dispatchId);
 
-        // Batch save dispatched tests
-        testRepo.saveAll(dispatchedTests);
-        logger.info("Dispatch {} created {} tests.", dispatchId, dispatchedTests.size());
+            // Simulate incremented count for calculation but avoid persistence yet
+            int simulatedExecutedCount = dispatch.getExecutedCount();
+            if (isIntervalSchedule(dispatch)) {
+                simulatedExecutedCount++; // Simulate increment for dispatch calculation
+            }
 
-        // Send notifications
-        dispatchedTests.forEach(test -> simulateNotification(
-                test.getPersonnelId().intValue(),
-                generateFormUrl(test.getPersonnelId().intValue(), test.getFormId())
-        ));
+            // Determine dispatch time
+            OffsetDateTime calculatedDispatchTime = calculateDispatchTime(dispatch, simulatedExecutedCount);
 
-        // Increment executed count only for INTERVAL schedule
-        if (isIntervalSchedule(dispatch)) {
-            incrementExecutedCount(dispatch);
+            logger.debug("Dispatch {} calculated dispatch time: {}", dispatchId, calculatedDispatchTime);
+
+            // Create dispatched tests
+            List<DispatchedTask> dispatchedTasks = formIds.stream()
+                    .flatMap(formId -> personnelList.stream()
+                            .map(personnelId -> createDispatchedTest(dispatch, formId, personnelId, calculatedDispatchTime)))
+                    .toList();
+
+            // Save dispatched tests
+            dispatchedTaskRepo.saveAll(dispatchedTasks);
+            logger.debug("Dispatch {} created {} tests.", dispatchId, dispatchedTasks.size());
+
+            // Send notifications
+            dispatchedTasks.forEach(test -> simulateNotification(
+                    test.getPersonnelId().intValue(),
+                    generateFormUrl(test.getPersonnelId().intValue(), test.getFormId())
+            ));
+
+            // Persist incremented executed count
+            if (isIntervalSchedule(dispatch)) {
+                incrementExecutedCount(dispatch); // Increment persisted value
+            }
+        } catch (IllegalStateException e) {
+            logger.warn("Skipping execution of dispatch {}: {}", dispatchId, e.getMessage());
         }
     }
 
@@ -176,10 +203,11 @@ public class DispatchServiceImpl implements DispatchService {
         Dispatch dispatch = new Dispatch();
 
         // Base Dispatch Fields
+        dispatch.setName(request.getName());
         dispatch.setScheduleType(request.getScheduleType().name());
         dispatch.setActive(request.getActive());
-        dispatch.setCreatedAt(LocalDateTime.now());
-        dispatch.setUpdatedAt(LocalDateTime.now());
+        dispatch.setCreatedAt(OffsetDateTime.now());
+        dispatch.setUpdatedAt(OffsetDateTime.now());
         dispatch.setExecutedCount(0);
 
         // Handle SPECIFIC_DAYS Schedule
@@ -204,7 +232,14 @@ public class DispatchServiceImpl implements DispatchService {
             }
             dispatch.setIntervalMinutes(request.getIntervalMinutes());
             dispatch.setRepeatCount(request.getRepeatCount());
-            dispatch.setStartTime(request.getStartTime());
+
+            // Parse startTime as OffsetDateTime
+            if (request.getStartTime() != null) {
+                dispatch.setStartTime(request.getStartTime());
+            } else {
+                throw new IllegalArgumentException("StartTime must be provided for INTERVAL schedule");
+            }
+
             dispatch.setDispatchDays(null);
             dispatch.setTimeOfDay(null);
         }
@@ -237,9 +272,10 @@ public class DispatchServiceImpl implements DispatchService {
                 .orElseThrow(() -> new IllegalArgumentException("Dispatch with ID " + id + " not found"));
 
         // 2. Update base Dispatch fields
+        dispatch.setName(request.getName());
         dispatch.setScheduleType(request.getScheduleType().name());
         dispatch.setActive(request.getActive());
-        dispatch.setUpdatedAt(LocalDateTime.now());
+        dispatch.setUpdatedAt(OffsetDateTime.now());
 
         // 3. Update fields for SPECIFIC_DAYS schedule
         if (request.getScheduleType() == DispatchRequest.ScheduleType.SPECIFIC_DAYS) {
@@ -307,68 +343,29 @@ public class DispatchServiceImpl implements DispatchService {
      */
     @Transactional(readOnly = true)
     public DispatchDTO getDispatch(Long id) {
+
         Dispatch dispatch = dispatchRepo.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Dispatch with ID " + id + " not found"));
 
-        DispatchDTO dto = new DispatchDTO();
-        dto.setId(dispatch.getId());
-        dto.setScheduleType(dispatch.getScheduleType());
-        dto.setTimeOfDay(dispatch.getTimeOfDay());
-        dto.setIntervalMinutes(dispatch.getIntervalMinutes());
-        dto.setRepeatCount(dispatch.getRepeatCount());
-        dto.setStartTime(dispatch.getStartTime()); // Set start_time
-        dto.setExecutedCount(dispatch.getExecutedCount()); // Set executed_count
-        dto.setActive(dispatch.getActive()); // Set active flag
-        dto.setCreatedAt(dispatch.getCreatedAt()); // Set created_at
-        dto.setUpdatedAt(dispatch.getUpdatedAt()); // Set updated_at
-
-        // Map related entities to DTO
-        dto.setDispatchDays(dispatch.getDispatchDays().stream()
-                .map(DispatchDay::getDay).toList());
-        dto.setFormIds(dispatch.getDispatchForms().stream()
-                .map(DispatchForm::getFormId).toList());
-        dto.setPersonnelIds(dispatch.getDispatchPersonnel().stream()
-                .map(personnel -> Long.valueOf(personnel.getUser().getId())).toList());
-
-        return dto;
+        return convertToDTO(dispatch);
     }
 
 
     @Transactional(readOnly = true)
     public List<DispatchDTO> getAllDispatches() {
-        return dispatchRepo.findAll().stream().map(dispatch -> {
-            DispatchDTO dto = new DispatchDTO();
 
-            // Base fields
-            dto.setId(dispatch.getId());
-            dto.setScheduleType(dispatch.getScheduleType());
-            dto.setTimeOfDay(dispatch.getTimeOfDay());
-            dto.setIntervalMinutes(dispatch.getIntervalMinutes());
-            dto.setRepeatCount(dispatch.getRepeatCount());
-            dto.setStartTime(dispatch.getStartTime());
-            dto.setExecutedCount(dispatch.getExecutedCount());
-            dto.setActive(dispatch.getActive());
-            dto.setCreatedAt(dispatch.getCreatedAt());
-            dto.setUpdatedAt(dispatch.getUpdatedAt());
+        return dispatchRepo.findAll().stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
 
-            // Map related entities
-            dto.setDispatchDays(dispatch.getDispatchDays().stream()
-                    .map(DispatchDay::getDay)
-                    .collect(Collectors.toList()));
-
-            dto.setFormIds(dispatch.getDispatchForms().stream()
-                    .map(DispatchForm::getFormId)
-                    .collect(Collectors.toList()));
-
-            dto.setPersonnelIds(dispatch.getDispatchPersonnel().stream()
-                    .map(personnel -> Long.valueOf(personnel.getUser().getId()))
-                    .collect(Collectors.toList()));
-
-            return dto;
-        }).collect(Collectors.toList());
     }
 
-
+    @Transactional(readOnly = true)
+    public List<DispatchedTaskDTO> getAllDispatchedTasks() {
+        return dispatchedTaskRepo.findAll().stream()
+                .map(dispatchedTask -> modelMapper.map(dispatchedTask, DispatchedTaskDTO.class))
+                .collect(Collectors.toList());
+    }
     /**
      * Delete a dispatch by its ID.
      * @param id The ID of the dispatch to delete.
@@ -388,69 +385,75 @@ public class DispatchServiceImpl implements DispatchService {
     // HELPER METHODS --------------------------------------------------------------------------
 
     private DispatchDTO convertToDTO(Dispatch dispatch) {
-        DispatchDTO dto = new DispatchDTO();
-        dto.setId(dispatch.getId());
-        dto.setScheduleType(dispatch.getScheduleType());
-        dto.setIntervalMinutes(dispatch.getIntervalMinutes());
-        dto.setRepeatCount(dispatch.getRepeatCount());
-        dto.setStartTime(dispatch.getStartTime());
-        dto.setTimeOfDay(dispatch.getTimeOfDay());
-        dto.setActive(dispatch.getActive());
+//
 
-        // Convert DispatchDays to specificDays
+        DispatchDTO dto = modelMapper.map(dispatch, DispatchDTO.class);
+
+        // Manually handle nested fields or additional processing as needed
         if (dispatch.getDispatchDays() != null) {
             dto.setDispatchDays(dispatch.getDispatchDays().stream()
                     .map(DispatchDay::getDay)
-                    .toList());
+                    .collect(Collectors.toList()));
         }
-
-        // Convert DispatchForms to formIds
         if (dispatch.getDispatchForms() != null) {
             dto.setFormIds(dispatch.getDispatchForms().stream()
                     .map(DispatchForm::getFormId)
-                    .toList());
+                    .collect(Collectors.toList()));
         }
-
-        // Convert DispatchPersonnel to personnelIds
         if (dispatch.getDispatchPersonnel() != null) {
-            dto.setPersonnelIds(dispatch.getDispatchPersonnel().stream()
-                    .map(personnel -> Long.valueOf(personnel.getUser().getId()))
-                    .toList());
+            dto.setPersonnel(dispatch.getDispatchPersonnel().stream()
+                    .map(personnel -> modelMapper.map(personnel.getUser(), UserDTO.class))
+                    .collect(Collectors.toList()));
         }
 
         return dto;
     }
 
-
-    private LocalDateTime getSpecificDaysDispatchTime(Dispatch dispatch) {
-        if (dispatch.getTimeOfDay() == null || dispatch.getTimeOfDay().isEmpty()) {
-            throw new IllegalStateException("Time of day is missing for SPECIFIC_DAYS schedule.");
+    private List<Integer> validateAndGetPersonnel(Dispatch dispatch, Long dispatchId) {
+        List<DispatchPersonnel> personnel = dispatch.getDispatchPersonnel();
+        if (personnel == null || personnel.isEmpty()) {
+            logger.warn("Dispatch {} skipped: Personnel list is null or empty.", dispatchId);
+            throw new IllegalStateException("Personnel list is required.");
         }
+        return personnel.stream()
+                .map(dp -> dp.getUser().getId())
+                .toList();
+    }
 
-        LocalDateTime now = LocalDateTime.now();
-        String[] timeParts = dispatch.getTimeOfDay().split(":");
+    private List<Long> validateAndGetForms(Dispatch dispatch, Long dispatchId) {
+        List<DispatchForm> forms = dispatch.getDispatchForms();
+        if (forms == null || forms.isEmpty()) {
+            logger.warn("Dispatch {} skipped: Forms list is null or empty.", dispatchId);
+            throw new IllegalStateException("Forms list is required.");
+        }
+        return forms.stream()
+                .map(DispatchForm::getFormId)
+                .toList();
+    }
 
-        return now.withHour(Integer.parseInt(timeParts[0]))
-                .withMinute(Integer.parseInt(timeParts[1]))
-                .withSecond(0)
-                .withNano(0);
+    private OffsetDateTime calculateDispatchTime(Dispatch dispatch, int simulatedExecutedCount) {
+        if (isIntervalSchedule(dispatch)) {
+            if (dispatch.getStartTime() == null || dispatch.getIntervalMinutes() == null) {
+                throw new IllegalStateException("Invalid INTERVAL configuration: Missing start time or interval minutes.");
+            }
+            return dispatch.getStartTime().plusMinutes(
+                    (long) dispatch.getIntervalMinutes() * simulatedExecutedCount);
+        } else {
+            if (dispatch.getTimeOfDay() == null || dispatch.getTimeOfDay().trim().isEmpty()) {
+                throw new IllegalStateException("Time of day is missing for SPECIFIC_DAYS schedule.");
+            }
+            return OffsetDateTime.now().with(LocalTime.parse(dispatch.getTimeOfDay()));
+        }
     }
 
     private boolean isIntervalSchedule(Dispatch dispatch) {
         return ScheduleType.INTERVAL.name().equals(dispatch.getScheduleType());
     }
 
-    private LocalDateTime calculateDispatchTime(Dispatch dispatch) {
-        if (dispatch.getStartTime() == null || dispatch.getIntervalMinutes() == null) {
-            throw new IllegalStateException("Invalid INTERVAL configuration: Missing start time or interval minutes.");
-        }
-        int nextExecutedCount = dispatch.getExecutedCount() + 1; // Use the next count
-        return dispatch.getStartTime().plusMinutes((long) dispatch.getIntervalMinutes() * nextExecutedCount);
-    }
 
     // Create a single DispatchedTest object
-    private DispatchedTest createDispatchedTest(Dispatch dispatch, Long formId, Integer personnelId, LocalDateTime dispatchTime) {
-        DispatchedTest test = new DispatchedTest();
+    private DispatchedTask createDispatchedTest(Dispatch dispatch, Long formId, Integer personnelId, OffsetDateTime dispatchTime) {
+        DispatchedTask test = new DispatchedTask();
         test.setDispatch(dispatch);
         test.setFormId(formId);
         test.setPersonnelId(Long.valueOf(personnelId));
@@ -487,34 +490,4 @@ public class DispatchServiceImpl implements DispatchService {
         logger.info("Simulating notification to Personnel ID: {} with Form URL: {}", personnelId, formUrl);
     }
 
-    // FOR LATER WECOM
-    //    /**
-    //     * Sends a WeChat notification to the personnel with the form URL.
-    //     *
-    //     * @param personnelId the ID of the personnel
-    //     * @param formUrl the URL of the form
-    //     */
-    //    private void notifyPersonnel(Long personnelId, String formUrl) {
-    //        String url = wechatApiUrl + "/cgi-bin/message/template/send?access_token=" + wechatAccessToken;
-    //        RestTemplate restTemplate = new RestTemplate();
-    //
-    //        var payload = new java.util.HashMap<String, Object>();
-    //        payload.put("touser", "wechat-id-for-personnel-" + personnelId); // Replace with actual retrieval of WeChat ID
-    //
-    //        payload.put("template_id", wechatTemplateId);
-    //        payload.put("url", formUrl);
-    //        payload.put("data", java.util.Map.of(
-    //                "first", java.util.Map.of("value", "You have a new QC test assignment."),
-    //                "keyword1", java.util.Map.of("value", "Form Link"),
-    //                "keyword2", java.util.Map.of("value", "High Priority"),
-    //                "remark", java.util.Map.of("value", "Please complete it as soon as possible.")
-    //        ));
-    //
-    //        try {
-    //            restTemplate.postForObject(url, payload, String.class);
-    //            System.out.println("WeChat notification sent for Personnel ID: " + personnelId);
-    //        } catch (Exception e) {
-    //            System.err.println("Failed to send WeChat notification: " + e.getMessage());
-    //        }
-    //    }
 }

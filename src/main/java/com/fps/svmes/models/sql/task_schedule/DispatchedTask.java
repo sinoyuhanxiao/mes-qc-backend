@@ -7,15 +7,16 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 
 /**
  * Represents a test dispatched to a specific personnel.
  */
 @EqualsAndHashCode(callSuper = false)
 @Entity
-@Table(name = "dispatched_test", schema = "quality_management")
+@Table(name = "dispatched_task", schema = "quality_management")
 @Data
-public class DispatchedTest {
+public class DispatchedTask {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id")
@@ -33,17 +34,14 @@ public class DispatchedTest {
 
     @Column(name = "dispatch_time", nullable = false, updatable = false)
     @CreationTimestamp
-    private LocalDateTime dispatchTime; // Time when the test was dispatched
+    private OffsetDateTime dispatchTime; // Time when the test was dispatched
 
     @Column(name = "status", length = 20, nullable = false)
     private String status; // Status of the test (e.g., "PENDING", "COMPLETED")
 
-    @Column(name = "last_updated")
+    @Column(name = "updated_at")
     @UpdateTimestamp
-    private LocalDateTime lastUpdated; // Tracks when the record was last edited
-
-    @Column(name = "finished_at")
-    private LocalDateTime finishedAt; // Timestamp when the test was marked as finished
+    private OffsetDateTime updatedAt; // Tracks when the record was last edited
 
     @Column(name = "notes")
     private String notes; // Optional notes about edits or status changes

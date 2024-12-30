@@ -121,4 +121,25 @@ public class UserController {
     }
 
 
+    // Get User Information by Id
+    @GetMapping("/{id}")
+    @Operation(summary = "Get User Information By Id", description = "Fetches user information by id")
+    public ResponseResult<UserDTO> getUserById(@RequestParam Integer id) {
+        try {
+            UserDTO userDTO = userService.getUserById(id);
+
+            if (userDTO != null) {
+                logger.info("User information retrieved for id: {}", id);
+                return ResponseResult.success(userDTO);
+            } else {
+                logger.warn("No user found with id: {}", id);
+                return ResponseResult.fail("User not found");
+            }
+        } catch (Exception e) {
+            logger.error("Error retrieving user information for id: {}", id, e);
+            return ResponseResult.fail("Error retrieving user information", e);
+        }
+    }
+
+
 }

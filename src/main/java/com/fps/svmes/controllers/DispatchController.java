@@ -2,6 +2,7 @@ package com.fps.svmes.controllers;
 
 
 import com.fps.svmes.dto.dtos.dispatch.DispatchDTO;
+import com.fps.svmes.dto.dtos.dispatch.DispatchedTaskDTO;
 import com.fps.svmes.dto.requests.DispatchRequest;
 import com.fps.svmes.dto.responses.ResponseResult;
 import com.fps.svmes.services.DispatchService;
@@ -65,6 +66,19 @@ public class DispatchController {
         }
     }
 
+    @Operation(summary = "Get all dispatched tests", description = "Retrieves a list of all dispatched tests")
+    @GetMapping("/dispatched-tasks")
+    public ResponseResult<List<DispatchedTaskDTO>> getAllDispatchedTask() {
+        try {
+            List<DispatchedTaskDTO> tasks = dispatchService.getAllDispatchedTasks();
+            return tasks.isEmpty()
+                    ? ResponseResult.noContent(tasks)
+                    : ResponseResult.success(tasks);
+        } catch (Exception e) {
+            return ResponseResult.fail("Unexpected error occurred while retrieving all dispatched tasks", e);
+        }
+    }
+
     @Operation(summary = "Update an existing dispatch", description = "Updates a dispatch given an ID")
     @PutMapping("/{id}")
     public ResponseResult<DispatchDTO> updateDispatch(@PathVariable Long id, @RequestBody @Valid DispatchRequest request) {
@@ -108,6 +122,9 @@ public class DispatchController {
             return ResponseResult.fail("Unexpected error occurred while manually triggering dispatch", e);
         }
     }
+
+
+
 }
 
 

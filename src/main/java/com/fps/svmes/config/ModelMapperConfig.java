@@ -1,9 +1,20 @@
 package com.fps.svmes.config;
 
+import com.fps.svmes.dto.dtos.dispatch.DispatchDTO;
+import com.fps.svmes.dto.dtos.dispatch.DispatchedTaskDTO;
+import com.fps.svmes.dto.dtos.user.UserDTO;
+import com.fps.svmes.models.sql.task_schedule.*;
+
+
 import com.fasterxml.jackson.databind.ObjectMapper;
+
 import org.modelmapper.ModelMapper;
+import org.modelmapper.PropertyMap;
+import org.modelmapper.convention.MatchingStrategies;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+
+import static org.hibernate.Hibernate.map;
 
 @Configuration
 public class ModelMapperConfig {
@@ -11,6 +22,21 @@ public class ModelMapperConfig {
     public ModelMapper modelMapper() {
         ModelMapper mapper = new ModelMapper();
         mapper.getConfiguration().setSkipNullEnabled(true);
+        
+        // Add custom mapping for DispatchedTask to DispatchedTaskDTO
+        mapper.addMappings(new PropertyMap<DispatchedTask, DispatchedTaskDTO>() {
+            @Override
+            protected void configure() {
+                map().setDispatchId(source.getDispatch().getId()); // Map nested dispatch ID
+                map().setPersonnelId(source.getPersonnelId());
+                map().setFormId(source.getFormId());
+                map().setDispatchTime(source.getDispatchTime());
+                map().setStatus(source.getStatus());
+                map().setNotes(source.getNotes());
+                map().setUpdatedAt(source.getUpdatedAt());
+            }
+        });
+      
         return mapper;
     }
 
@@ -18,4 +44,5 @@ public class ModelMapperConfig {
     public ObjectMapper objectMapper() {
         return new ObjectMapper(); // Use for JSON serialization/deserialization
     }
+
 }

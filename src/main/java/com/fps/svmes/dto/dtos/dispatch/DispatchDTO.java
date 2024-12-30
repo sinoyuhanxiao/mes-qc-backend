@@ -47,7 +47,7 @@ public class DispatchDTO {
     private List<String> dispatchDays;
 
     @JsonProperty("dispatch_forms")
-    private List<Long> formIds;
+    private List<String> formIds;
 
     @JsonProperty("dispatch_personnel")
     private List<UserDTO> personnel;

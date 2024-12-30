@@ -149,7 +149,7 @@ public class DispatchServiceImpl implements DispatchService {
 
             // Validate and fetch personnel and forms
             List<Integer> personnelList = validateAndGetPersonnel(dispatch, dispatchId);
-            List<Long> formIds = validateAndGetForms(dispatch, dispatchId);
+            List<String> formIds = validateAndGetForms(dispatch, dispatchId);
 
             // Simulate incremented count for calculation but avoid persistence yet
             int simulatedExecutedCount = dispatch.getExecutedCount();
@@ -165,7 +165,7 @@ public class DispatchServiceImpl implements DispatchService {
             // Create dispatched tests
             List<DispatchedTask> dispatchedTasks = formIds.stream()
                     .flatMap(formId -> personnelList.stream()
-                            .map(personnelId -> createDispatchedTest(dispatch, formId, personnelId, calculatedDispatchTime)))
+                            .map(personnelId -> createDispatchedTask(dispatch, formId, personnelId, calculatedDispatchTime)))
                     .toList();
 
             // Save dispatched tests
@@ -420,7 +420,7 @@ public class DispatchServiceImpl implements DispatchService {
                 .toList();
     }
 
-    private List<Long> validateAndGetForms(Dispatch dispatch, Long dispatchId) {
+    private List<String> validateAndGetForms(Dispatch dispatch, Long dispatchId) {
         List<DispatchForm> forms = dispatch.getDispatchForms();
         if (forms == null || forms.isEmpty()) {
             logger.warn("Dispatch {} skipped: Forms list is null or empty.", dispatchId);
@@ -452,7 +452,7 @@ public class DispatchServiceImpl implements DispatchService {
 
 
     // Create a single DispatchedTest object
-    private DispatchedTask createDispatchedTest(Dispatch dispatch, Long formId, Integer personnelId, OffsetDateTime dispatchTime) {
+    private DispatchedTask createDispatchedTask(Dispatch dispatch, String formId, Integer personnelId, OffsetDateTime dispatchTime) {
         DispatchedTask test = new DispatchedTask();
         test.setDispatch(dispatch);
         test.setFormId(formId);
@@ -476,7 +476,7 @@ public class DispatchServiceImpl implements DispatchService {
      * @param personnelId the ID of the personnel
      * @return the generated URL
      */
-    private String generateFormUrl(int personnelId, Long formId) {
+    private String generateFormUrl(int personnelId, String formId) {
         return "https://your-system.com/forms/" + formId + "?user=" + personnelId;
     }
 

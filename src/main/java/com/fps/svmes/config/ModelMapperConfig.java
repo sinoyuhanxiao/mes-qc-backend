@@ -5,6 +5,9 @@ import com.fps.svmes.dto.dtos.dispatch.DispatchedTaskDTO;
 import com.fps.svmes.dto.dtos.user.UserDTO;
 import com.fps.svmes.models.sql.task_schedule.*;
 
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import org.modelmapper.ModelMapper;
 import org.modelmapper.PropertyMap;
 import org.modelmapper.convention.MatchingStrategies;
@@ -15,13 +18,13 @@ import static org.hibernate.Hibernate.map;
 
 @Configuration
 public class ModelMapperConfig {
-
     @Bean
     public ModelMapper modelMapper() {
-        ModelMapper modelMapper = new ModelMapper();
-
+        ModelMapper mapper = new ModelMapper();
+        mapper.getConfiguration().setSkipNullEnabled(true);
+        
         // Add custom mapping for DispatchedTask to DispatchedTaskDTO
-        modelMapper.addMappings(new PropertyMap<DispatchedTask, DispatchedTaskDTO>() {
+        mapper.addMappings(new PropertyMap<DispatchedTask, DispatchedTaskDTO>() {
             @Override
             protected void configure() {
                 map().setDispatchId(source.getDispatch().getId()); // Map nested dispatch ID
@@ -33,8 +36,13 @@ public class ModelMapperConfig {
                 map().setUpdatedAt(source.getUpdatedAt());
             }
         });
+      
+        return mapper;
+    }
 
-        return modelMapper;
+    @Bean
+    public ObjectMapper objectMapper() {
+        return new ObjectMapper(); // Use for JSON serialization/deserialization
     }
 
 }

@@ -30,7 +30,7 @@ public class DispatchedTask {
     private Long personnelId; // ID of the personnel receiving the test
 
     @Column(name = "form_id", nullable = false)
-    private Long formId; // ID of the dispatched form
+    private String formId; // ID of the dispatched form
 
     @Column(name = "dispatch_time", nullable = false, updatable = false)
     @CreationTimestamp

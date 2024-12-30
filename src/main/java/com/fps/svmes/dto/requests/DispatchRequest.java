@@ -64,8 +64,8 @@ public class DispatchRequest {
 
     @JsonProperty("formIds")
     @NotNull(message = "List of form IDs cannot be empty")
-    @Schema(description = "List of form IDs to associate with the dispatch", example = "[101, 102]")
-    private List<Long> formIds;
+    @Schema(description = "List of form IDs to associate with the dispatch", example = "[abcd-1a2, fas-adfa-s]")
+    private List<String> formIds;
 
     @JsonProperty("personnelIds")
     @NotNull(message = "List of personnel IDs cannot be empty")

@@ -20,15 +20,11 @@ public class DispatchForm {
     private Dispatch dispatch;
 
     @Column(name = "form_id", nullable = false)
-    private Long formId;
+    private String formId;
 
-    public DispatchForm(Long id, Dispatch dispatch, Long formId) {
-        this.id = id;
-        this.dispatch = dispatch;
-        this.formId = formId;
-    }
 
-    public DispatchForm( Dispatch dispatch, Long formId) {
+
+    public DispatchForm( Dispatch dispatch, String formId) {
         this.dispatch = dispatch;
         this.formId = formId;
     }

@@ -18,7 +18,7 @@ public class DispatchedTaskDTO {
     private Long personnelId;
 
     @JsonProperty("form_id")
-    private Long formId;
+    private String formId;
 
     @JsonProperty("dispatch_time")
     private OffsetDateTime dispatchTime;

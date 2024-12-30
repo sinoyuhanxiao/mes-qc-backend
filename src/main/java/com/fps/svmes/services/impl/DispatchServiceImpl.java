@@ -47,18 +47,18 @@ public class DispatchServiceImpl implements DispatchService {
     @Scheduled(fixedRate = 60000) // Run every 60 seconds
     @Override
     public synchronized void scheduleDispatches() {
-        logger.info("Running scheduled dispatches check.");
+        logger.debug("Running scheduled dispatches check.");
         List<Dispatch> activeDispatches = dispatchRepo.findByActiveTrue();
         OffsetDateTime now = OffsetDateTime.now();
-        logger.info("Number of active dispatches: {}.", activeDispatches.size());
+        logger.debug("Number of active dispatches: {}.", activeDispatches.size());
         for (Dispatch dispatch : activeDispatches) {
             try {
-                logger.info("Checking Dispatch id: {}", dispatch.getId());
+                logger.debug("Checking Dispatch id: {}", dispatch.getId());
                 if (shouldDispatch(dispatch, now)) {
-                    logger.info("Dispatch {} is scheduled for execution.", dispatch.getId());
+                    logger.debug("Dispatch {} is scheduled for execution.", dispatch.getId());
                     executeDispatch(dispatch.getId());
                 } else {
-                    logger.info("Dispatch {} skipped: Not eligible for execution at {}", dispatch.getId(), now);
+                    logger.debug("Dispatch {} skipped: Not eligible for execution at {}", dispatch.getId(), now);
                 }
             } catch (IllegalStateException e) {
                 logger.warn("Skipping dispatch {} due to configuration issue: {}", dispatch.getId(), e.getMessage());
@@ -105,7 +105,7 @@ public class DispatchServiceImpl implements DispatchService {
                 .anyMatch(day -> day.getDay().equalsIgnoreCase(currentDay)) &&
                 currentTime.equals(dispatch.getTimeOfDay());
 
-        logger.info("Dispatch {} shouldDispatch result: {}", dispatch.getId(), shouldDispatch);
+        logger.debug("Dispatch {} shouldDispatch result: {}", dispatch.getId(), shouldDispatch);
         return shouldDispatch;
     }
 
@@ -121,7 +121,7 @@ public class DispatchServiceImpl implements DispatchService {
             dispatch.setActive(false);
             dispatch.setUpdatedAt(OffsetDateTime.now());
             dispatchRepo.save(dispatch);
-            logger.info("Dispatch {} deactivated: Executed maximum times.", dispatch.getId());
+            logger.debug("Dispatch {} deactivated: Executed maximum times.", dispatch.getId());
             return false;
         }
 
@@ -129,7 +129,7 @@ public class DispatchServiceImpl implements DispatchService {
                 (long) dispatch.getIntervalMinutes() * dispatch.getExecutedCount());
         boolean shouldDispatch = !now.isBefore(nextDispatchTime);
 
-        logger.info("Dispatch {} next execution time: {}, shouldDispatch result: {}", dispatch.getId(), nextDispatchTime, shouldDispatch);
+        logger.debug("Dispatch {} next execution time: {}, shouldDispatch result: {}", dispatch.getId(), nextDispatchTime, shouldDispatch);
         return shouldDispatch;
     }
 
@@ -137,7 +137,7 @@ public class DispatchServiceImpl implements DispatchService {
     @Override
     public void executeDispatch(Long dispatchId) {
         Dispatch dispatch = dispatchRepo.findById(dispatchId).orElseThrow();
-        logger.info("Executing dispatch {}.", dispatchId);
+        logger.debug("Executing dispatch {}.", dispatchId);
 
         try {
             // Validate interval-specific fields
@@ -170,7 +170,7 @@ public class DispatchServiceImpl implements DispatchService {
 
             // Save dispatched tests
             dispatchedTaskRepo.saveAll(dispatchedTasks);
-            logger.info("Dispatch {} created {} tests.", dispatchId, dispatchedTasks.size());
+            logger.debug("Dispatch {} created {} tests.", dispatchId, dispatchedTasks.size());
 
             // Send notifications
             dispatchedTasks.forEach(test -> simulateNotification(
@@ -409,10 +409,6 @@ public class DispatchServiceImpl implements DispatchService {
         return dto;
     }
 
-//    private DispatchedTaskDTO convertToDTO(DispatchedTask dispatchedTask) {
-//        return modelMapper.map(dispatchedTask, DispatchedTaskDTO.class);
-//    }
-
     private List<Integer> validateAndGetPersonnel(Dispatch dispatch, Long dispatchId) {
         List<DispatchPersonnel> personnel = dispatch.getDispatchPersonnel();
         if (personnel == null || personnel.isEmpty()) {
@@ -449,7 +445,6 @@ public class DispatchServiceImpl implements DispatchService {
             return OffsetDateTime.now().with(LocalTime.parse(dispatch.getTimeOfDay()));
         }
     }
-
 
     private boolean isIntervalSchedule(Dispatch dispatch) {
         return ScheduleType.INTERVAL.name().equals(dispatch.getScheduleType());

@@ -5,9 +5,11 @@ import com.fps.svmes.dto.dtos.dispatch.DispatchedTaskDTO;
 import com.fps.svmes.dto.dtos.user.UserDTO;
 import com.fps.svmes.dto.requests.DispatchRequest;
 import com.fps.svmes.models.sql.task_schedule.*;
+import com.fps.svmes.models.sql.user.User;
 import com.fps.svmes.repositories.jpaRepo.dispatch.DispatchRepository;
 import com.fps.svmes.repositories.jpaRepo.dispatch.DispatchedTestRepository;
 import com.fps.svmes.services.DispatchService;
+import com.fps.svmes.services.UserService;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -40,6 +42,9 @@ public class DispatchServiceImpl implements DispatchService {
 
     @Autowired
     private ModelMapper modelMapper;
+
+    @Autowired
+    private UserService userService;
 
     // TEST DISPATCH SCHEDULING LOGIC --------------------------------------------------------------------------
 
@@ -148,8 +153,8 @@ public class DispatchServiceImpl implements DispatchService {
             }
 
             // Validate and fetch personnel and forms
-            List<Integer> personnelList = validateAndGetPersonnel(dispatch, dispatchId);
-            List<String> formIds = validateAndGetForms(dispatch, dispatchId);
+            List<Integer> userList = validateAndGetPersonnel(dispatch, dispatchId);
+            List<String> qcFormTreeNodeIdList = validateAndGetForms(dispatch, dispatchId);
 
             // Simulate incremented count for calculation but avoid persistence yet
             int simulatedExecutedCount = dispatch.getExecutedCount();
@@ -163,9 +168,9 @@ public class DispatchServiceImpl implements DispatchService {
             logger.debug("Dispatch {} calculated dispatch time: {}", dispatchId, calculatedDispatchTime);
 
             // Create dispatched tests
-            List<DispatchedTask> dispatchedTasks = formIds.stream()
-                    .flatMap(formId -> personnelList.stream()
-                            .map(personnelId -> createDispatchedTask(dispatch, formId, personnelId, calculatedDispatchTime)))
+            List<DispatchedTask> dispatchedTasks = qcFormTreeNodeIdList.stream()
+                    .flatMap(qcFormTreeNodeId -> userList.stream()
+                            .map(userId -> createDispatchedTask(dispatch, qcFormTreeNodeId, userId, calculatedDispatchTime)))
                     .toList();
 
             // Save dispatched tests
@@ -173,9 +178,9 @@ public class DispatchServiceImpl implements DispatchService {
             logger.debug("Dispatch {} created {} tests.", dispatchId, dispatchedTasks.size());
 
             // Send notifications
-            dispatchedTasks.forEach(test -> simulateNotification(
-                    test.getPersonnelId().intValue(),
-                    generateFormUrl(test.getPersonnelId().intValue(), test.getFormId())
+            dispatchedTasks.forEach(task -> simulateNotification(
+                    task.getUser().getId(),
+                    generateFormUrl(task.getUser().getId(), task.getQcFormTreeNodeId())
             ));
 
             // Persist incremented executed count
@@ -253,8 +258,8 @@ public class DispatchServiceImpl implements DispatchService {
         }
 
         // Handle DispatchPersonnel
-        if (request.getPersonnelIds() != null) {
-            List<DispatchPersonnel> personnel = request.getPersonnelIds().stream()
+        if (request.getUserIds() != null) {
+            List<DispatchPersonnel> personnel = request.getUserIds().stream()
                     .map(userId -> new DispatchPersonnel(dispatch, userId.intValue()))
                     .toList();
             dispatch.setDispatchPersonnel(personnel);
@@ -323,8 +328,8 @@ public class DispatchServiceImpl implements DispatchService {
 
         // 6. Update DispatchPersonnel relationships
         dispatch.getDispatchPersonnel().clear();
-        if (request.getPersonnelIds() != null) {
-            List<DispatchPersonnel> personnel = request.getPersonnelIds().stream()
+        if (request.getUserIds() != null) {
+            List<DispatchPersonnel> personnel = request.getUserIds().stream()
                     .map(userId -> new DispatchPersonnel(dispatch, userId.intValue()))
                     .toList();
             dispatch.getDispatchPersonnel().addAll(personnel);
@@ -397,7 +402,7 @@ public class DispatchServiceImpl implements DispatchService {
         }
         if (dispatch.getDispatchForms() != null) {
             dto.setFormIds(dispatch.getDispatchForms().stream()
-                    .map(DispatchForm::getFormId)
+                    .map(DispatchForm::getQcFormTreeNodeId)
                     .collect(Collectors.toList()));
         }
         if (dispatch.getDispatchPersonnel() != null) {
@@ -427,7 +432,7 @@ public class DispatchServiceImpl implements DispatchService {
             throw new IllegalStateException("Forms list is required.");
         }
         return forms.stream()
-                .map(DispatchForm::getFormId)
+                .map(DispatchForm::getQcFormTreeNodeId)
                 .toList();
     }
 
@@ -451,16 +456,22 @@ public class DispatchServiceImpl implements DispatchService {
     }
 
 
-    // Create a single DispatchedTest object
-    private DispatchedTask createDispatchedTask(Dispatch dispatch, String formId, Integer personnelId, OffsetDateTime dispatchTime) {
-        DispatchedTask test = new DispatchedTask();
-        test.setDispatch(dispatch);
-        test.setFormId(formId);
-        test.setPersonnelId(Long.valueOf(personnelId));
-        test.setDispatchTime(dispatchTime);
-        test.setStatus("PENDING");
-        return test;
+    private DispatchedTask createDispatchedTask(Dispatch dispatch, String qcFormTreeNodeId, Integer userId, OffsetDateTime dispatchTime) {
+        // Fetch the User entity using UserService
+        UserDTO userDTO = userService.getUserById(userId); // Use UserService to retrieve the user
+        User user = modelMapper.map(userDTO, User.class);
+
+        // Create and populate DispatchedTask
+        DispatchedTask task = new DispatchedTask();
+        task.setDispatch(dispatch);
+        task.setQcFormTreeNodeId(qcFormTreeNodeId);
+        task.setUser(user);
+        task.setDispatchTime(dispatchTime);
+        task.setState("PENDING");
+        task.setStatus(1); // Active by default
+        return task;
     }
+
 
     // Increment executed count and save the dispatch
     private void incrementExecutedCount(Dispatch dispatch) {
@@ -473,21 +484,21 @@ public class DispatchServiceImpl implements DispatchService {
      * Generates a unique URL for a form assigned to a personnel.
      *
      * @param formId the ID of the form
-     * @param personnelId the ID of the personnel
+     * @param userId the ID of the personnel
      * @return the generated URL
      */
-    private String generateFormUrl(int personnelId, String formId) {
-        return "https://your-system.com/forms/" + formId + "?user=" + personnelId;
+    private String generateFormUrl(int userId, String formId) {
+        return "https://your-system.com/forms/" + formId + "?user=" + userId;
     }
 
     /**
      * Simulates sending a notification by printing to the console.
      *
-     * @param personnelId the ID of the personnel
+     * @param userId the ID of the personnel
      * @param formUrl the URL of the form
      */
-    private void simulateNotification(int personnelId, String formUrl) {
-        logger.info("Simulating notification to Personnel ID: {} with Form URL: {}", personnelId, formUrl);
+    private void simulateNotification(int userId, String formUrl) {
+        logger.info("Simulating notification to Personnel ID: {} with Form URL: {}", userId, formUrl);
     }
 
 }

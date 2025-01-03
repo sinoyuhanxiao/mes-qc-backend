@@ -10,6 +10,7 @@ import com.fps.svmes.models.sql.task_schedule.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import com.fps.svmes.models.sql.user.User;
 import org.modelmapper.ModelMapper;
 import org.modelmapper.PropertyMap;
 import org.modelmapper.convention.MatchingStrategies;
@@ -24,18 +25,28 @@ public class ModelMapperConfig {
     public ModelMapper modelMapper() {
         ModelMapper mapper = new ModelMapper();
         mapper.getConfiguration().setSkipNullEnabled(true);
-        
+
         // Add custom mapping for DispatchedTask to DispatchedTaskDTO
         mapper.addMappings(new PropertyMap<DispatchedTask, DispatchedTaskDTO>() {
             @Override
             protected void configure() {
                 map().setDispatchId(source.getDispatch().getId()); // Map nested dispatch ID
-                map().setPersonnelId(source.getPersonnelId());
-                map().setFormId(source.getFormId());
-                map().setDispatchTime(source.getDispatchTime());
-                map().setStatus(source.getStatus());
-                map().setNotes(source.getNotes());
-                map().setUpdatedAt(source.getUpdatedAt());
+                map().setUserId(Long.valueOf(source.getUser().getId())); // Map user ID
+                map().setQcFormTreeNodeId(source.getQcFormTreeNodeId()); // Map form tree node ID
+                map().setDispatchTime(source.getDispatchTime()); // Map dispatch time
+                map().setState(source.getState()); // Map state
+                map().setStatus(source.getStatus()); // Map status
+                map().setNotes(source.getNotes()); // Map notes
+                map().setFinishedAt(source.getFinishedAt()); // Map finished_at
+                map().setUpdatedAt(source.getUpdatedAt()); // Map updated_at
+
+                // Null-safe mapping for createdBy
+                using(ctx -> ctx.getSource() != null ? ((User) ctx.getSource()).getId() : null)
+                        .map(source.getCreatedBy(), destination.getCreated_by());
+
+                // Null-safe mapping for updatedBy
+                using(ctx -> ctx.getSource() != null ? ((User) ctx.getSource()).getId() : null)
+                        .map(source.getUpdatedBy(), destination.getUpdated_by());
             }
         });
       

@@ -19,13 +19,13 @@ public class DispatchForm {
     @JsonBackReference
     private Dispatch dispatch;
 
-    @Column(name = "form_id", nullable = false)
-    private String formId;
+    @Column(name = "qc_form_tree_node_id", nullable = false)
+    private String qcFormTreeNodeId;
 
 
 
-    public DispatchForm( Dispatch dispatch, String formId) {
+    public DispatchForm( Dispatch dispatch, String qcFormTreeNodeId) {
         this.dispatch = dispatch;
-        this.formId = formId;
+        this.qcFormTreeNodeId = qcFormTreeNodeId;
     }
 }

@@ -1,5 +1,6 @@
 package com.fps.svmes.models.sql.task_schedule;
 
+import com.fps.svmes.models.sql.user.User;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -26,24 +27,39 @@ public class DispatchedTask {
     @JoinColumn(name = "dispatch_id", nullable = false)
     private Dispatch dispatch; // Associated configuration
 
-    @Column(name = "personnel_id", nullable = false)
-    private Long personnelId; // ID of the personnel receiving the test
+    @ManyToOne
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
 
-    @Column(name = "form_id", nullable = false)
-    private String formId; // ID of the dispatched form
+    @Column(name = "qc_form_tree_node_id", nullable = false)
+    private String qcFormTreeNodeId; // ID of the dispatched form
 
     @Column(name = "dispatch_time", nullable = false, updatable = false)
     @CreationTimestamp
     private OffsetDateTime dispatchTime; // Time when the test was dispatched
 
-    @Column(name = "status", length = 20, nullable = false)
-    private String status; // Status of the test (e.g., "PENDING", "COMPLETED")
+    @Column(name = "state", length = 20, nullable = false)
+    private String state; // state of the test (e.g., "PENDING", "COMPLETED")
 
     @Column(name = "updated_at")
     @UpdateTimestamp
     private OffsetDateTime updatedAt; // Tracks when the record was last edited
 
+    @Column(name = "finished_at")
+    private OffsetDateTime finishedAt;
+
     @Column(name = "notes")
     private String notes; // Optional notes about edits or status changes
+
+    @ManyToOne
+    @JoinColumn(name = "created_by", nullable = true)
+    private User createdBy;
+
+    @ManyToOne
+    @JoinColumn(name = "updated_by", nullable = true)
+    private User updatedBy;
+
+    @Column(name = "status", nullable = false, columnDefinition = "SMALLINT DEFAULT 1")
+    private Integer status; // New column for active/inactive status
 }
 

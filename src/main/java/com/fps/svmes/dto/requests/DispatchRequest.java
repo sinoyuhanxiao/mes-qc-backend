@@ -10,7 +10,6 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.util.List;
 
@@ -70,5 +69,5 @@ public class DispatchRequest {
     @JsonProperty("personnelIds")
     @NotNull(message = "List of personnel IDs cannot be empty")
     @Schema(description = "List of personnel IDs to associate with the dispatch", example = "[1001, 1002]")
-    private List<Long> personnelIds;
+    private List<Long> userIds;
 }

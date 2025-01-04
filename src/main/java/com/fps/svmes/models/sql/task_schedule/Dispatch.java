@@ -45,8 +45,6 @@ public class Dispatch {
     @Column(name = "interval_minutes")
     private Integer intervalMinutes;
 
-
-
     @Column(name = "repeat_count")
     private Integer repeatCount;
 

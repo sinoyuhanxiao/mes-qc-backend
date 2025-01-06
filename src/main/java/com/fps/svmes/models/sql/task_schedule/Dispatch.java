@@ -5,7 +5,6 @@ import jakarta.persistence.*;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
-import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -81,7 +80,6 @@ public class Dispatch {
                 ", timeOfDay='" + timeOfDay + '\'' +
                 '}';
     }
-
 
 }
 

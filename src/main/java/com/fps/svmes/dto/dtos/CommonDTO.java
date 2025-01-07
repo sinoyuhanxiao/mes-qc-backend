@@ -4,17 +4,19 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.MappedSuperclass;
 import lombok.Data;
 
+import java.time.OffsetDateTime;
+
 @Data
 @MappedSuperclass
 public abstract class CommonDTO {
     @JsonProperty("created_at")
-    private Long createdAt;
+    private OffsetDateTime createdAt;
 
     @JsonProperty("created_by")
     private Integer createdBy;
 
     @JsonProperty("updated_at")
-    private Long updatedAt;
+    private OffsetDateTime updatedAt;
 
     @JsonProperty("updated_by")
     private Integer updatedBy;

@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -38,7 +39,7 @@ public class QcFormTemplateServiceImpl implements QcFormTemplateService {
     @Override
     public QcFormTemplateDTO createTemplate(QcFormTemplateDTO dto) {
         QcFormTemplate template = modelMapper.map(dto, QcFormTemplate.class);
-        template.setCreatedAt(Timestamp.valueOf(LocalDateTime.now()));
+        template.setCreatedAt(OffsetDateTime.now());
         template.setStatus(1);
         return modelMapper.map(repository.save(template), QcFormTemplateDTO.class);
     }
@@ -55,7 +56,7 @@ public class QcFormTemplateServiceImpl implements QcFormTemplateService {
         } else {
             template.setFormTemplateJson(template.getFormTemplateJson());
         }
-        template.setUpdatedAt(Timestamp.valueOf(LocalDateTime.now()));
+        template.setUpdatedAt(OffsetDateTime.now());
         template.setUpdatedBy(dto.getUpdatedBy());
 
         return modelMapper.map(repository.save(template), QcFormTemplateDTO.class);

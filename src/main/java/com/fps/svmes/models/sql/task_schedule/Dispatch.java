@@ -5,7 +5,6 @@ import jakarta.persistence.*;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
-import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -45,8 +44,6 @@ public class Dispatch {
     @Column(name = "interval_minutes")
     private Integer intervalMinutes;
 
-
-
     @Column(name = "repeat_count")
     private Integer repeatCount;
 
@@ -83,7 +80,6 @@ public class Dispatch {
                 ", timeOfDay='" + timeOfDay + '\'' +
                 '}';
     }
-
 
 }
 

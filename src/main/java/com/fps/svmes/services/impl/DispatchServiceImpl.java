@@ -95,7 +95,7 @@ public class DispatchServiceImpl implements DispatchService {
     public DispatchDTO createDispatch(DispatchRequest request) {
         Dispatch dispatch = modelMapper.map(request, Dispatch.class);
         dispatch.setExecutedCount(0);
-        dispatch.setCreationDetails(request.getCreatedBy(), 1);
+//        dispatch.setCreationDetails(request.getCreatedBy(), 1);
 
         // Handle DispatchForms
         if (request.getFormIds() != null) {
@@ -127,7 +127,7 @@ public class DispatchServiceImpl implements DispatchService {
                 .orElseThrow(() -> new EntityNotFoundException("Dispatch not found"));
 
         modelMapper.map(request, dispatch);
-        dispatch.setUpdatedAt(new Timestamp(System.currentTimeMillis()));
+//        dispatch.setUpdatedAt(new Timestamp(System.currentTimeMillis()));
 
         // Handle DispatchForms
         if (request.getFormIds() != null) {
@@ -227,7 +227,7 @@ public class DispatchServiceImpl implements DispatchService {
         if (taskScheduleService.cancelDispatch(dispatchId)) {
             // Update status after cancellation
             dispatch.setStatus(0); // Mark as inactive
-            dispatch.setUpdatedAt(new Timestamp(System.currentTimeMillis()));
+//            dispatch.setUpdatedAt(new Timestamp(System.currentTimeMillis()));
             dispatchRepo.save(dispatch);
         } else {
             throw new IllegalStateException("No task was scheduled for this dispatch ID.");
@@ -283,7 +283,7 @@ public class DispatchServiceImpl implements DispatchService {
                             task.setDispatchTime(dispatchTime);
                             task.setNotes(dispatch.getRemark());
                             task.setDescription(dispatch.getRemark());
-                            task.setCreationDetails(30, 1);
+//                            task.setCreationDetails(30, 1);
                             task.setDueDate(dueDate);
                             task.setOverdue(false);
                             task.setDispatchedTaskStateId(1); // Default state ID

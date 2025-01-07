@@ -85,7 +85,7 @@ public class UserController {
     @Operation(summary = "Validate User Credentials", description = "Validates the provided username and password")
     public ResponseResult<String> validateUser(@RequestParam String username, @RequestParam String password) {
         try {
-            boolean isValid = userService.validateCredentials(username, password);
+            boolean isValid = userService.getUserByUsername(username).getStatus() == 1 && userService.validateCredentials(username, password);
 
             if (isValid) {
                 logger.info("User validation successful for username: {}", username);

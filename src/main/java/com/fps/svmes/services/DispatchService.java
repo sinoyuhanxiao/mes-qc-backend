@@ -16,12 +16,12 @@ import java.util.List;
 public interface DispatchService {
     void executeDispatch(Long dispatchId);
     void scheduleDispatches();
-    boolean shouldDispatch(Dispatch dispatch, OffsetDateTime now);
     DispatchDTO createDispatch(@Valid DispatchRequest request);
     DispatchDTO updateDispatch(Long id, @Valid DispatchRequest request);
     DispatchDTO getDispatch(Long id);
     List<DispatchDTO> getAllDispatches();
     List<DispatchedTaskDTO> getAllDispatchedTasks();
     void deleteDispatch(Long id);
-    boolean manualDispatch(Long id);
+    void scheduleDispatchTask(Long dispatchId, Runnable task);
+    void cancelDispatchTask(Long dispatchId);
 }

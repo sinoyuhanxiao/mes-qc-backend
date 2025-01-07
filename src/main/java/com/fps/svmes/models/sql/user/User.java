@@ -1,13 +1,16 @@
 package com.fps.svmes.models.sql.user;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fps.svmes.models.sql.Common;
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 
 @Entity
 @Table(name = "user", schema = "quality_management")
 @Data
-public class User {
+@EqualsAndHashCode(callSuper = true)
+public class User extends Common {
     @Id
     @JsonProperty("id")
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -33,5 +36,13 @@ public class User {
     @JsonProperty("password")
     @Column(name = "password")
     private String password;
+
+    @JsonProperty("email")
+    @Column(name = "email")
+    private String email;
+
+    @JsonProperty("phone_number")
+    @Column(name = "phone_number")
+    private String phoneNumber;
 
 }

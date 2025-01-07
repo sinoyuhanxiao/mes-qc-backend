@@ -2,11 +2,14 @@ package com.fps.svmes.dto.dtos.user;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fps.svmes.dto.dtos.CommonDTO;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 
 @Data
 @JsonInclude(JsonInclude.Include.NON_NULL)
-public class UserDTO {
+@EqualsAndHashCode(callSuper = true)
+public class UserDTO extends CommonDTO {
 
     @JsonProperty("id")
     private Integer id;
@@ -25,4 +28,10 @@ public class UserDTO {
 
     @JsonProperty("password")
     private String password;
+
+    @JsonProperty("email")
+    private String email;
+
+    @JsonProperty("phone_number")
+    private String phoneNumber;
 }

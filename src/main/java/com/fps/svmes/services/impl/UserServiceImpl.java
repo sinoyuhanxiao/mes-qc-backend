@@ -68,6 +68,32 @@ public class UserServiceImpl implements UserService {
             if (userDTO.getPassword() != null) {
                 existingUser.setPassword(userDTO.getPassword());
             }
+            if (userDTO.getEmail() != null) {
+                existingUser.setEmail(userDTO.getEmail());
+            }
+            if (userDTO.getPhoneNumber() != null) {
+                existingUser.setPhoneNumber(userDTO.getPhoneNumber());
+            }
+            // basic 5
+            if (userDTO.getStatus() != null) {
+                existingUser.setStatus(userDTO.getStatus());
+            }
+
+            if (userDTO.getCreatedBy() != null) {
+                existingUser.setCreatedBy(userDTO.getCreatedBy());
+            }
+
+            if (userDTO.getUpdatedBy() != null) {
+                existingUser.setUpdatedBy(userDTO.getUpdatedBy());
+            }
+
+            if (userDTO.getCreatedAt() != null) {
+                existingUser.setCreatedAt(userDTO.getCreatedAt());
+            }
+
+            if (userDTO.getUpdatedAt() != null) {
+                existingUser.setUpdatedAt(userDTO.getUpdatedAt());
+            }
 
             User updatedUser = userRepository.save(existingUser);
             return modelMapper.map(updatedUser, UserDTO.class);

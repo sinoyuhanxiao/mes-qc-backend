@@ -22,10 +22,8 @@ public class DispatchForm {
     @Column(name = "qc_form_tree_node_id", nullable = false)
     private String qcFormTreeNodeId;
 
-
-
-    public DispatchForm( Dispatch dispatch, String qcFormTreeNodeId) {
+    public DispatchForm(Dispatch dispatch, String formTreeNodeId) {
+        this.setQcFormTreeNodeId(formTreeNodeId);
         this.dispatch = dispatch;
-        this.qcFormTreeNodeId = qcFormTreeNodeId;
     }
 }

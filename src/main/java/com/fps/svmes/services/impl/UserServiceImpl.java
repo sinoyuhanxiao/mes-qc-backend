@@ -126,4 +126,10 @@ public class UserServiceImpl implements UserService {
         }
     }
 
+    public List<UserDTO> getUsersByIds(List<Integer> userIds) {
+        return getAllUsers().stream()
+                .filter(user -> userIds.contains(user.getId()))
+                .toList();
+    }
+
 }

@@ -1,5 +1,6 @@
 package com.fps.svmes.models.sql.task_schedule;
 
+import com.fps.svmes.models.sql.Common;
 import com.fps.svmes.models.sql.user.User;
 import jakarta.persistence.*;
 import lombok.Data;
@@ -7,6 +8,8 @@ import lombok.EqualsAndHashCode;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
+import java.sql.Timestamp;
+import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 
 /**
@@ -14,13 +17,16 @@ import java.time.OffsetDateTime;
  */
 @EqualsAndHashCode(callSuper = false)
 @Entity
-@Table(name = "dispatched_task", schema = "quality_management")
+@Table(name = "dispatched_task_test", schema = "quality_management")
 @Data
-public class DispatchedTask {
+public class DispatchedTask extends Common {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id")
     private Long id;
+
+    @Column(name = "name")
+    private String name;
 
     @ManyToOne
     @JoinColumn(name = "dispatch_id", nullable = false)
@@ -35,30 +41,25 @@ public class DispatchedTask {
 
     @Column(name = "dispatch_time", nullable = false, updatable = false)
     @CreationTimestamp
-    private OffsetDateTime dispatchTime; // Time when the test was dispatched
-
-    @Column(name = "state", length = 20, nullable = false)
-    private String state; // state of the test (e.g., "PENDING", "COMPLETED")
-
-    @Column(name = "updated_at")
-    @UpdateTimestamp
-    private OffsetDateTime updatedAt; // Tracks when the record was last edited
+    private Timestamp dispatchTime; // Time when the test was dispatched
 
     @Column(name = "finished_at")
-    private OffsetDateTime finishedAt;
+    private Timestamp finishedAt;
+
+    @Column(name = "due_date")
+    private Timestamp dueDate;
 
     @Column(name = "notes")
     private String notes; // Optional notes about edits or status changes
 
-    @ManyToOne
-    @JoinColumn(name = "created_by", nullable = true)
-    private User createdBy;
+    @Column(name = "description")
+    private String description;
 
-    @ManyToOne
-    @JoinColumn(name = "updated_by", nullable = true)
-    private User updatedBy;
+    @Column(name = "dispatched_task_state_id", nullable = false)
+    private Integer dispatchedTaskStateId;
 
-    @Column(name = "status", nullable = false, columnDefinition = "SMALLINT DEFAULT 1")
-    private Integer status; // New column for active/inactive status
+    @Column(name = "is_overdue", nullable = false)
+    private boolean isOverdue;
+
 }
 

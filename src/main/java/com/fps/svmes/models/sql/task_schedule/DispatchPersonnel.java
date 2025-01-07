@@ -26,19 +26,13 @@ public class DispatchPersonnel {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-
-    public DispatchPersonnel(Long id, Dispatch dispatch, Integer userId) {
-        this.id = id;
+    public DispatchPersonnel(Dispatch dispatch, Integer userId) {
         this.dispatch = dispatch;
-        this.user = new User();
-        this.user.setId(userId);
+        user = new User();
+        user.setId(userId);
+        this.setUser(user);
     }
 
-    public DispatchPersonnel( Dispatch dispatch, Integer userId) {
-        this.dispatch = dispatch;
-        this.user = new User();
-        this.user.setId(userId);
-    }
 
     @Override
     public String toString() {
@@ -47,7 +41,6 @@ public class DispatchPersonnel {
                 ", userId=" + (user != null ? user.getId() : "null") +
                 '}';
     }
-
 
 }
 

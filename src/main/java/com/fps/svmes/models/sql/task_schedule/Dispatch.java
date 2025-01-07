@@ -1,86 +1,78 @@
 package com.fps.svmes.models.sql.task_schedule;
 
+import com.fps.svmes.models.sql.Common;
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
+import lombok.NoArgsConstructor;
 
+import java.sql.Timestamp;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Represents the configuration for dispatching QC tests.
- */
-
-@EqualsAndHashCode(callSuper = false)
-@Entity
-@Table(name = "dispatch", schema = "quality_management")
 @Data
-public class Dispatch {
+@NoArgsConstructor
+@EqualsAndHashCode(callSuper = true)
+@Entity
+@Table(name = "dispatch_temp", schema = "quality_management")
+public class Dispatch extends Common {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id")
     private Long id;
 
+    @Column(name = "type", nullable = false)
+    private String type;
+
     @Column(name = "name", nullable = false)
     private String name;
 
-    @JsonManagedReference
-    @OneToMany(mappedBy = "dispatch", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
-    private List<DispatchPersonnel> dispatchPersonnel = new ArrayList<>();
+    @Column(name = "remark")
+    private String remark;
 
-    @JsonManagedReference
-    @OneToMany(mappedBy = "dispatch", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
-    private List<DispatchForm> dispatchForms = new ArrayList<>();
+    @Column(name = "cron_expression", nullable = false)
+    private String cronExpression;
 
-    @JsonManagedReference
-    @OneToMany(mappedBy = "dispatch", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
-    private List<DispatchDay> dispatchDays = new ArrayList<>();
+    @Column(name = "start_time", nullable = false)
+    private Timestamp startTime;
 
-    @Column(name = "schedule_type")
-    private String scheduleType;
+    @Column(name = "end_time", nullable = false)
+    private Timestamp endTime;
 
-    @Column(name = "interval_minutes")
-    private Integer intervalMinutes;
-
-    @Column(name = "repeat_count")
-    private Integer repeatCount;
+    @Column(name = "dispatch_limit")
+    private Integer dispatchLimit;
 
     @Column(name = "executed_count", nullable = false)
     private Integer executedCount = 0;
 
-    @Column(name = "active", nullable = false)
-    private Boolean active;
+    @OneToMany(mappedBy = "dispatch", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonManagedReference
+    private List<DispatchPersonnel> dispatchPersonnel;
 
-    @Column(name = "created_at", updatable = false)
-    private OffsetDateTime createdAt;
+    @OneToMany(mappedBy = "dispatch", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonManagedReference
+    private List<DispatchForm> dispatchForms;
 
-    @Column(name = "updated_at")
-    private OffsetDateTime updatedAt;
+    @Column(name = "due_date_offset_minute")
+    private Integer dueDateOffsetMinute; // Total offset in minutes
 
-    @Column(name = "start_time")
-    private OffsetDateTime startTime;
-
-    @Column(name = "time_of_day")
-    private String timeOfDay;
-
-    @Override
-    public String toString() {
-        return "Dispatch{" +
-                "id=" + id +
-                ", scheduleType='" + scheduleType + '\'' +
-                ", intervalMinutes=" + intervalMinutes +
-                ", startTime=" + startTime +
-                ", repeatCount=" + repeatCount +
-                ", executedCount=" + executedCount +
-                ", active=" + active +
-                ", createdAt=" + createdAt +
-                ", updatedAt=" + updatedAt +
-                ", timeOfDay='" + timeOfDay + '\'' +
-                '}';
+    public void incrementExecutedCount() {
+        if (executedCount == null) {
+            executedCount = 0;
+        }
+        executedCount++;
     }
 
+    public boolean isActiveAndWithinScheduledTime() {
+        long currentTimeMillis = System.currentTimeMillis();
+        return getStatus() == 1 &&
+                startTime != null &&
+                endTime != null &&
+                currentTimeMillis >= startTime.getTime() &&
+                currentTimeMillis <= endTime.getTime();
+    }
 }
-
-

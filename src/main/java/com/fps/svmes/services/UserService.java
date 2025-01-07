@@ -19,4 +19,6 @@ public interface UserService {
     UserDTO getUserByUsername(String username);
 
     UserDTO getUserById(Integer id);
+
+    List<UserDTO> getUsersByIds(List<Integer> userIds);
 }

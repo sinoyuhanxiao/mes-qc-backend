@@ -3,9 +3,10 @@ package com.fps.svmes.dto.dtos.dispatch;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fps.svmes.dto.dtos.user.UserDTO;
+import com.fps.svmes.models.sql.user.User;
 import lombok.Data;
 
-import java.time.OffsetDateTime;
+import java.sql.Timestamp;
 
 @Data
 public class DispatchedTaskDTO {
@@ -15,14 +16,14 @@ public class DispatchedTaskDTO {
     @JsonProperty("dispatch_id")
     private Long dispatchId;
 
-    @JsonProperty("user_id")
-    private Long userId;
+    @JsonProperty("user")
+    private UserDTO user;
 
     @JsonProperty("qc_form_tree_node_id")
     private String qcFormTreeNodeId;
 
     @JsonProperty("dispatch_time")
-    private OffsetDateTime dispatchTime;
+    private Timestamp dispatchTime;
 
     @JsonProperty("state")
     private String state;
@@ -31,10 +32,10 @@ public class DispatchedTaskDTO {
     private String notes;
 
     @JsonProperty("finished_at")
-    private OffsetDateTime finishedAt;
+    private Timestamp finishedAt;
 
     @JsonProperty("updated_at")
-    private OffsetDateTime updatedAt;
+    private Timestamp updatedAt;
 
     @JsonProperty("created_by")
     private Integer created_by;

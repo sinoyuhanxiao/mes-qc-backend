@@ -32,9 +32,13 @@ public abstract class Common {
     @Column(name = "status", nullable = false, columnDefinition = "SMALLINT DEFAULT 1")
     private Integer status;
 
-    public void setDetails(Integer userId, Integer status) {
+    public void setCreationDetails(Integer userId, Integer status) {
         this.createdAt = OffsetDateTime.now();
         this.createdBy = userId;
+        this.status = status;
+    }
+
+    public void setUpdateDetails(Integer userId, Integer status) {
         this.updatedAt = OffsetDateTime.now();
         this.updatedBy = userId;
         this.status = status;

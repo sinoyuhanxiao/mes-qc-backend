@@ -1,49 +1,48 @@
 package com.fps.svmes.dto.dtos.dispatch;
 
-
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fps.svmes.dto.dtos.user.UserDTO;
-import com.fps.svmes.models.sql.user.User;
+import com.fps.svmes.dto.dtos.CommonDTO;
 import lombok.Data;
-
-import java.sql.Timestamp;
+import lombok.EqualsAndHashCode;
+import java.time.OffsetDateTime;
 
 @Data
-public class DispatchedTaskDTO {
+@EqualsAndHashCode(callSuper = true)
+public class DispatchedTaskDTO extends CommonDTO {
+
     @JsonProperty("id")
     private Long id;
 
-    @JsonProperty("dispatch_id")
-    private Long dispatchId;
+    @JsonProperty("dispatch_id") // make it nullable
+    private Long dispatchId; // Associated configuration ID
 
-    @JsonProperty("user")
-    private UserDTO user;
+    @JsonProperty("user_id")
+    private Long userId; // User ID associated with the task
 
     @JsonProperty("qc_form_tree_node_id")
-    private String qcFormTreeNodeId;
+    private String qcFormTreeNodeId; // ID of the dispatched form
 
     @JsonProperty("dispatch_time")
-    private Timestamp dispatchTime;
+    private OffsetDateTime dispatchTime; // Time when the test was dispatched
 
-    @JsonProperty("state")
-    private String state;
+    @JsonProperty("name")
+    private String name; // Task name
 
-    @JsonProperty("notes")
-    private String notes;
+    @JsonProperty("description")
+    private String description; // Task description
+
+    @JsonProperty("due_date")
+    private OffsetDateTime dueDate; // Due date of the task
+
+    @JsonProperty("is_overdue")
+    private Boolean isOverdue; // Indicates if the task is overdue
+
+    @JsonProperty("dispatched_task_state_id")
+    private Short stateId; // State ID referencing dispatched_task_state
 
     @JsonProperty("finished_at")
-    private Timestamp finishedAt;
+    private OffsetDateTime finishedAt; // Tracks when the task was finished
 
-    @JsonProperty("updated_at")
-    private Timestamp updatedAt;
-
-    @JsonProperty("created_by")
-    private Integer created_by;
-
-    @JsonProperty("updated_by")
-    private Integer updated_by;
-
-    @JsonProperty("status")
-    private Integer status;
-
+    @JsonProperty("notes")
+    private String notes; // Optional notes about edits or status changes
 }

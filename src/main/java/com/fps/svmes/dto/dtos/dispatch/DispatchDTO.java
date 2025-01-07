@@ -1,11 +1,11 @@
 package com.fps.svmes.dto.dtos.dispatch;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fps.svmes.dto.dtos.user.UserDTO;
 import lombok.Data;
-import java.sql.Timestamp;
 
 
 @Data
@@ -26,10 +26,10 @@ public class DispatchDTO {
     private String cronExpression;
 
     @JsonProperty("start_time")
-    private Timestamp startTime;
+    private OffsetDateTime startTime;
 
     @JsonProperty("end_time")
-    private Timestamp endTime;
+    private OffsetDateTime endTime;
 
     @JsonProperty("dispatch_limit")
     private Integer dispatchLimit;
@@ -41,13 +41,13 @@ public class DispatchDTO {
     private Integer status;
 
     @JsonProperty("created_at")
-    private Timestamp createdAt;
+    private OffsetDateTime createdAt;
 
     @JsonProperty("created_by")
     private Integer createdBy;
 
     @JsonProperty("updated_at")
-    private Timestamp updatedAt;
+    private OffsetDateTime updatedAt;
 
     @JsonProperty("updated_by")
     private Integer updatedBy;
@@ -55,8 +55,8 @@ public class DispatchDTO {
     @JsonProperty("dispatch_forms")
     private List<String> qcFormTreeNodeIds;
 
-    @JsonProperty("dispatch_personnel")
-    private List<UserDTO> personnel;
+    @JsonProperty("dispatch_users")
+    private List<UserDTO> users;
 
     @JsonProperty("due_date_offset_minute")
     private Integer dueDateOffsetMinute; // Total offset in minutes

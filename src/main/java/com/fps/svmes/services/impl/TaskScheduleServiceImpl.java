@@ -1,6 +1,6 @@
 package com.fps.svmes.services.impl;
 
-import com.fps.svmes.models.sql.task_schedule.Dispatch;
+import com.fps.svmes.models.sql.taskSchedule.Dispatch;
 import com.fps.svmes.services.TaskScheduleService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -9,8 +9,9 @@ import org.springframework.scheduling.TaskScheduler;
 import org.springframework.scheduling.support.CronTrigger;
 import org.springframework.stereotype.Service;
 
-import java.sql.Timestamp;
-import java.util.HashMap;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.util.Date;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
@@ -77,15 +78,18 @@ public class TaskScheduleServiceImpl implements TaskScheduleService {
      * Retrieve the next scheduled execution time for a given dispatch ID.
      *
      * @param dispatchId the ID of the dispatch to check.
-     * @return the next execution time as a Timestamp, or null if not scheduled.
+     * @return the next execution time as a OffsetDateTime, or null if not scheduled.
      */
-    public Timestamp getNextExecutionTime(Long dispatchId) {
+
+    public OffsetDateTime getNextExecutionTime(Long dispatchId) {
         ScheduledFuture<?> future = scheduledTasks.get(dispatchId);
         if (future != null && !future.isCancelled()) {
             long delay = future.getDelay(java.util.concurrent.TimeUnit.MILLISECONDS);
-            return delay > 0 ? new Timestamp(System.currentTimeMillis() + delay) : null;
+            if (delay > 0) {
+                return OffsetDateTime.now(ZoneOffset.UTC).plusNanos(delay * 1_000_000);
+            }
         }
-        return null;
+        return null; // Return null if no next execution time is available
     }
 
     /**
@@ -93,41 +97,29 @@ public class TaskScheduleServiceImpl implements TaskScheduleService {
      *
      * @return A map where the key is the dispatch ID and the value is the next execution time.
      */
-    public Map<Long, Timestamp> getAllScheduledTasks() {
-        Map<Long, Timestamp> result = new HashMap<>();
+    public Map<Long, OffsetDateTime> getAllScheduledTasks() {
+        Map<Long, OffsetDateTime> result = new ConcurrentHashMap<>();
         scheduledTasks.forEach((id, future) -> {
             if (future != null && !future.isCancelled()) {
                 long delay = future.getDelay(java.util.concurrent.TimeUnit.MILLISECONDS);
-                result.put(id, delay > 0 ? new Timestamp(System.currentTimeMillis() + delay) : null);
+                result.put(id, delay > 0 ? OffsetDateTime.now(ZoneOffset.UTC).plusNanos(delay * 1_000_000) : null);
             }
         });
         return result;
     }
 
-    /**
-     * Update an existing scheduled dispatch task if necessary.
-     *
-     * @param dispatch the updated dispatch entity.
-     * @param task     the new task to execute.
-     */
-    public void updateDispatchTask(Dispatch dispatch, Runnable task) {
-        if (isScheduled(dispatch.getId())) {
-            cancelDispatch(dispatch.getId());
-        }
-        scheduleDispatchTask(dispatch, task);
-    }
+    public void scheduleOneTimeTask(OffsetDateTime executionTime, Runnable task) {
+        OffsetDateTime now = OffsetDateTime.now();
 
-    /**
-     * Log scheduled task details for monitoring.
-     *
-     * @param dispatchId the ID of the dispatch.
-     */
-    public void logScheduledTaskDetails(Long dispatchId) {
-        ScheduledFuture<?> future = scheduledTasks.get(dispatchId);
-        if (future != null) {
-            System.out.println("Task ID: " + dispatchId + ", Next Execution Time: " + getNextExecutionTime(dispatchId));
+        if (executionTime.isAfter(now)) {
+            long delay = executionTime.toInstant().toEpochMilli() - System.currentTimeMillis();
+            taskScheduler.schedule(task, triggerContext -> {
+                // Return the execution time as a `Date`
+                return Date.from(executionTime.toInstant()).toInstant();
+            });
+            logger.info("One-time task scheduled for execution at {}", executionTime);
         } else {
-            System.out.println("Task ID: " + dispatchId + " is not currently scheduled.");
+            logger.warn("Attempted to schedule a one-time task for a past time: {}", executionTime);
         }
     }
 }

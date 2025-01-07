@@ -23,4 +23,17 @@ public abstract class CommonDTO {
 
     @JsonProperty("status")
     private Integer status;
+
+    public void setCreationDetails(Integer userId, Integer status) {
+        this.createdAt = OffsetDateTime.now();
+        this.createdBy = userId;
+        this.status = status;
+    }
+
+    public void setUpdateDetails(Integer userId, Integer status) {
+        this.updatedAt = OffsetDateTime.now();
+        this.updatedBy = userId;
+        this.status = status;
+    }
+
 }

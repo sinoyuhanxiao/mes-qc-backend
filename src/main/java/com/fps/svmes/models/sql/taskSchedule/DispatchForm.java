@@ -1,4 +1,4 @@
-package com.fps.svmes.models.sql.task_schedule;
+package com.fps.svmes.models.sql.taskSchedule;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
 import jakarta.persistence.*;
@@ -21,6 +21,9 @@ public class DispatchForm {
 
     @Column(name = "qc_form_tree_node_id", nullable = false)
     private String qcFormTreeNodeId;
+
+    @Column(name = "status", nullable = false, columnDefinition = "SMALLINT DEFAULT 1")
+    private Integer status = 1; // Active by default
 
     public DispatchForm(Dispatch dispatch, String formTreeNodeId) {
         this.setQcFormTreeNodeId(formTreeNodeId);

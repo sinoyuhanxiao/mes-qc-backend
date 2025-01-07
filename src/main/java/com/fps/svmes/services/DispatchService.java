@@ -3,10 +3,8 @@ package com.fps.svmes.services;
 import com.fps.svmes.dto.dtos.dispatch.DispatchDTO;
 import com.fps.svmes.dto.dtos.dispatch.DispatchedTaskDTO;
 import com.fps.svmes.dto.requests.DispatchRequest;
-import com.fps.svmes.models.sql.task_schedule.Dispatch;
 import jakarta.validation.Valid;
 
-import java.time.OffsetDateTime;
 import java.util.List;
 
 /**
@@ -16,6 +14,7 @@ public interface DispatchService {
     void executeDispatch(Long dispatchId);
     void scheduleDispatches();
     DispatchDTO createDispatch(@Valid DispatchRequest request);
+    DispatchDTO createManualDispatch(DispatchRequest request);
     DispatchDTO updateDispatch(Long id, @Valid DispatchRequest request);
     DispatchDTO getDispatch(Long id);
     List<DispatchDTO> getAllDispatches();

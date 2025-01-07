@@ -1,8 +1,8 @@
 package com.fps.svmes.controllers;
 
-import com.fps.svmes.dto.dtos.dispatch.DispatchedTaskTestDTO;
+import com.fps.svmes.dto.dtos.dispatch.DispatchedTaskDTO;
 import com.fps.svmes.dto.responses.ResponseResult;
-import com.fps.svmes.services.DispatchedTaskTestService;
+import com.fps.svmes.services.DispatchedTaskService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -18,16 +18,16 @@ import java.util.List;
 @Slf4j
 @RequiredArgsConstructor
 @Tag(name = "Dispatched Task Test API", description = "API for managing dispatched tasks")
-public class DispatchedTaskTestController {
+public class DispatchedTaskController {
 
-    private final DispatchedTaskTestService dispatchedTaskTestService;
-    private static final Logger logger = LoggerFactory.getLogger(DispatchedTaskTestController.class);
+    private final DispatchedTaskService dispatchedTaskService;
+    private static final Logger logger = LoggerFactory.getLogger(DispatchedTaskController.class);
 
     @GetMapping("/today")
     @Operation(summary = "Get current tasks", description = "Fetch tasks assigned to a user for today.")
-    public ResponseResult<List<DispatchedTaskTestDTO>> getCurrentTasks(@RequestParam Long userId) {
+    public ResponseResult<List<DispatchedTaskDTO>> getCurrentTasks(@RequestParam Long userId) {
         try {
-            List<DispatchedTaskTestDTO> tasks = dispatchedTaskTestService.getCurrentTasks(userId);
+            List<DispatchedTaskDTO> tasks = dispatchedTaskService.getCurrentTasks(userId);
             logger.info("Current tasks retrieved for userId: {}, count: {}", userId, tasks.size());
             return ResponseResult.success(tasks);
         } catch (Exception e) {
@@ -38,9 +38,9 @@ public class DispatchedTaskTestController {
 
     @GetMapping("/future")
     @Operation(summary = "Get future tasks", description = "Fetch tasks assigned to a user with due dates after today.")
-    public ResponseResult<List<DispatchedTaskTestDTO>> getFutureTasks(@RequestParam Long userId) {
+    public ResponseResult<List<DispatchedTaskDTO>> getFutureTasks(@RequestParam Long userId) {
         try {
-            List<DispatchedTaskTestDTO> tasks = dispatchedTaskTestService.getFutureTasks(userId);
+            List<DispatchedTaskDTO> tasks = dispatchedTaskService.getFutureTasks(userId);
             logger.info("Future tasks retrieved for userId: {}, count: {}", userId, tasks.size());
             return ResponseResult.success(tasks);
         } catch (Exception e) {
@@ -51,9 +51,9 @@ public class DispatchedTaskTestController {
 
     @GetMapping("/history")
     @Operation(summary = "Get historical tasks", description = "Fetch tasks assigned to a user with due dates before today.")
-    public ResponseResult<List<DispatchedTaskTestDTO>> getHistoricalTasks(@RequestParam Long userId) {
+    public ResponseResult<List<DispatchedTaskDTO>> getHistoricalTasks(@RequestParam Long userId) {
         try {
-            List<DispatchedTaskTestDTO> tasks = dispatchedTaskTestService.getHistoricalTasks(userId);
+            List<DispatchedTaskDTO> tasks = dispatchedTaskService.getHistoricalTasks(userId);
             logger.info("Historical tasks retrieved for userId: {}, count: {}", userId, tasks.size());
             return ResponseResult.success(tasks);
         } catch (Exception e) {
@@ -64,9 +64,9 @@ public class DispatchedTaskTestController {
 
     @GetMapping("/overdue")
     @Operation(summary = "Get overdue tasks", description = "Fetch tasks assigned to a user that are overdue.")
-    public ResponseResult<List<DispatchedTaskTestDTO>> getOverdueTasks(@RequestParam Long userId) {
+    public ResponseResult<List<DispatchedTaskDTO>> getOverdueTasks(@RequestParam Long userId) {
         try {
-            List<DispatchedTaskTestDTO> tasks = dispatchedTaskTestService.getOverdueTasks(userId);
+            List<DispatchedTaskDTO> tasks = dispatchedTaskService.getOverdueTasks(userId);
             logger.info("Overdue tasks retrieved for userId: {}, count: {}", userId, tasks.size());
             return ResponseResult.success(tasks);
         } catch (Exception e) {
@@ -77,10 +77,10 @@ public class DispatchedTaskTestController {
 
     @PostMapping("/insert")
     @Operation(summary = "Insert dispatched tasks", description = "Insert multiple dispatched tasks based on user IDs")
-    public ResponseResult<Void> insertDispatchedTasks(@RequestBody DispatchedTaskTestDTO dispatchedTaskDTO,
+    public ResponseResult<Void> insertDispatchedTasks(@RequestBody DispatchedTaskDTO dispatchedTaskDTO,
                                                       @RequestParam List<Integer> userIds) {
         try {
-            dispatchedTaskTestService.insertDispatchedTasks(dispatchedTaskDTO, userIds);
+            dispatchedTaskService.insertDispatchedTasks(dispatchedTaskDTO, userIds);
             logger.info("Inserted tasks for userIds: {}", userIds);
             return ResponseResult.success(null);
         } catch (Exception e) {
@@ -91,9 +91,9 @@ public class DispatchedTaskTestController {
 
     @PutMapping("/update/{id}")
     @Operation(summary = "Update a dispatched task", description = "Update a dispatched task by its ID (partial updates allowed)")
-    public ResponseResult<Void> updateDispatchedTask(@PathVariable Long id, @RequestBody DispatchedTaskTestDTO dispatchedTaskDTO) {
+    public ResponseResult<Void> updateDispatchedTask(@PathVariable Long id, @RequestBody DispatchedTaskDTO dispatchedTaskDTO) {
         try {
-            dispatchedTaskTestService.updateDispatchedTask(id, dispatchedTaskDTO);
+            dispatchedTaskService.updateDispatchedTask(id, dispatchedTaskDTO);
             logger.info("Updated task with ID: {}", id);
             return ResponseResult.success(null);
         } catch (Exception e) {
@@ -104,9 +104,9 @@ public class DispatchedTaskTestController {
 
     @GetMapping("/get/{id}")
     @Operation(summary = "Get a dispatched task", description = "Get a dispatched task by its ID")
-    public ResponseResult<DispatchedTaskTestDTO> getDispatchedTaskById(@PathVariable Long id) {
+    public ResponseResult<DispatchedTaskDTO> getDispatchedTaskById(@PathVariable Long id) {
         try {
-            DispatchedTaskTestDTO task = dispatchedTaskTestService.getDispatchedTaskById(id);
+            DispatchedTaskDTO task = dispatchedTaskService.getDispatchedTaskById(id);
             logger.info("Retrieved task with ID: {}", id);
             return ResponseResult.success(task);
         } catch (Exception e) {
@@ -119,7 +119,7 @@ public class DispatchedTaskTestController {
     @Operation(summary = "Delete a dispatched task", description = "Soft delete a dispatched task by its ID")
     public ResponseResult<Void> deleteDispatchedTask(@PathVariable Long id) {
         try {
-            dispatchedTaskTestService.deleteDispatchedTask(id);
+            dispatchedTaskService.deleteDispatchedTask(id);
             logger.info("Deleted (soft) task with ID: {}", id);
             return ResponseResult.success(null);
         } catch (Exception e) {

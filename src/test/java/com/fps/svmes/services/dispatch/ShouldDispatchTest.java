@@ -317,9 +317,9 @@
 //        return dispatch;
 //    }
 //
-//    private List<DispatchPersonnel> createPersonnel(Dispatch dispatch, Integer... userIds) {
+//    private List<DispatchUser> createPersonnel(Dispatch dispatch, Integer... userIds) {
 //        return Stream.of(userIds)
-//                .map(userId -> new DispatchPersonnel(1L, dispatch, userId))
+//                .map(userId -> new DispatchUser(1L, dispatch, userId))
 //                .toList();
 //    }
 //

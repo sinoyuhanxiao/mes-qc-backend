@@ -5,7 +5,7 @@
 //import com.fps.svmes.models.sql.task_schedule.Dispatch;
 //import com.fps.svmes.models.sql.task_schedule.DispatchDay;
 //import com.fps.svmes.models.sql.task_schedule.DispatchForm;
-//import com.fps.svmes.models.sql.task_schedule.DispatchPersonnel;
+//import com.fps.svmes.models.sql.task_schedule.DispatchUser;
 //import com.fps.svmes.repositories.jpaRepo.dispatch.DispatchRepository;
 //import com.fps.svmes.repositories.jpaRepo.dispatch.DispatchedTestRepository;
 //import com.fps.svmes.services.impl.DispatchServiceImpl;
@@ -176,8 +176,8 @@
 //            existingDispatch.setDispatchForms(new ArrayList<>(List.of(
 //                    new DispatchForm(existingDispatch, 101L)
 //            )));
-//            existingDispatch.setDispatchPersonnel(new ArrayList<>(List.of(
-//                    new DispatchPersonnel(existingDispatch, 201)
+//            existingDispatch.setDispatchUser(new ArrayList<>(List.of(
+//                    new DispatchUser(existingDispatch, 201)
 //            )));
 //        }
 //
@@ -389,9 +389,9 @@
 //        return dispatch;
 //    }
 //
-//    private List<DispatchPersonnel> createPersonnel(Dispatch dispatch, Integer... userIds) {
+//    private List<DispatchUser> createPersonnel(Dispatch dispatch, Integer... userIds) {
 //        return Stream.of(userIds)
-//                .map(userId -> new DispatchPersonnel(1L, dispatch, userId))
+//                .map(userId -> new DispatchUser(1L, dispatch, userId))
 //                .toList();
 //    }
 //

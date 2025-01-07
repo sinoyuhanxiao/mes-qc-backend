@@ -25,7 +25,7 @@ public class DispatchRequest {
 
     @JsonProperty("type")
     @NotNull(message = "Type cannot be null")
-    @Schema(description = "Type of the dispatch", example = "SCHEDULED")
+    @Schema(description = "Type of the dispatch", example = "SCHEDULED or MANUAL")
     private String type;
 
     @JsonProperty("remark")
@@ -33,8 +33,7 @@ public class DispatchRequest {
     private String remark;
 
     @JsonProperty("cronExpression")
-    @NotNull(message = "Cron expression cannot be null")
-    @Schema(description = "Cron expression defining the schedule", example = "0 0 12 * * ?")
+    @Schema(description = "Cron expression defining the schedule", example = "0 * * * * *")
     private String cronExpression;
 
     @JsonProperty("startTime")

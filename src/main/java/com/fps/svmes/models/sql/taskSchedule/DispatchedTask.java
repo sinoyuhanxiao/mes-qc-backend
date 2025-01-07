@@ -1,4 +1,4 @@
-package com.fps.svmes.models.sql.task_schedule;
+package com.fps.svmes.models.sql.taskSchedule;
 
 import com.fps.svmes.models.sql.Common;
 import com.fps.svmes.models.sql.user.User;
@@ -14,9 +14,9 @@ import java.time.OffsetDateTime;
  */
 @EqualsAndHashCode(callSuper = true)
 @Entity
-@Table(name = "dispatched_task_test", schema = "quality_management")
+@Table(name = "dispatched_task", schema = "quality_management")
 @Data
-public class DispatchedTaskTest extends Common {
+public class DispatchedTask extends Common {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id")

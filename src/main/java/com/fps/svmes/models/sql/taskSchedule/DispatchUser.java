@@ -1,4 +1,4 @@
-package com.fps.svmes.models.sql.task_schedule;
+package com.fps.svmes.models.sql.taskSchedule;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fps.svmes.models.sql.user.User;
@@ -8,10 +8,10 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name = "dispatch_personnel", schema = "quality_management")
+@Table(name = "dispatch_user", schema = "quality_management")
 @Data
 @NoArgsConstructor
-public class DispatchPersonnel {
+public class DispatchUser {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -29,7 +29,7 @@ public class DispatchPersonnel {
     @Column(name = "status", nullable = false, columnDefinition = "SMALLINT DEFAULT 1")
     private Integer status = 1; // Active by default
 
-    public DispatchPersonnel(Dispatch dispatch, Integer userId) {
+    public DispatchUser(Dispatch dispatch, Integer userId) {
         this.dispatch = dispatch;
         user = new User();
         user.setId(userId);
@@ -39,7 +39,7 @@ public class DispatchPersonnel {
 
     @Override
     public String toString() {
-        return "DispatchPersonnel{" +
+        return "DispatchUser{" +
                 "id=" + id +
                 ", userId=" + (user != null ? user.getId() : "null") +
                 '}';

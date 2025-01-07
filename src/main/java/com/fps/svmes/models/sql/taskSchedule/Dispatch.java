@@ -1,23 +1,20 @@
-package com.fps.svmes.models.sql.task_schedule;
+package com.fps.svmes.models.sql.taskSchedule;
 
 import com.fps.svmes.models.sql.Common;
-import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 
-import java.sql.Timestamp;
 import java.time.OffsetDateTime;
-import java.util.ArrayList;
 import java.util.List;
 
 @Data
 @NoArgsConstructor
 @EqualsAndHashCode(callSuper = true)
 @Entity
-@Table(name = "dispatch_temp", schema = "quality_management")
+@Table(name = "dispatch", schema = "quality_management")
 public class Dispatch extends Common {
 
     @Id
@@ -34,7 +31,7 @@ public class Dispatch extends Common {
     @Column(name = "remark")
     private String remark;
 
-    @Column(name = "cron_expression", nullable = false)
+    @Column(name = "cron_expression")
     private String cronExpression;
 
     @Column(name = "start_time", nullable = false)
@@ -51,21 +48,14 @@ public class Dispatch extends Common {
 
     @OneToMany(mappedBy = "dispatch", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonManagedReference
-    private List<DispatchPersonnel> dispatchPersonnel;
+    private List<DispatchUser> dispatchUsers;
 
     @OneToMany(mappedBy = "dispatch", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonManagedReference
     private List<DispatchForm> dispatchForms;
 
-    @Column(name = "due_date_offset_minute")
-    private Integer dueDateOffsetMinute; // Total offset in minutes
-
-    public void incrementExecutedCount() {
-        if (executedCount == null) {
-            executedCount = 0;
-        }
-        executedCount++;
-    }
+    @Column(name = "due_date_offset_minute", nullable = false)
+    private Integer dueDateOffsetMinute = 60; // Total offset in minutes, default to 1 hour
 
     public boolean isActiveAndWithinScheduledTime() {
         OffsetDateTime now = OffsetDateTime.now();

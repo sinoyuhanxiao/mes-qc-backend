@@ -51,9 +51,9 @@
 //                new DispatchDay(dispatch, "MONDAY"),
 //                new DispatchDay(dispatch, "WEDNESDAY")
 //        ));
-//        dispatch.setDispatchPersonnel(List.of(
-//                new DispatchPersonnel(dispatch, 101),
-//                new DispatchPersonnel(dispatch, 102)
+//        dispatch.setDispatchUser(List.of(
+//                new DispatchUser(dispatch, 101),
+//                new DispatchUser(dispatch, 102)
 //        ));
 //        dispatch.setDispatchForms(List.of(
 //                new DispatchForm(dispatch, 201L),
@@ -97,9 +97,9 @@
 //        dispatch.setDispatchDays(List.of(
 //                new DispatchDay(dispatch, "MONDAY")
 //        ));
-//        dispatch.setDispatchPersonnel(List.of(
-//                new DispatchPersonnel(dispatch, 101),
-//                new DispatchPersonnel(dispatch, 102)
+//        dispatch.setDispatchUser(List.of(
+//                new DispatchUser(dispatch, 101),
+//                new DispatchUser(dispatch, 102)
 //        ));
 //        dispatch.setDispatchForms(List.of(
 //                new DispatchForm(dispatch, 201L),
@@ -129,9 +129,9 @@
 //        dispatch.setStartTime(LocalDateTime.now().minusMinutes(10));
 //        dispatch.setIntervalMinutes(5);
 //        dispatch.setExecutedCount(1);
-//        dispatch.setDispatchPersonnel(List.of(
-//                new DispatchPersonnel(dispatch, 101),
-//                new DispatchPersonnel(dispatch, 102)
+//        dispatch.setDispatchUser(List.of(
+//                new DispatchUser(dispatch, 101),
+//                new DispatchUser(dispatch, 102)
 //        ));
 //        dispatch.setDispatchForms(List.of(
 //                new DispatchForm(dispatch, 201L),
@@ -154,7 +154,7 @@
 //        Long dispatchId = 1L;
 //
 //        Dispatch mockDispatch = getIntervalDispatch(dispatchId, 2, 15);
-//        mockDispatch.setDispatchPersonnel(createPersonnel(mockDispatch, 201, 202));
+//        mockDispatch.setDispatchUser(createPersonnel(mockDispatch, 201, 202));
 //        mockDispatch.setDispatchForms(createForms(mockDispatch, 101L, 102L));
 //
 //        when(dispatchRepo.findById(dispatchId)).thenReturn(Optional.of(mockDispatch));
@@ -171,7 +171,7 @@
 //        Long dispatchId = 3L;
 //
 //        Dispatch mockDispatch = createSpecificDaysDispatch(dispatchId, "MONDAY", "09:00");
-//        mockDispatch.setDispatchPersonnel(List.of());
+//        mockDispatch.setDispatchUser(List.of());
 //        mockDispatch.setDispatchForms(List.of());
 //
 //        when(dispatchRepo.findById(dispatchId)).thenReturn(Optional.of(mockDispatch));
@@ -187,7 +187,7 @@
 //        Long dispatchId = 7L;
 //
 //        Dispatch mockDispatch = createSpecificDaysDispatch(dispatchId, "MONDAY", null); // Null timeOfDay
-//        mockDispatch.setDispatchPersonnel(createPersonnel(mockDispatch, 201));
+//        mockDispatch.setDispatchUser(createPersonnel(mockDispatch, 201));
 //        mockDispatch.setDispatchForms(createForms(mockDispatch, 101L));
 //
 //        when(dispatchRepo.findById(dispatchId)).thenReturn(Optional.of(mockDispatch));
@@ -207,7 +207,7 @@
 //        int original_count = 15;
 //        // Arrange: Interval-based dispatch with start time and interval configuration
 //        Dispatch mockDispatch = getIntervalDispatch(dispatchId, original_count, 2);
-//        mockDispatch.setDispatchPersonnel(createPersonnel(mockDispatch, 201, 202));
+//        mockDispatch.setDispatchUser(createPersonnel(mockDispatch, 201, 202));
 //        mockDispatch.setDispatchForms(createForms(mockDispatch, 101L, 102L));
 //
 //        when(dispatchRepo.findById(dispatchId)).thenReturn(Optional.of(mockDispatch));
@@ -247,7 +247,7 @@
 //        mockDispatch.setIntervalMinutes(15);
 //        mockDispatch.setExecutedCount(0);
 //        mockDispatch.setStartTime(null); // Missing start time
-//        mockDispatch.setDispatchPersonnel(createPersonnel(mockDispatch, 201, 202));
+//        mockDispatch.setDispatchUser(createPersonnel(mockDispatch, 201, 202));
 //        mockDispatch.setDispatchForms(createForms(mockDispatch, 101L, 102L));
 //
 //        when(dispatchRepo.findById(dispatchId)).thenReturn(Optional.of(mockDispatch));
@@ -273,16 +273,16 @@
 //        mockDispatch.setIntervalMinutes(15);
 //        mockDispatch.setExecutedCount(1);
 //
-//        List<DispatchPersonnel> personnelList = List.of(
-//                new DispatchPersonnel(1L, mockDispatch, 201),
-//                new DispatchPersonnel(2L, mockDispatch, 202)
+//        List<DispatchUser> personnelList = List.of(
+//                new DispatchUser(1L, mockDispatch, 201),
+//                new DispatchUser(2L, mockDispatch, 202)
 //        );
 //        List<DispatchForm> formList = List.of(
 //                new DispatchForm(1L, mockDispatch, 101L),
 //                new DispatchForm(2L, mockDispatch, 102L)
 //        );
 //
-//        mockDispatch.setDispatchPersonnel(personnelList);
+//        mockDispatch.setDispatchUser(personnelList);
 //        mockDispatch.setDispatchForms(formList);
 //
 //        when(dispatchRepo.findById(dispatchId)).thenReturn(Optional.of(mockDispatch));
@@ -321,7 +321,7 @@
 //        Long dispatchId = 11L;
 //
 //        Dispatch mockDispatch = createSpecificDaysDispatch(dispatchId, "MONDAY", "09:00");
-//        mockDispatch.setDispatchPersonnel(null); // Null personnel list
+//        mockDispatch.setDispatchUser(null); // Null personnel list
 //        mockDispatch.setDispatchForms(createForms(mockDispatch, 101L, 102L));
 //
 //        when(dispatchRepo.findById(dispatchId)).thenReturn(Optional.of(mockDispatch));
@@ -337,7 +337,7 @@
 //        Long dispatchId = 12L;
 //
 //        Dispatch mockDispatch = createSpecificDaysDispatch(dispatchId, "MONDAY", "09:00");
-//        mockDispatch.setDispatchPersonnel(createPersonnel(mockDispatch, 201, 202));
+//        mockDispatch.setDispatchUser(createPersonnel(mockDispatch, 201, 202));
 //        mockDispatch.setDispatchForms(null); // Null forms list
 //
 //        when(dispatchRepo.findById(dispatchId)).thenReturn(Optional.of(mockDispatch));
@@ -354,7 +354,7 @@
 //
 //        // Arrange: Create a dispatch with valid personnel and forms but empty timeOfDay
 //        Dispatch mockDispatch = createSpecificDaysDispatch(dispatchId, "MONDAY", ""); // Empty timeOfDay
-//        mockDispatch.setDispatchPersonnel(createPersonnel(mockDispatch, 201, 202)); // Add valid personnel
+//        mockDispatch.setDispatchUser(createPersonnel(mockDispatch, 201, 202)); // Add valid personnel
 //        mockDispatch.setDispatchForms(createForms(mockDispatch, 101L, 102L)); // Add valid forms
 //
 //        when(dispatchRepo.findById(dispatchId)).thenReturn(Optional.of(mockDispatch));
@@ -385,10 +385,10 @@
 //        // Arrange
 //        Long dispatchId = 5L;
 //        Dispatch mockDispatch = createSpecificDaysDispatch(dispatchId, "MONDAY", "14:00");
-//        List<DispatchPersonnel> personnelList = createPersonnel(mockDispatch, 201, 202);
+//        List<DispatchUser> personnelList = createPersonnel(mockDispatch, 201, 202);
 //        List<DispatchForm> formList = createForms(mockDispatch, 101L, 102L);
 //
-//        mockDispatch.setDispatchPersonnel(personnelList);
+//        mockDispatch.setDispatchUser(personnelList);
 //        mockDispatch.setDispatchForms(formList);
 //
 //        // Set up the mock behavior
@@ -452,9 +452,9 @@
 //        return dispatch;
 //    }
 //
-//    private List<DispatchPersonnel> createPersonnel(Dispatch dispatch, Integer... userIds) {
+//    private List<DispatchUser> createPersonnel(Dispatch dispatch, Integer... userIds) {
 //        return Stream.of(userIds)
-//                .map(userId -> new DispatchPersonnel(1L, dispatch, userId))
+//                .map(userId -> new DispatchUser(1L, dispatch, userId))
 //                .toList();
 //    }
 //

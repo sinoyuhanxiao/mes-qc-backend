@@ -2,19 +2,11 @@ package com.fps.svmes.config;
 
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import com.fps.svmes.dto.dtos.dispatch.DispatchedTaskDTO;
-import com.fps.svmes.models.sql.task_schedule.*;
 
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import com.fps.svmes.models.sql.user.User;
-import com.fps.svmes.services.UserService;
 import org.modelmapper.ModelMapper;
-import org.modelmapper.PropertyMap;
-
-import org.modelmapper.convention.MatchingStrategies;
-import org.springframework.beans.factory.annotation.Autowired;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

@@ -1,10 +1,10 @@
 package com.fps.svmes.services.impl;
 
-import com.fps.svmes.dto.dtos.dispatch.DispatchedTaskTestDTO;
-import com.fps.svmes.models.sql.task_schedule.DispatchedTaskTest;
+import com.fps.svmes.dto.dtos.dispatch.DispatchedTaskDTO;
+import com.fps.svmes.models.sql.taskSchedule.DispatchedTask;
 import com.fps.svmes.models.sql.user.User;
-import com.fps.svmes.repositories.jpaRepo.dispatch.DispatchedTaskTestRepository;
-import com.fps.svmes.services.DispatchedTaskTestService;
+import com.fps.svmes.repositories.jpaRepo.dispatch.DispatchedTaskRepository;
+import com.fps.svmes.services.DispatchedTaskService;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -17,10 +17,10 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
-public class DispatchedTaskTestServiceImpl implements DispatchedTaskTestService {
+public class DispatchedTaskServiceImpl implements DispatchedTaskService {
 
     @Autowired
-    private DispatchedTaskTestRepository dispatchedTaskTestRepository;
+    private DispatchedTaskRepository dispatchedTaskRepository;
 
     @Autowired
     private UserRepository userRepository;
@@ -29,49 +29,49 @@ public class DispatchedTaskTestServiceImpl implements DispatchedTaskTestService 
     private ModelMapper modelMapper;
 
     @Override
-    public List<DispatchedTaskTestDTO> getCurrentTasks(Long userId) {
+    public List<DispatchedTaskDTO> getCurrentTasks(Long userId) {
         OffsetDateTime startOfDay = LocalDateTime.now().toLocalDate().atStartOfDay().atOffset(ZoneOffset.UTC);
         OffsetDateTime endOfDay = startOfDay.plusDays(1);
-        List<DispatchedTaskTest> tasks = dispatchedTaskTestRepository.findByUserIdAndDueDateBetweenAndStatus(userId, startOfDay, endOfDay, 1);
-        return tasks.stream().map(task -> modelMapper.map(task, DispatchedTaskTestDTO.class)).collect(Collectors.toList());
+        List<DispatchedTask> tasks = dispatchedTaskRepository.findByUserIdAndDueDateBetweenAndStatus(userId, startOfDay, endOfDay, 1);
+        return tasks.stream().map(task -> modelMapper.map(task, DispatchedTaskDTO.class)).collect(Collectors.toList());
     }
 
     @Override
-    public List<DispatchedTaskTestDTO> getFutureTasks(Long userId) {
+    public List<DispatchedTaskDTO> getFutureTasks(Long userId) {
         OffsetDateTime now = OffsetDateTime.now();
-        List<DispatchedTaskTest> tasks = dispatchedTaskTestRepository.findByUserIdAndDueDateAfterAndStatus(userId, now, 1);
-        return tasks.stream().map(task -> modelMapper.map(task, DispatchedTaskTestDTO.class)).collect(Collectors.toList());
+        List<DispatchedTask> tasks = dispatchedTaskRepository.findByUserIdAndDueDateAfterAndStatus(userId, now, 1);
+        return tasks.stream().map(task -> modelMapper.map(task, DispatchedTaskDTO.class)).collect(Collectors.toList());
     }
 
     @Override
-    public List<DispatchedTaskTestDTO> getHistoricalTasks(Long userId) {
+    public List<DispatchedTaskDTO> getHistoricalTasks(Long userId) {
         OffsetDateTime now = OffsetDateTime.now();
-        List<DispatchedTaskTest> tasks = dispatchedTaskTestRepository.findByUserIdAndDueDateBeforeAndStatus(userId, now, 1);
-        return tasks.stream().map(task -> modelMapper.map(task, DispatchedTaskTestDTO.class)).collect(Collectors.toList());
+        List<DispatchedTask> tasks = dispatchedTaskRepository.findByUserIdAndDueDateBeforeAndStatus(userId, now, 1);
+        return tasks.stream().map(task -> modelMapper.map(task, DispatchedTaskDTO.class)).collect(Collectors.toList());
     }
 
     @Override
-    public List<DispatchedTaskTestDTO> getOverdueTasks(Long userId) {
-        List<DispatchedTaskTest> tasks = dispatchedTaskTestRepository.findByUserIdAndIsOverdueAndStatus(userId, true, 1);
-        return tasks.stream().map(task -> modelMapper.map(task, DispatchedTaskTestDTO.class)).collect(Collectors.toList());
+    public List<DispatchedTaskDTO> getOverdueTasks(Long userId) {
+        List<DispatchedTask> tasks = dispatchedTaskRepository.findByUserIdAndIsOverdueAndStatus(userId, true, 1);
+        return tasks.stream().map(task -> modelMapper.map(task, DispatchedTaskDTO.class)).collect(Collectors.toList());
     }
 
     @Override
-    public void insertDispatchedTasks(DispatchedTaskTestDTO dispatchedTaskDTO, List<Integer> userIds) {
+    public void insertDispatchedTasks(DispatchedTaskDTO dispatchedTaskDTO, List<Integer> userIds) {
         for (Integer userId : userIds) {
-            DispatchedTaskTest task = modelMapper.map(dispatchedTaskDTO, DispatchedTaskTest.class);
+            DispatchedTask task = modelMapper.map(dispatchedTaskDTO, DispatchedTask.class);
             User user = userRepository.findById(userId)
                     .orElseThrow(() -> new IllegalArgumentException("User not found with ID: " + userId));
             task.setUser(user);
-            dispatchedTaskTestRepository.save(task);
+            dispatchedTaskRepository.save(task);
         }
     }
 
 
     @Override
-    public void updateDispatchedTask(Long id, DispatchedTaskTestDTO dispatchedTaskDTO) {
+    public void updateDispatchedTask(Long id, DispatchedTaskDTO dispatchedTaskDTO) {
         // Fetch the existing task or throw an exception if not found
-        DispatchedTaskTest existingTask = dispatchedTaskTestRepository.findById(id)
+        DispatchedTask existingTask = dispatchedTaskRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Task not found with ID: " + id));
 
         if (dispatchedTaskDTO.getName() != null) {
@@ -97,22 +97,22 @@ public class DispatchedTaskTestServiceImpl implements DispatchedTaskTestService 
         }
 
         // Save the updated task back to the database
-        dispatchedTaskTestRepository.save(existingTask);
+        dispatchedTaskRepository.save(existingTask);
     }
 
     @Override
-    public DispatchedTaskTestDTO getDispatchedTaskById(Long id) {
-        DispatchedTaskTest task = dispatchedTaskTestRepository.findById(id)
+    public DispatchedTaskDTO getDispatchedTaskById(Long id) {
+        DispatchedTask task = dispatchedTaskRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Task not found with ID: " + id));
-        return modelMapper.map(task, DispatchedTaskTestDTO.class);
+        return modelMapper.map(task, DispatchedTaskDTO.class);
     }
 
     @Override
     public void deleteDispatchedTask(Long id) {
-        DispatchedTaskTest task = dispatchedTaskTestRepository.findById(id)
+        DispatchedTask task = dispatchedTaskRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Task not found with ID: " + id));
         task.setStatus(0); // Set status to 0 for soft delete
-        dispatchedTaskTestRepository.save(task);
+        dispatchedTaskRepository.save(task);
     }
 
 }

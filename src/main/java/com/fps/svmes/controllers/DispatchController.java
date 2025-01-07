@@ -5,7 +5,7 @@ import com.fps.svmes.dto.dtos.dispatch.DispatchDTO;
 import com.fps.svmes.dto.dtos.dispatch.DispatchedTaskDTO;
 import com.fps.svmes.dto.requests.DispatchRequest;
 import com.fps.svmes.dto.responses.ResponseResult;
-import com.fps.svmes.models.sql.task_schedule.Dispatch;
+import com.fps.svmes.models.sql.taskSchedule.Dispatch;
 import com.fps.svmes.repositories.jpaRepo.dispatch.DispatchRepository;
 import com.fps.svmes.services.DispatchService;
 import com.fps.svmes.services.TaskScheduleService;
@@ -13,12 +13,14 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.Valid;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.io.Serializable;
 import java.sql.Timestamp;
+import java.time.OffsetDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -40,16 +42,30 @@ public class DispatchController {
     @Autowired
     private DispatchRepository dispatchRepository;
 
+    private static final Logger logger = LoggerFactory.getLogger(DispatchController.class);
+
+
     @Operation(summary = "Create a new dispatch", description = "Creates a dispatch in the QC System")
     @PostMapping
-    public ResponseResult<DispatchDTO> createDispatch(@RequestBody @Valid DispatchRequest request) {
+    public ResponseResult<DispatchDTO> createDispatch(@RequestBody DispatchRequest request) {
         try {
             DispatchDTO dispatchDTO = dispatchService.createDispatch(request);
             return ResponseResult.success(dispatchDTO);
-        } catch (IllegalArgumentException e) {
-            return ResponseResult.failBadRequest("Failed to create dispatch: " + e.getMessage(), e);
         } catch (Exception e) {
-            return ResponseResult.fail("Unexpected error occurred while creating dispatch", e);
+            logger.error("Error creating dispatch", e);
+            return ResponseResult.fail("Failed to create dispatch", e);
+        }
+    }
+
+    @Operation(summary = "Create a manual dispatch", description = "Create a manual dispatch that dispatches right away")
+    @PostMapping("/manual")
+    public ResponseResult<DispatchDTO> createManualDispatch(@RequestBody DispatchRequest request) {
+        try {
+            DispatchDTO dispatchDTO = dispatchService.createManualDispatch(request);
+            return ResponseResult.success(dispatchDTO);
+        } catch (Exception e) {
+            logger.error("Error creating manual dispatch", e);
+            return ResponseResult.fail("Failed to create a manual dispatch", e);
         }
     }
 
@@ -59,10 +75,9 @@ public class DispatchController {
         try {
             DispatchDTO dispatchDTO = dispatchService.getDispatch(id);
             return ResponseResult.success(dispatchDTO);
-        } catch (IllegalArgumentException e) {
-            return ResponseResult.failNotFound("Dispatch not found with ID: " + id, e);
         } catch (Exception e) {
-            return ResponseResult.fail("Unexpected error occurred while retrieving dispatch", e);
+            logger.error("Error retrieving dispatch for ID: {}", id);
+            return ResponseResult.fail("Failed to retrieve dispatch", e);
         }
     }
 
@@ -76,7 +91,8 @@ public class DispatchController {
                     ? ResponseResult.noContent(dispatches)
                     : ResponseResult.success(dispatches);
         } catch (Exception e) {
-            return ResponseResult.fail("Unexpected error occurred while retrieving all dispatches", e);
+            logger.error("Error retrieving all dispatches");
+            return ResponseResult.fail("Failed to retrieve all dispatches", e);
         }
     }
 
@@ -89,7 +105,8 @@ public class DispatchController {
                     ? ResponseResult.noContent(tasks)
                     : ResponseResult.success(tasks);
         } catch (Exception e) {
-            return ResponseResult.fail("Unexpected error occurred while retrieving all dispatched tasks", e);
+            logger.error("Error retrieving all dispatched tasks");
+            return ResponseResult.fail("Failed to retrieve all dispatched tasks", e);
         }
     }
 
@@ -99,10 +116,9 @@ public class DispatchController {
         try {
             DispatchDTO dispatchDTO = dispatchService.updateDispatch(id, request);
             return ResponseResult.success(dispatchDTO);
-        } catch (IllegalArgumentException e) {
-            return ResponseResult.failBadRequest("Failed to update dispatch: " + e.getMessage(), e);
         } catch (Exception e) {
-            return ResponseResult.fail("Unexpected error occurred while updating dispatch", e);
+            logger.error("Error updating dispatch with ID: {}",  id);
+            return ResponseResult.fail("Failed to update a dispatch", e);
         }
     }
 
@@ -112,73 +128,86 @@ public class DispatchController {
         try {
             dispatchService.deleteDispatch(id);
             return ResponseResult.success("Dispatch with ID " + id + " deleted successfully.");
-        } catch (IllegalArgumentException e) {
-            return ResponseResult.failNotFound("Failed to delete dispatch: " + e.getMessage(), e);
-        } catch (EntityNotFoundException e) {
-            return ResponseResult.failNotFound(e.getMessage(), e);
-        }
-        catch (Exception e) {
-            return ResponseResult.fail("Unexpected error occurred while deleting dispatch", e);
+        } catch (Exception e) {
+            logger.error("Error deleting a dispatch with ID: {}", id );
+            return ResponseResult.fail("Failed to delete a dispatch", e);
         }
     }
 
     /**
      * Endpoint to schedule a dispatch task.
      *
-     * @param dispatchId the ID of the dispatch to schedule.
+     * @param id the ID of the dispatch to schedule.
      * @return success or failure response.
      */
     @Operation(summary = "Schedule dispatch task for the specified dispatch", description = "Schedule dispatch task for the specified dispatch")
-    @PostMapping("/schedule/{dispatchId}")
-    public ResponseEntity<String> scheduleTask(@PathVariable Long dispatchId) {
-        Dispatch dispatch = dispatchRepository.findById(dispatchId)
-                .orElseThrow(() -> new IllegalArgumentException("Dispatch not found"));
-        dispatchService.scheduleDispatchTask(dispatch.getId(), () -> dispatchService.executeDispatch(dispatch.getId()));
-        return ResponseEntity.ok("Task scheduled successfully for Dispatch ID: " + dispatchId);
+    @PostMapping("/schedule/{id}")
+    public ResponseResult<String> scheduleTask(@PathVariable Long id) {
+        try {
+
+            Dispatch dispatch = dispatchRepository.findByIdAndStatus(id, 1);
+            dispatchService.scheduleDispatchTask(dispatch.getId(), () -> dispatchService.executeDispatch(dispatch.getId()));
+            return ResponseResult.success("Task scheduled successfully for Dispatch ID: " + id);
+        } catch (Exception e) {
+            logger.error("Error scheduling a dispatch with ID: {}", id);
+            return ResponseResult.fail("Failed to schedule a dispatch", e);
+        }
     }
 
     /**
      * Endpoint to cancel a scheduled task.
      *
-     * @param dispatchId the ID of the dispatch to cancel.
+     * @param id the ID of the dispatch to cancel.
      * @return success or failure response.
      */
     @Operation(summary = "Cancel dispatch task for specified dispatch", description = "Schedule dispatch task for the specified dispatch")
-    @DeleteMapping("/cancel/{dispatchId}")
-    public ResponseResult<String> cancelTask(@PathVariable Long dispatchId) {
+    @DeleteMapping("/cancel/{id}")
+    public ResponseResult<String> cancelTask(@PathVariable Long id) {
 
         try {
-            dispatchService.cancelDispatchTask(dispatchId);
-            return ResponseResult.success("Task cancelled successfully for Dispatch ID: " + dispatchId);
+            dispatchService.cancelDispatchTask(id);
+            return ResponseResult.success("Task cancelled successfully for Dispatch ID: " + id);
         }
         catch (Exception e) {
-            return ResponseResult.fail("Unexpected error occurred while canceling dispatching task", e);
+            logger.error("Error canceling a dispatch with ID: {}", id);
+            return ResponseResult.fail("Failed to cancel a dispatch", e);
         }
     }
 
     /**
      * Endpoint to check if a task is scheduled.
      *
-     * @param dispatchId the ID of the dispatch to check.
+     * @param id the ID of the dispatch to check.
      * @return true if the task is scheduled, false otherwise.
      */
-    @GetMapping("/is-scheduled/{dispatchId}")
-    public ResponseEntity<Boolean> isTaskScheduled(@PathVariable Long dispatchId) {
-        boolean isScheduled = taskScheduleService.isScheduled(dispatchId);
-        return ResponseEntity.ok(isScheduled);
+    @GetMapping("/is-scheduled/{id}")
+    public ResponseResult<Boolean> isTaskScheduled(@PathVariable Long id) {
+
+        try {
+            boolean isScheduled = taskScheduleService.isScheduled(id);
+            return ResponseResult.success(isScheduled);
+        } catch (Exception e) {
+            logger.error("Error checking is scheduled for a dispatch with ID: {}", id);
+            return ResponseResult.fail("Fail to check is scheduled for a dispatch with ID", e);
+        }
     }
 
 
     /**
      * Endpoint to get the next execution time of a scheduled task.
      *
-     * @param dispatchId the ID of the dispatch to check.
+     * @param id the ID of the dispatch to check.
      * @return the next execution time or null if not scheduled.
      */
-    @GetMapping("/next-execution-time/{dispatchId}")
-    public ResponseEntity<String> getNextExecutionTime(@PathVariable Long dispatchId) {
-        Timestamp nextExecutionTime = taskScheduleService.getNextExecutionTime(dispatchId);
-        return ResponseEntity.ok("Next execution time for this dispatch is : " + nextExecutionTime);
+    @GetMapping("/next-execution-time/{id}")
+    public ResponseResult<OffsetDateTime> getNextExecutionTime(@PathVariable Long id) {
+        try {
+            OffsetDateTime nextExecutionTime = taskScheduleService.getNextExecutionTime(id);
+            return ResponseResult.success(nextExecutionTime);
+        } catch (Exception e) {
+            logger.error("Error getting next execution time for dispatch ID: {}", id);
+            return ResponseResult.fail("Fail to get next execution time for dispatch with ID", e);
+        }
     }
 
     /**
@@ -190,7 +219,7 @@ public class DispatchController {
     @GetMapping("/scheduled-tasks")
     public ResponseResult<List<Map<String, Object>>> getAllScheduledTasks() {
         try {
-            Map<Long, Timestamp> scheduledTasks = taskScheduleService.getAllScheduledTasks();
+            Map<Long, OffsetDateTime> scheduledTasks = taskScheduleService.getAllScheduledTasks();
 
             // Convert Map to List of Maps for JSON-friendly representation
             List<Map<String, Object>> response = scheduledTasks.entrySet().stream()
@@ -206,39 +235,10 @@ public class DispatchController {
                     ? ResponseResult.noContent(response)
                     : ResponseResult.success(response);
         } catch (Exception e) {
-            return ResponseResult.fail("Unexpected error occurred while retrieving scheduled tasks", e);
+            logger.error("Error retrieving all scheduled tasks details");
+            return ResponseResult.fail("Failed to retrieve all scheduled tasks", e);
         }
     }
-
-    /**
-     * Endpoint to log task details for a given dispatch ID.
-     *
-     * @param dispatchId the ID of the dispatch to log details for.
-     * @return success message.
-     */
-    @GetMapping("/log-details/{dispatchId}")
-    public ResponseEntity<String> logTaskDetails(@PathVariable Long dispatchId) {
-        taskScheduleService.logScheduledTaskDetails(dispatchId);
-        return ResponseEntity.ok("Logged task details for Dispatch ID: " + dispatchId);
-    }
-
-
-//    @Operation(summary = "Manually trigger a dispatch", description = "Manually triggers a dispatch execution")
-//    @PostMapping("/manual_trigger/{id}")
-//    public ResponseResult<String> manualDispatch(@PathVariable Long id) {
-//        try {
-//            boolean success = dispatchService.manualDispatch(id);
-//            if (success) {
-//                return ResponseResult.success("Dispatch executed successfully for ID: " + id);
-//            } else {
-//                return ResponseResult.failNotFound("No dispatch found with ID: " + id, null);
-//            }
-//        } catch (Exception e) {
-//            return ResponseResult.fail("Unexpected error occurred while manually triggering dispatch", e);
-//        }
-//    }
-
-
 
 }
 

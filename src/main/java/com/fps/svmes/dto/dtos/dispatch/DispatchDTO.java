@@ -6,7 +6,6 @@ import java.util.List;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fps.svmes.dto.dtos.user.UserDTO;
 import lombok.Data;
-import java.sql.Timestamp;
 
 
 @Data
@@ -56,8 +55,8 @@ public class DispatchDTO {
     @JsonProperty("dispatch_forms")
     private List<String> qcFormTreeNodeIds;
 
-    @JsonProperty("dispatch_personnel")
-    private List<UserDTO> personnel;
+    @JsonProperty("dispatch_users")
+    private List<UserDTO> users;
 
     @JsonProperty("due_date_offset_minute")
     private Integer dueDateOffsetMinute; // Total offset in minutes

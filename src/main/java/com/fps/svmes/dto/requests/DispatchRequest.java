@@ -10,6 +10,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.sql.Timestamp;
+import java.time.OffsetDateTime;
 import java.util.List;
 
 @Data
@@ -38,13 +39,13 @@ public class DispatchRequest {
 
     @JsonProperty("startTime")
     @NotNull(message = "Start time cannot be null")
-    @Schema(description = "Start time of the dispatch (timestamp format)", example = "2025-01-01T08:00:00")
-    private Timestamp startTime;
+    @Schema(description = "Start time of the dispatch (ISO 8601 format)", example = "2025-01-01T08:00:00Z")
+    private OffsetDateTime startTime;
 
     @JsonProperty("endTime")
     @NotNull(message = "End time cannot be null")
-    @Schema(description = "End time of the dispatch (timestamp format)", example = "2025-12-31T18:00:00")
-    private Timestamp endTime;
+    @Schema(description = "End time of the dispatch (ISO 8601 format)", example = "2025-12-31T18:00:00Z")
+    private OffsetDateTime endTime;
 
     @JsonProperty("dispatchLimit")
     @Schema(description = "Maximum number of times the dispatch can be executed", example = "10")
@@ -70,7 +71,7 @@ public class DispatchRequest {
     private Integer createdBy;
 
     @JsonProperty("updated_by")
-    @Schema(description = "User ID that updates this dispatch", example = "14")
+    @Schema(description = "User ID that updates this dispatch", example = "null")
     private Integer updatedBy;
 
 }

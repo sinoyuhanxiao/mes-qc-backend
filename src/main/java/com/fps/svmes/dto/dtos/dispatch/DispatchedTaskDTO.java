@@ -7,6 +7,7 @@ import com.fps.svmes.models.sql.user.User;
 import lombok.Data;
 
 import java.sql.Timestamp;
+import java.time.OffsetDateTime;
 
 @Data
 public class DispatchedTaskDTO {
@@ -23,19 +24,16 @@ public class DispatchedTaskDTO {
     private String qcFormTreeNodeId;
 
     @JsonProperty("dispatch_time")
-    private Timestamp dispatchTime;
-
-    @JsonProperty("state")
-    private String state;
+    private OffsetDateTime dispatchTime;
 
     @JsonProperty("notes")
     private String notes;
 
     @JsonProperty("finished_at")
-    private Timestamp finishedAt;
+    private OffsetDateTime finishedAt;
 
     @JsonProperty("updated_at")
-    private Timestamp updatedAt;
+    private OffsetDateTime updatedAt;
 
     @JsonProperty("created_by")
     private Integer created_by;

@@ -10,6 +10,8 @@ import org.springframework.scheduling.support.CronTrigger;
 import org.springframework.stereotype.Service;
 
 import java.sql.Timestamp;
+import java.time.OffsetDateTime;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -102,6 +104,21 @@ public class TaskScheduleServiceImpl implements TaskScheduleService {
             }
         });
         return result;
+    }
+
+    public void scheduleOneTimeTask(OffsetDateTime executionTime, Runnable task) {
+        OffsetDateTime now = OffsetDateTime.now();
+
+        if (executionTime.isAfter(now)) {
+            long delay = executionTime.toInstant().toEpochMilli() - System.currentTimeMillis();
+            taskScheduler.schedule(task, triggerContext -> {
+                // Return the execution time as a `Date`
+                return Date.from(executionTime.toInstant()).toInstant();
+            });
+            logger.info("One-time task scheduled for execution at {}", executionTime);
+        } else {
+            logger.warn("Attempted to schedule a one-time task for a past time: {}", executionTime);
+        }
     }
 
     /**

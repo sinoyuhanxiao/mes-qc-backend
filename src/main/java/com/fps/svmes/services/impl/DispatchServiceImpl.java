@@ -17,7 +17,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import org.modelmapper.ModelMapper;
 
-import java.sql.Timestamp;
+import java.time.ZoneOffset;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
@@ -115,8 +116,12 @@ public class DispatchServiceImpl implements DispatchService {
 
         Dispatch savedDispatch = dispatchRepo.save(dispatch);
 
-        this.scheduleDispatchTask(savedDispatch.getId(), () -> executeDispatch(savedDispatch.getId()));
-        // Schedule the task
+        // Schedule the task or a one-time start-time check
+        try {
+            this.scheduleDispatchTask(savedDispatch.getId(), () -> executeDispatch(savedDispatch.getId()));
+        } catch (IllegalStateException e) {
+            logger.warn("Dispatch created but not immediately scheduled: {}", e.getMessage());
+        }
 
         return convertToDispatchDTO(savedDispatch);
     }
@@ -127,7 +132,7 @@ public class DispatchServiceImpl implements DispatchService {
                 .orElseThrow(() -> new EntityNotFoundException("Dispatch not found"));
 
         modelMapper.map(request, dispatch);
-        dispatch.setUpdatedAt(new Timestamp(System.currentTimeMillis()));
+        dispatch.setUpdateDetails(request.getUpdatedBy(), 1);
 
         // Handle DispatchForms
         if (request.getFormIds() != null) {
@@ -159,13 +164,28 @@ public class DispatchServiceImpl implements DispatchService {
 
     @Transactional
     public void deleteDispatch(Long id) {
-        if (dispatchRepo.existsById(id)) {
-            taskScheduleService.cancelDispatch(id);
-            dispatchRepo.deleteById(id);
-            logger.info("Deleted Dispatch ID: {}", id);
-        } else {
-            throw new EntityNotFoundException("Dispatch not found");
+        Dispatch dispatch = dispatchRepo.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Dispatch not found"));
+
+        // Cancel the dispatch task if scheduled
+        boolean taskCancelled = taskScheduleService.cancelDispatch(id);
+        if (taskCancelled) {
+            logger.info("Cancelled scheduled task for Dispatch ID: {}", id);
         }
+
+        // TODO change update by to data passed from frontend
+        dispatch.setUpdateDetails(30, 0);
+
+        // Update the status of related personnel and forms
+        if (dispatch.getDispatchPersonnel() != null) {
+            dispatch.getDispatchPersonnel().forEach(personnel -> personnel.setStatus(0));
+        }
+        if (dispatch.getDispatchForms() != null) {
+            dispatch.getDispatchForms().forEach(form -> form.setStatus(0));
+        }
+
+        dispatchRepo.save(dispatch);
+        logger.info("Soft-deleted Dispatch ID: {}", id);
     }
 
 
@@ -188,13 +208,41 @@ public class DispatchServiceImpl implements DispatchService {
 
 
 
+//    @Transactional(readOnly = true)
+//    public List<DispatchedTaskDTO> getAllDispatchedTasks() {
+//        // Fetch all dispatched tasks from the repository
+//        List<DispatchedTask> dispatchedTasks = dispatchedTaskRepo.findAll();
+//
+//        // Convert to DTOs
+//        return dispatchedTasks.stream()
+//                .map(dispatchedTask -> {
+//                    DispatchedTaskDTO dto = modelMapper.map(dispatchedTask, DispatchedTaskDTO.class);
+//
+//                    // Map nested properties
+//                    dto.setDispatchId(dispatchedTask.getDispatch().getId());
+//                    dto.setUser(userService.getUserById(dispatchedTask.getUser().getId()));
+//                    return dto;
+//                })
+//                .collect(Collectors.toList());
+//    }
+
     @Transactional(readOnly = true)
     public List<DispatchedTaskDTO> getAllDispatchedTasks() {
         // Fetch all dispatched tasks from the repository
         List<DispatchedTask> dispatchedTasks = dispatchedTaskRepo.findAll();
 
-        // Convert to DTOs
+        // Convert to DTOs while filtering out tasks with non-existent dispatch references
         return dispatchedTasks.stream()
+                .filter(dispatchedTask -> {
+                    try {
+                        // Check if Dispatch exists
+                        return dispatchedTask.getDispatch() != null && dispatchedTask.getDispatch().getId() != null;
+                    } catch (EntityNotFoundException e) {
+                        // Log if the dispatch is missing
+                        logger.warn("DispatchedTask with ID {} references a non-existent Dispatch.", dispatchedTask.getId());
+                        return false; // Exclude from the result
+                    }
+                })
                 .map(dispatchedTask -> {
                     DispatchedTaskDTO dto = modelMapper.map(dispatchedTask, DispatchedTaskDTO.class);
 
@@ -205,17 +253,28 @@ public class DispatchServiceImpl implements DispatchService {
                 })
                 .collect(Collectors.toList());
     }
+
     @Override
     public void scheduleDispatchTask(Long dispatchId, Runnable task) {
         Dispatch dispatch = dispatchRepo.findById(dispatchId)
                 .orElseThrow(() -> new EntityNotFoundException("Dispatch not found"));
 
-        if (dispatch.isActiveAndWithinScheduledTime()) {
-            logger.info("Dispatch is active and within start/end time");
-            // Schedule the task
-            taskScheduleService.scheduleDispatchTask(dispatch, task);
+        OffsetDateTime now = OffsetDateTime.now();
+
+        if (dispatch.getStartTime().isAfter(now)) {
+            // If the start time is in the future, schedule a one-time task to re-evaluate at start time
+            logger.info("Dispatch start time is in the future. Scheduling a one-time check at start time.");
+            taskScheduleService.scheduleOneTimeTask(dispatch.getStartTime(), () -> {
+                logger.info("Re-evaluating dispatch ID {} at start time.", dispatchId);
+                this.scheduleDispatchTask(dispatchId, task);
+            });
+        } else if (dispatch.getEndTime().isBefore(now)) {
+            // If the end time is in the past, no scheduling
+            throw new IllegalStateException("Dispatch's end time is in the past.");
         } else {
-            throw new IllegalStateException("Dispatch is not active or within the scheduled time.");
+            // Schedule the task as the current time is within the start and end time
+            logger.info("Dispatch is active and within start/end time");
+            taskScheduleService.scheduleDispatchTask(dispatch, task);
         }
     }
 
@@ -226,8 +285,7 @@ public class DispatchServiceImpl implements DispatchService {
 
         if (taskScheduleService.cancelDispatch(dispatchId)) {
             // Update status after cancellation
-            dispatch.setStatus(0); // Mark as inactive
-            dispatch.setUpdatedAt(new Timestamp(System.currentTimeMillis()));
+            dispatch.setUpdateDetails(30, 0);
             dispatchRepo.save(dispatch);
         } else {
             throw new IllegalStateException("No task was scheduled for this dispatch ID.");
@@ -268,8 +326,8 @@ public class DispatchServiceImpl implements DispatchService {
 
 
     private List<DispatchedTask> createTasksForDispatch(Dispatch dispatch) {
-        Timestamp dispatchTime = new Timestamp(System.currentTimeMillis());
-        Timestamp dueDate = calculateDueDate(dispatchTime, dispatch.getDueDateOffsetMinute());
+        OffsetDateTime dispatchTime = OffsetDateTime.now(ZoneOffset.UTC);
+        OffsetDateTime dueDate = calculateDueDate(dispatchTime, dispatch.getDueDateOffsetMinute());
 
         // Logic to create DispatchedTask entities based on dispatch forms and personnel
         return dispatch.getDispatchForms().stream()
@@ -293,9 +351,8 @@ public class DispatchServiceImpl implements DispatchService {
                 .collect(Collectors.toList());
     }
 
-    private Timestamp calculateDueDate(Timestamp dispatchTime, int dueDateOffsetMinute) {
-        long offsetMillis = dueDateOffsetMinute * 60 * 1000L; // Convert minutes to milliseconds
-        return new Timestamp(dispatchTime.getTime() + offsetMillis);
+    private OffsetDateTime calculateDueDate(OffsetDateTime dispatchTime, int dueDateOffsetMinute) {
+        return dispatchTime.plusMinutes(dueDateOffsetMinute);
     }
 
 

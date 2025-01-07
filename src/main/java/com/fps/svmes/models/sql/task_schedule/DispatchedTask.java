@@ -41,13 +41,13 @@ public class DispatchedTask extends Common {
 
     @Column(name = "dispatch_time", nullable = false, updatable = false)
     @CreationTimestamp
-    private Timestamp dispatchTime; // Time when the test was dispatched
+    private OffsetDateTime dispatchTime; // Time when the test was dispatched
 
     @Column(name = "finished_at")
-    private Timestamp finishedAt;
+    private OffsetDateTime finishedAt;
 
     @Column(name = "due_date")
-    private Timestamp dueDate;
+    private OffsetDateTime dueDate;
 
     @Column(name = "notes")
     private String notes; // Optional notes about edits or status changes

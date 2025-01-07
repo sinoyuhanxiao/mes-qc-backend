@@ -38,10 +38,10 @@ public class Dispatch extends Common {
     private String cronExpression;
 
     @Column(name = "start_time", nullable = false)
-    private Timestamp startTime;
+    private OffsetDateTime startTime;
 
     @Column(name = "end_time", nullable = false)
-    private Timestamp endTime;
+    private OffsetDateTime endTime;
 
     @Column(name = "dispatch_limit")
     private Integer dispatchLimit;
@@ -68,11 +68,11 @@ public class Dispatch extends Common {
     }
 
     public boolean isActiveAndWithinScheduledTime() {
-        long currentTimeMillis = System.currentTimeMillis();
+        OffsetDateTime now = OffsetDateTime.now();
         return getStatus() == 1 &&
                 startTime != null &&
                 endTime != null &&
-                currentTimeMillis >= startTime.getTime() &&
-                currentTimeMillis <= endTime.getTime();
+                !now.isBefore(startTime) && // now >= startTime
+                !now.isAfter(endTime);     // now <= endTime
     }
 }

@@ -26,6 +26,9 @@ public class DispatchPersonnel {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
+    @Column(name = "status", nullable = false, columnDefinition = "SMALLINT DEFAULT 1")
+    private Integer status = 1; // Active by default
+
     public DispatchPersonnel(Dispatch dispatch, Integer userId) {
         this.dispatch = dispatch;
         user = new User();

@@ -1,5 +1,6 @@
 package com.fps.svmes.dto.dtos.dispatch;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -26,10 +27,10 @@ public class DispatchDTO {
     private String cronExpression;
 
     @JsonProperty("start_time")
-    private Timestamp startTime;
+    private OffsetDateTime startTime;
 
     @JsonProperty("end_time")
-    private Timestamp endTime;
+    private OffsetDateTime endTime;
 
     @JsonProperty("dispatch_limit")
     private Integer dispatchLimit;
@@ -41,13 +42,13 @@ public class DispatchDTO {
     private Integer status;
 
     @JsonProperty("created_at")
-    private Timestamp createdAt;
+    private OffsetDateTime createdAt;
 
     @JsonProperty("created_by")
     private Integer createdBy;
 
     @JsonProperty("updated_at")
-    private Timestamp updatedAt;
+    private OffsetDateTime updatedAt;
 
     @JsonProperty("updated_by")
     private Integer updatedBy;

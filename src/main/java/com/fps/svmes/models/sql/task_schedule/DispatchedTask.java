@@ -43,7 +43,6 @@ public class DispatchedTask extends Common {
     @CreationTimestamp
     private Timestamp dispatchTime; // Time when the test was dispatched
 
-
     @Column(name = "finished_at")
     private Timestamp finishedAt;
 

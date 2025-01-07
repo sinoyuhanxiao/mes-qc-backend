@@ -28,6 +28,12 @@ public class QcFormDataController {
             @PathVariable Long userId,
             @RequestBody Map<String, Object> formData) {
         try {
+            // Check if the collection exists
+            if (!mongoTemplate.collectionExists(collectionName)) {
+                return ResponseEntity.status(400)
+                        .body("Error: Collection '" + collectionName + "' does not exist.");
+            }
+
             Map<String, Object> document = new HashMap<>(formData);
             document.put("created_at", LocalDateTime.now().toString());
             document.put("created_by", userId);

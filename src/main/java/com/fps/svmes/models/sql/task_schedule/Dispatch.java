@@ -9,6 +9,8 @@ import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 
 import java.sql.Timestamp;
+import java.time.OffsetDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 @Data
@@ -57,7 +59,6 @@ public class Dispatch extends Common {
 
     @Column(name = "due_date_offset_minute")
     private Integer dueDateOffsetMinute; // Total offset in minutes
-
 
     public void incrementExecutedCount() {
         if (executedCount == null) {

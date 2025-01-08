@@ -35,14 +35,16 @@ public class TaskScheduleServiceImpl implements TaskScheduleService {
      * @param task     the task to be executed.
      */
     public void scheduleDispatchTask(Dispatch dispatch, Runnable task) {
-        cancelDispatch(dispatch.getId()); // Cancel existing task if any
-        ScheduledFuture<?> future = taskScheduler.schedule(task, new CronTrigger(dispatch.getCronExpression()));
+        synchronized (scheduledTasks) { // Lock for task scheduling map to avoid race conditions
+            cancelDispatch(dispatch.getId()); // Cancel existing task if any
+            ScheduledFuture<?> future = taskScheduler.schedule(task, new CronTrigger(dispatch.getCronExpression()));
 
-        if (future != null) {
-            scheduledTasks.put(dispatch.getId(), future);
-            logger.info("Scheduled a dispatching task for dispatch id {}", dispatch.getId());
-        } else {
-            throw new IllegalStateException("Failed to schedule task for Dispatch ID: " + dispatch.getId());
+            if (future != null) {
+                scheduledTasks.put(dispatch.getId(), future);
+                logger.info("Scheduled a dispatching task for dispatch id {}", dispatch.getId());
+            } else {
+                throw new IllegalStateException("Failed to schedule task for Dispatch ID: " + dispatch.getId());
+            }
         }
     }
 

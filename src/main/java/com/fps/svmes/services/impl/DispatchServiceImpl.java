@@ -274,23 +274,28 @@ public class DispatchServiceImpl implements DispatchService {
         Dispatch dispatch = dispatchRepo.findById(dispatchId)
                 .orElseThrow(() -> new EntityNotFoundException("Dispatch not found"));
 
-        OffsetDateTime now = OffsetDateTime.now();
+        synchronized (dispatch.getId()) {
+            OffsetDateTime now = OffsetDateTime.now();
 
-        if (dispatch.getStartTime().isAfter(now)) {
-            // If the start time is in the future, schedule a one-time task to re-evaluate at start time
-            logger.info("Dispatch start time is in the future. Scheduling a one-time check at start time.");
-            taskScheduleService.scheduleOneTimeTask(dispatch.getStartTime(), () -> {
-                logger.info("Re-evaluating dispatch ID {} at start time.", dispatchId);
-                this.scheduleDispatchTask(dispatchId, task);
-            });
-        } else if (dispatch.getEndTime().isBefore(now)) {
-            // Log and skip scheduling as the end time is in the past
-            logger.warn("Dispatch ID {} has an end time in the past. Skipping scheduling.", dispatchId);
-        } else {
-            // Schedule the task as the current time is within the start and end time
-            logger.info("Dispatch ID {} is active and within start/end time", dispatchId);
-            taskScheduleService.scheduleDispatchTask(dispatch, task);
+            if (dispatch.getStartTime().isAfter(now)) {
+                // If the start time is in the future, schedule a one-time task to re-evaluate at start time
+                logger.info("Dispatch start time is in the future. Scheduling a one-time check at start time.");
+                taskScheduleService.scheduleOneTimeTask(dispatch.getStartTime(), () -> {
+                    logger.info("Re-evaluating dispatch ID {} at start time.", dispatchId);
+                    this.scheduleDispatchTask(dispatchId, task);
+                });
+            } else if (dispatch.getEndTime().isBefore(now)) {
+                // Log and skip scheduling as the end time is in the past
+                logger.warn("Dispatch ID {} has an end time in the past. Skipping scheduling.", dispatchId);
+            } else if (!taskScheduleService.isScheduled(dispatchId)) {
+                // Schedule the task only if not already scheduled
+                logger.info("Dispatch ID {} is active and within start/end time", dispatchId);
+                taskScheduleService.scheduleDispatchTask(dispatch, task);
+            } else {
+                logger.info("Dispatch ID {} is already scheduled.", dispatchId);
+            }
         }
+
     }
 
     @Override

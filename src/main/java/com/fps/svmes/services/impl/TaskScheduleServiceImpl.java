@@ -24,7 +24,7 @@ public class TaskScheduleServiceImpl implements TaskScheduleService {
 
     // Map to track scheduled tasks by dispatch ID
     private final Map<Long, ScheduledFuture<?>> scheduledTasks = new ConcurrentHashMap<>();
-
+    private final Map<Long, Boolean> schedulingInProgress = new ConcurrentHashMap<>();
     private static final Logger logger = LoggerFactory.getLogger(TaskScheduleServiceImpl.class);
 
 
@@ -35,16 +35,27 @@ public class TaskScheduleServiceImpl implements TaskScheduleService {
      * @param task     the task to be executed.
      */
     public void scheduleDispatchTask(Dispatch dispatch, Runnable task) {
-        synchronized (scheduledTasks) { // Lock for task scheduling map to avoid race conditions
-            cancelDispatch(dispatch.getId()); // Cancel existing task if any
-            ScheduledFuture<?> future = taskScheduler.schedule(task, new CronTrigger(dispatch.getCronExpression()));
+        if (schedulingInProgress.putIfAbsent(dispatch.getId(), true) != null) {
+            logger.warn("Dispatch ID {} is already being scheduled. Skipping redundant request.", dispatch.getId());
+            return;
+        }
 
-            if (future != null) {
-                scheduledTasks.put(dispatch.getId(), future);
-                logger.info("Scheduled a dispatching task for dispatch id {}", dispatch.getId());
-            } else {
-                throw new IllegalStateException("Failed to schedule task for Dispatch ID: " + dispatch.getId());
+        synchronized (scheduledTasks) { // Lock for task scheduling map to avoid race conditions
+            try {
+                cancelDispatch(dispatch.getId()); // Cancel existing task if any
+                ScheduledFuture<?> future = taskScheduler.schedule(task, new CronTrigger(dispatch.getCronExpression()));
+
+                if (future != null) {
+                    scheduledTasks.put(dispatch.getId(), future);
+                    logger.info("Scheduled a dispatching task for dispatch id {}", dispatch.getId());
+//                    logger.info("Scheduled a dispatching task for dispatch id {} to assign {} forms to {} users", dispatch.getId(), dispatch.getDispatchForms().size(), dispatch.getDispatchUsers().size());
+                } else {
+                    throw new IllegalStateException("Failed to schedule task for Dispatch ID: " + dispatch.getId());
+                }
+            } finally {
+                schedulingInProgress.remove(dispatch.getId());
             }
+
         }
     }
 
@@ -115,11 +126,20 @@ public class TaskScheduleServiceImpl implements TaskScheduleService {
 
         if (executionTime.isAfter(now)) {
             long delay = executionTime.toInstant().toEpochMilli() - System.currentTimeMillis();
-            taskScheduler.schedule(task, triggerContext -> {
-                // Return the execution time as a `Date`
-                return Date.from(executionTime.toInstant()).toInstant();
-            });
-            logger.info("One-time task scheduled for execution at {}", executionTime);
+
+            synchronized (schedulingInProgress) {
+                if (schedulingInProgress.putIfAbsent((long) task.hashCode(), true) != null) {
+                    logger.warn("One-time task for execution at {} is already being scheduled. Skipping.", executionTime);
+                    return;
+                }
+
+                try {
+                    taskScheduler.schedule(task, triggerContext -> Date.from(executionTime.toInstant()).toInstant());
+                    logger.info("One-time task scheduled for execution at {}", executionTime);
+                } finally {
+                    schedulingInProgress.remove((long) task.hashCode());
+                }
+            }
         } else {
             logger.warn("Attempted to schedule a one-time task for a past time: {}", executionTime);
         }

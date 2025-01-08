@@ -15,6 +15,7 @@ import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,7 +24,10 @@ import org.modelmapper.ModelMapper;
 import java.time.ZoneOffset;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -54,12 +58,18 @@ public class DispatchServiceImpl implements DispatchService {
     private UserService userService;
 
     private static final Logger logger = LoggerFactory.getLogger(DispatchServiceImpl.class);
+    private final Map<Long, ReentrantLock> dispatchLocks = new ConcurrentHashMap<>();
 
+    private ReentrantLock getDispatchLock(Long dispatchId) {
+        return dispatchLocks.computeIfAbsent(dispatchId, id -> new ReentrantLock());
+    }
 
     @EventListener(ApplicationReadyEvent.class)
     public void initializeSchedules() {
         logger.info("Initializing scheduled tasks...");
         scheduleDispatches();
+        logger.info("Done initializing scheduling dispatches...");
+
     }
 
     @Override
@@ -74,6 +84,21 @@ public class DispatchServiceImpl implements DispatchService {
                     }
                 });
     }
+
+    @Scheduled(fixedRate = 600000) // Runs every 10 minutes (600000 ms)
+    public void periodicCleanupExpiredTasks() {
+        logger.info("Running cleanup of expired tasks...");
+
+        dispatchRepo.findByStatus(1).stream()
+                .filter(dispatch -> "SCHEDULED".equals(dispatch.getType()) && taskScheduleService.isScheduled(dispatch.getId()))
+                .forEach(dispatch -> {
+                    if (dispatch.getEndTime().isBefore(OffsetDateTime.now())) {
+                        logger.info("Dispatch ID {} has expired. Canceling task...", dispatch.getId());
+                        cancelDispatchTask(dispatch.getId());
+                    }
+                });
+    }
+
 
 
     @Transactional
@@ -97,6 +122,66 @@ public class DispatchServiceImpl implements DispatchService {
             dispatchRepo.save(dispatch);
         } catch (Exception e) {
             logger.error("Error executing Dispatch ID: {}", dispatchId, e);
+        }
+    }
+
+    @Override
+    public void scheduleDispatchTask(Long dispatchId, Runnable task) {
+        Dispatch dispatch = dispatchRepo.findById(dispatchId)
+                .orElseThrow(() -> new EntityNotFoundException("Dispatch not found"));
+
+        ReentrantLock lock = getDispatchLock(dispatchId);
+        lock.lock();
+
+        try {
+            OffsetDateTime now = OffsetDateTime.now();
+
+            // Prevent redundant re-evaluations
+            if (taskScheduleService.isScheduled(dispatchId) && dispatch.getStartTime().isBefore(now)) {
+                logger.info("Dispatch ID {} is already scheduled and start time has passed. Skipping re-evaluation.", dispatchId);
+                return;
+            }
+
+            if (dispatch.getStartTime().isAfter(now)) {
+                // TODO FIX
+                // If the start time is in the future, schedule a one-time task to re-evaluate at start time
+//                taskScheduleService.scheduleOneTimeTask(dispatch.getStartTime(), () -> {
+//                    logger.info("Re-evaluating dispatch ID {} at start time.", dispatchId);
+//                    this.scheduleDispatchTask(dispatchId, task);
+//                });
+            } else if (dispatch.getEndTime().isBefore(now)) {
+                // Log and skip scheduling as the end time is in the past
+                logger.warn("Dispatch ID {} has an end time in the past. Skipping scheduling.", dispatchId);
+            } else if (!taskScheduleService.isScheduled(dispatchId)) {
+                // Schedule the task only if not already scheduled
+                logger.info("Dispatch ID {} is active and within start/end time", dispatchId);
+                taskScheduleService.scheduleDispatchTask(dispatch, task);
+
+                // TODO FIX
+                // Schedule a one-time task to cancel at endTime
+//                taskScheduleService.scheduleOneTimeTask(dispatch.getEndTime(), () -> {
+//                    logger.info("Canceling dispatch ID {} at end time.", dispatchId);
+//                    this.cancelDispatchTask(dispatchId);
+//                });
+            } else {
+                logger.info("Dispatch ID {} is already scheduled.", dispatchId);
+            }
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    @Override
+    public void cancelDispatchTask(Long dispatchId) {
+        Dispatch dispatch = dispatchRepo.findById(dispatchId)
+                .orElseThrow(() -> new EntityNotFoundException("Dispatch not found"));
+
+        if (taskScheduleService.cancelDispatch(dispatchId)) {
+            // Update status after cancellation
+            dispatch.setUpdatedAt(OffsetDateTime.now());
+            dispatchRepo.save(dispatch);
+        } else {
+            logger.warn("No task was scheduled for this dispatch ID.");
         }
     }
 
@@ -268,50 +353,6 @@ public class DispatchServiceImpl implements DispatchService {
                 })
                 .collect(Collectors.toList());
     }
-
-    @Override
-    public void scheduleDispatchTask(Long dispatchId, Runnable task) {
-        Dispatch dispatch = dispatchRepo.findById(dispatchId)
-                .orElseThrow(() -> new EntityNotFoundException("Dispatch not found"));
-
-        synchronized (dispatch.getId()) {
-            OffsetDateTime now = OffsetDateTime.now();
-
-            if (dispatch.getStartTime().isAfter(now)) {
-                // If the start time is in the future, schedule a one-time task to re-evaluate at start time
-                logger.info("Dispatch start time is in the future. Scheduling a one-time check at start time.");
-                taskScheduleService.scheduleOneTimeTask(dispatch.getStartTime(), () -> {
-                    logger.info("Re-evaluating dispatch ID {} at start time.", dispatchId);
-                    this.scheduleDispatchTask(dispatchId, task);
-                });
-            } else if (dispatch.getEndTime().isBefore(now)) {
-                // Log and skip scheduling as the end time is in the past
-                logger.warn("Dispatch ID {} has an end time in the past. Skipping scheduling.", dispatchId);
-            } else if (!taskScheduleService.isScheduled(dispatchId)) {
-                // Schedule the task only if not already scheduled
-                logger.info("Dispatch ID {} is active and within start/end time", dispatchId);
-                taskScheduleService.scheduleDispatchTask(dispatch, task);
-            } else {
-                logger.info("Dispatch ID {} is already scheduled.", dispatchId);
-            }
-        }
-
-    }
-
-    @Override
-    public void cancelDispatchTask(Long dispatchId) {
-        Dispatch dispatch = dispatchRepo.findById(dispatchId)
-                .orElseThrow(() -> new EntityNotFoundException("Dispatch not found"));
-
-        if (taskScheduleService.cancelDispatch(dispatchId)) {
-            // Update status after cancellation
-            dispatch.setUpdatedAt(OffsetDateTime.now());
-            dispatchRepo.save(dispatch);
-        } else {
-            throw new IllegalStateException("No task was scheduled for this dispatch ID.");
-        }
-    }
-
 
     // HELPER CLASS ----------------------------------
 

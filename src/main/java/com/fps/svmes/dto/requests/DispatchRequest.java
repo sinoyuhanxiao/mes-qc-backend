@@ -70,7 +70,7 @@ public class DispatchRequest {
     private Integer createdBy;
 
     @JsonProperty("updated_by")
-    @Schema(description = "User ID that updates this dispatch", example = "null")
+    @Schema(description = "User ID that updates this dispatch", example = "Null")
     private Integer updatedBy;
 
 }

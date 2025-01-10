@@ -146,7 +146,7 @@ public class DispatchController {
         try {
 
             Dispatch dispatch = dispatchRepository.findByIdAndStatus(id, 1);
-            dispatchService.scheduleDispatchTask(dispatch.getId(), () -> dispatchService.executeDispatch(dispatch.getId()));
+            dispatchService.scheduleDispatch(dispatch.getId(), () -> dispatchService.executeDispatch(dispatch.getId()));
             return ResponseResult.success("Task scheduled successfully for Dispatch ID: " + id);
         } catch (Exception e) {
             logger.error("Error scheduling a dispatch with ID: {}", id);

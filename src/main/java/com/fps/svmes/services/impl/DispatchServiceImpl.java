@@ -25,7 +25,6 @@ import java.time.ZoneOffset;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Objects;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -57,131 +56,27 @@ public class DispatchServiceImpl implements DispatchService {
 
     private static final Logger logger = LoggerFactory.getLogger(DispatchServiceImpl.class);
 
-    @EventListener(ApplicationReadyEvent.class)
-    public void initializeSchedules() {
-        logger.info("Initializing scheduled tasks...");
-        scheduleDispatches();
-        logger.info("Done initializing scheduling dispatches...");
+    // ------------- Dispatch CRUD -----------------------------------------------------------------------
 
-    }
-
-    @Override
-    public void scheduleDispatches() {
-        dispatchRepo.findByStatus(1).stream()
-                .filter(dispatch -> "SCHEDULED".equals(dispatch.getType()) && !taskScheduleService.isScheduled(dispatch.getId()))
-                .forEach(dispatch -> {
-                    try {
-                        scheduleDispatch(dispatch.getId(), () -> executeDispatch(dispatch.getId()));
-                    } catch (Exception e) {
-                        logger.error("Failed to schedule task for Dispatch ID: {}", dispatch.getId(), e);
-                    }
-                });
-    }
-
-    @Scheduled(fixedRate = 600000) // Runs every 10 minutes (600000 ms)
-    public void periodicCleanupExpiredTasks() {
-        logger.info("Running cleanup of expired tasks...");
-
-        dispatchRepo.findByStatus(1).stream()
-                .filter(dispatch -> "SCHEDULED".equals(dispatch.getType()) && taskScheduleService.isScheduled(dispatch.getId()))
-                .forEach(dispatch -> {
-                    if (dispatch.getEndTime().isBefore(OffsetDateTime.now())) {
-                        logger.info("Dispatch ID {} has expired. Canceling task...", dispatch.getId());
-                        cancelDispatchTask(dispatch.getId());
-                    }
-                });
-    }
-
-
-
-    @Transactional
-    @Override
-    public void executeDispatch(Long dispatchId) {
-        Dispatch dispatch = this.getDispatchWithDetails(dispatchId);
-
-        // Handle inactive dispatch
-        if (dispatch.getStatus() == 0) {
-            handleInactiveDispatch(dispatchId);
-            return;
-        }
-
-        try {
-            if (hasReachedDispatchLimit(dispatch)) {
-                handleDispatchLimitReached(dispatchId, dispatch);
-            } else {
-                processDispatch(dispatch);
-            }
-
-            dispatchRepo.save(dispatch);
-        } catch (Exception e) {
-            logger.error("Error executing Dispatch ID: {}", dispatchId, e);
-        }
-    }
-
-    // Dispatch create, update, and initialization upon restart
-    public void scheduleDispatch(Long dispatchId, Runnable task) {
-        Dispatch dispatch = dispatchRepo.findById(dispatchId)
-                .orElseThrow(() -> new EntityNotFoundException("Dispatch not found"));
-
-        OffsetDateTime now = OffsetDateTime.now();
-
-        if (taskScheduleService.isScheduled(dispatchId) && dispatch.getStartTime().isBefore(now)) {
-            logger.info("Dispatch ID {} is already scheduled and start time has passed. Skipping re-evaluation.", dispatchId);
-            return;
-        }
-        if (dispatch.getStartTime().isAfter(now)) {
-            // Delegate future scheduling to TaskScheduleService
-            taskScheduleService.scheduleDispatchStartingAt(dispatch, task);
-        } else if (dispatch.getEndTime().isBefore(now)) {
-            logger.warn("Dispatch ID {} has an end time in the past. Skipping scheduling.", dispatchId);
-        } else if (!taskScheduleService.isScheduled(dispatchId)) {
-            taskScheduleService.scheduleDispatchCronTask(dispatch, task);
-        } else {
-            logger.info("Dispatch ID {} is already scheduled.", dispatchId);
-        }
-    }
-
-    @Override
-    public void cancelDispatchTask(Long dispatchId) {
-        Dispatch dispatch = dispatchRepo.findById(dispatchId)
-                .orElseThrow(() -> new EntityNotFoundException("Dispatch not found"));
-
-        if (taskScheduleService.cancelDispatch(dispatchId)) {
-            // Update status after cancellation
-            dispatch.setUpdatedAt(OffsetDateTime.now());
-            dispatchRepo.save(dispatch);
-        } else {
-            logger.warn("No task was scheduled for this dispatch ID.");
-        }
-    }
-
+    // Map dispatch request to a dispatch object,
     @Transactional
     public DispatchDTO createDispatch(DispatchRequest request) {
         Dispatch dispatch = modelMapper.map(request, Dispatch.class);
-        dispatch.setExecutedCount(0);
         dispatch.setCreationDetails(request.getCreatedBy(), 1);
 
-        // Handle DispatchForms
         if (request.getFormIds() != null) {
-            List<DispatchForm> forms = request.getFormIds().stream()
-                    .map(formTreeNodeId -> new DispatchForm(dispatch, formTreeNodeId))
-                    .toList();
-            dispatch.setDispatchForms(forms);
+            dispatch.setDispatchForms(mapDispatchForms(dispatch, request.getFormIds()));
         }
 
-        // Handle DispatchUser
         if (request.getUserIds() != null) {
-            List<DispatchUser> users = request.getUserIds().stream()
-                    .map(userId -> new DispatchUser(dispatch, userId))
-                    .toList();
-            dispatch.setDispatchUsers(users);
+            dispatch.setDispatchUsers(mapDispatchUsers(dispatch, request.getUserIds()));
         }
 
         Dispatch savedDispatch = dispatchRepo.save(dispatch);
 
         // Schedule the task or a one-time start-time check
         try {
-            this.scheduleDispatch(savedDispatch.getId(), () -> executeDispatch(savedDispatch.getId()));
+            this.initializeDispatch(savedDispatch.getId(), () -> executeDispatch(savedDispatch.getId()));
         } catch (IllegalStateException e) {
             logger.warn("Dispatch created but not immediately scheduled: {}", e.getMessage());
         }
@@ -195,25 +90,18 @@ public class DispatchServiceImpl implements DispatchService {
         dispatch.setExecutedCount(0);
         dispatch.setCreationDetails(request.getCreatedBy(), 1);
 
-        // Handle DispatchForms
         if (request.getFormIds() != null) {
-            List<DispatchForm> forms = request.getFormIds().stream()
-                    .map(formTreeNodeId -> new DispatchForm(dispatch, formTreeNodeId))
-                    .toList();
-            dispatch.setDispatchForms(forms);
+            dispatch.setDispatchForms(this.mapDispatchForms(dispatch, request.getFormIds()));
         }
 
-        // Handle DispatchUser
         if (request.getUserIds() != null) {
-            List<DispatchUser> users = request.getUserIds().stream()
-                    .map(userId -> new DispatchUser(dispatch, userId))
-                    .toList();
-            dispatch.setDispatchUsers(users);
+            dispatch.setDispatchUsers(mapDispatchUsers(dispatch, request.getUserIds()));
         }
 
-        Dispatch savedDispatch = dispatchRepo.save(dispatch);
 
-        processDispatch(savedDispatch);
+        processDispatch(dispatch);
+        dispatch.setIsActive(false);
+        Dispatch savedDispatch = dispatchRepo.save(dispatch);
 
         return convertToDispatchDTO(savedDispatch);
 
@@ -229,29 +117,32 @@ public class DispatchServiceImpl implements DispatchService {
 
         // Handle DispatchForms
         if (request.getFormIds() != null) {
-            List<DispatchForm> forms = request.getFormIds().stream()
-                    .map(formTreeNodeId -> new DispatchForm(dispatch, formTreeNodeId))
-                    .toList();
+            // Clear old forms
             dispatch.getDispatchForms().forEach(form -> form.setStatus(dispatch.getStatus())); // Update status
             dispatch.getDispatchForms().clear();
+
+            // Add new forms
+            List<DispatchForm> forms = mapDispatchForms(dispatch, request.getFormIds());
             dispatch.getDispatchForms().addAll(forms);
         }
 
         // Handle DispatchUser
         if (request.getUserIds() != null) {
-            List<DispatchUser> personnel = request.getUserIds().stream()
-                    .map(userId -> new DispatchUser(dispatch, userId))
-                    .toList();
             dispatch.getDispatchUsers().forEach(user -> user.setStatus(dispatch.getStatus())); // Update status
             dispatch.getDispatchUsers().clear();
-            dispatch.getDispatchUsers().addAll(personnel);
+
+            List<DispatchUser> users = mapDispatchUsers(dispatch, request.getUserIds());
+            dispatch.getDispatchUsers().addAll(users);
         }
 
         Dispatch updatedDispatch = dispatchRepo.save(dispatch);
 
         // Update scheduled task
-        if (Objects.equals(request.getType(), "SCHEDULED")) {
-            taskScheduleService.scheduleDispatchCronTask(updatedDispatch, () -> executeDispatch(updatedDispatch.getId()));
+        if (Objects.equals(request.getType(), "SCHEDULED") && isDispatchExistAndActive(updatedDispatch)) {
+            // reset its scheduled task
+            taskScheduleService.removeAllTasks(dispatch.getId());
+
+            initializeDispatch(id, () -> executeDispatch(updatedDispatch.getId()));
         }
 
         return convertToDispatchDTO(updatedDispatch);
@@ -262,13 +153,15 @@ public class DispatchServiceImpl implements DispatchService {
         Dispatch dispatch = dispatchRepo.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Dispatch not found"));
 
-        // Cancel the dispatch task if scheduled
-        boolean taskCancelled = taskScheduleService.cancelDispatch(id);
+        // Cancel any task of this dispatch if scheduled
+        boolean taskCancelled = taskScheduleService.removeAllTasks(id);
         if (taskCancelled) {
-            logger.info("Cancelled scheduled task for Dispatch ID: {}", id);
+            logger.info("Cancelled all scheduled task for Dispatch ID: {}", id);
         }
-        dispatch.setUpdatedAt(OffsetDateTime.now());
+
+        dispatch.setIsActive(false);
         dispatch.setStatus(0);
+
         // Update the status of related personnel and forms
         if (dispatch.getDispatchUsers() != null) {
             dispatch.getDispatchUsers().forEach(personnel -> personnel.setStatus(0));
@@ -277,8 +170,9 @@ public class DispatchServiceImpl implements DispatchService {
             dispatch.getDispatchForms().forEach(form -> form.setStatus(0));
         }
 
+        dispatch.setUpdatedAt(OffsetDateTime.now());
         dispatchRepo.save(dispatch);
-        logger.info("Soft-deleted Dispatch ID: {}", id);
+        logger.warn("Soft-deleted Dispatch ID: {}", id);
     }
 
     @Transactional(readOnly = true)
@@ -301,46 +195,154 @@ public class DispatchServiceImpl implements DispatchService {
         // Fetch all dispatched tasks from the repository
         List<DispatchedTask> dispatchedTasks = dispatchedTaskRepo.findAll();
 
-        // Convert to DTOs while filtering out tasks with non-existent dispatch references
         return dispatchedTasks.stream()
-                .filter(dispatchedTask -> {
+                .map(dispatchedTask -> {
                     try {
-                        // Check if Dispatch exists
-                        return dispatchedTask.getDispatch() != null && dispatchedTask.getDispatch().getId() != null;
+                        // Skip if dispatch or user is missing
+                        if (dispatchedTask.getDispatch() == null || dispatchedTask.getUser() == null) {
+                            return null; // Skip this entry
+                        }
+
+                        DispatchedTaskDTO dto = modelMapper.map(dispatchedTask, DispatchedTaskDTO.class);
+                        dto.setDispatchId(dispatchedTask.getDispatch().getId());
+                        dto.setUserId(Long.valueOf(dispatchedTask.getUser().getId()));
+
+                        return dto;
                     } catch (EntityNotFoundException e) {
-                        // Log if the dispatch is missing
-                        logger.warn("DispatchedTask with ID {} references a non-existent Dispatch.", dispatchedTask.getId());
-                        return false; // Exclude from the result
+                        // Log and skip the entry
+                        return null;
                     }
                 })
-                .map(dispatchedTask -> {
-                    DispatchedTaskDTO dto = modelMapper.map(dispatchedTask, DispatchedTaskDTO.class);
-
-                    // Map nested properties
-                    dto.setDispatchId(dispatchedTask.getDispatch().getId());
-                    dto.setUserId(Long.valueOf(dispatchedTask.getUser().getId()));
-                    return dto;
-                })
+                .filter(Objects::nonNull) // Remove skipped entries
                 .collect(Collectors.toList());
     }
 
-    // HELPER CLASS ----------------------------------
+    // ------------- SCHEDULING LOGIC -----------------------------------------------------------------------
 
-    private void handleInactiveDispatch(Long dispatchId) {
-        if (taskScheduleService.isScheduled(dispatchId)) {
-            taskScheduleService.cancelDispatch(dispatchId);
+    // Runs on server start up
+    @EventListener(ApplicationReadyEvent.class)
+    public void initializeSchedules() {
+        logger.info("Initializing scheduled tasks...");
+        scheduleDispatches();
+        logger.info("Done initializing scheduling dispatches...");
+
+    }
+
+    // Go through all active and existing dispatch to initialize scheduling
+    @Override
+    public void scheduleDispatches() {
+        dispatchRepo.findByStatus(1).stream()
+                .filter(dispatch -> "SCHEDULED".equals(dispatch.getType()) &&
+                        dispatch.getIsActive() != null && dispatch.getIsActive() &&
+                        !taskScheduleService.isScheduled(dispatch.getId()))
+                .forEach(dispatch -> {
+                    try {
+                        initializeDispatch(dispatch.getId(), () -> executeDispatch(dispatch.getId()));
+                    } catch (Exception e) {
+                        logger.error("Failed to schedule task for Dispatch ID: {}", dispatch.getId(), e);
+                    }
+                });
+    }
+
+    // Runs every 10 minutes (600000 ms)
+    @Scheduled(fixedRate = 600000)
+    public void periodicCleanupExpiredTasks() {
+        logger.info("Running cleanup of expired tasks...");
+
+        dispatchRepo.findByStatus(1).stream()
+                .filter(dispatch -> "SCHEDULED".equals(dispatch.getType()) &&
+                        dispatch.getIsActive())
+                .forEach(dispatch -> {
+                    if (dispatch.getEndTime().isBefore(OffsetDateTime.now())) {
+                        logger.info("Dispatch ID {} has expired. Canceling task...", dispatch.getId());
+                        cancelDispatchTask(dispatch.getId());
+                    }
+                });
+    }
+
+    // called by create dispatch, update dispatch, initialization upon server restart , schedule by id
+    // This function setup task(CRON, FUTURE, CANCEL) based on the start/end time of dispatch
+    public void initializeDispatch(Long dispatchId, Runnable task) {
+        Dispatch dispatch = dispatchRepo.findById(dispatchId)
+                .orElseThrow(() -> new EntityNotFoundException("Dispatch not found"));
+
+        OffsetDateTime now = OffsetDateTime.now();
+
+        // Dispatch is already scheduled
+        if (taskScheduleService.isScheduled(dispatchId)){
+            logger.info("Dispatch ID {} is already scheduled.", dispatchId);
+            return;
         }
-        logger.warn("Dispatch ID {} is inactive.", dispatchId);
+
+        if (dispatch.getEndTime().isBefore(now)) {
+            logger.info("Dispatch ID {} has an end time in the past. Skipping scheduling.", dispatchId);
+            // set dispatch to be inactive
+            if (dispatch.getIsActive()) {
+                dispatch.setIsActive(false);
+                dispatch.setUpdatedAt(OffsetDateTime.now());
+                dispatchRepo.save(dispatch);
+            }
+            return;
+        }
+
+        if (dispatch.getStartTime().isAfter(now)) {
+            taskScheduleService.scheduleFutureDispatch(dispatch, task);
+        } else {
+            taskScheduleService.scheduleDispatch(dispatch, task);
+        }
+    }
+
+    // This function updates isActive where needed, and insert rows to dispatched task table
+    @Transactional
+    @Override
+    public void executeDispatch(Long dispatchId) {
+        Dispatch dispatch = this.getDispatchWithDetails(dispatchId);
+
+        // cancel and update is active for dispatch reach limit
+        if (hasReachedDispatchLimit(dispatch)) {
+            if(taskScheduleService.isScheduled(dispatch.getId())) {
+                taskScheduleService.removeAllTasks(dispatch.getId());
+            }
+            dispatch.setIsActive(false);
+            dispatchRepo.save(dispatch);
+            return;
+        }
+
+        try {
+            // insert dispatched task rows and increase executed count
+            processDispatch(dispatch);
+            dispatch.setIsActive(dispatch.getEndTime().isAfter(OffsetDateTime.now())); // Set isActive based on time
+            dispatchRepo.save(dispatch);
+        } catch (Exception e) {
+            logger.error("Error executing Dispatch ID: {}", dispatchId, e);
+        }
+    }
+
+
+    // This function cancels all tasks of a dispatch
+    @Override
+    public void cancelDispatchTask(Long dispatchId) {
+        Dispatch dispatch = dispatchRepo.findById(dispatchId)
+                .orElseThrow(() -> new EntityNotFoundException("Dispatch not found"));
+
+        if (taskScheduleService.removeAllTasks(dispatchId)) {
+            // Update status after cancellation
+            dispatch.setUpdatedAt(OffsetDateTime.now());
+            dispatch.setIsActive(false);
+            dispatchRepo.save(dispatch);
+        } else {
+            logger.info("No task was scheduled for this dispatch ID.");
+        }
+    }
+
+    // // ------------- Helper Function  -----------------------------------------------------------------------
+
+    private boolean isDispatchExistAndActive(Dispatch dispatch) {
+        return dispatch.getIsActive() && (dispatch.getStatus() == 1);
     }
 
     private boolean hasReachedDispatchLimit(Dispatch dispatch) {
         return dispatch.getDispatchLimit() != -1 && dispatch.getExecutedCount() >= dispatch.getDispatchLimit();
-    }
-
-    private void handleDispatchLimitReached(Long dispatchId, Dispatch dispatch) {
-        taskScheduleService.cancelDispatch(dispatchId);
-        dispatch.setStatus(0); // Mark as inactive
-        logger.info("Dispatch ID {} reached its limit and is now inactive.", dispatchId);
     }
 
     private void processDispatch(Dispatch dispatch) {
@@ -376,7 +378,6 @@ public class DispatchServiceImpl implements DispatchService {
         return dto;
     }
 
-
     private void createTasksForDispatch(Dispatch dispatch) {
         OffsetDateTime dispatchTime = OffsetDateTime.now(ZoneOffset.UTC);
         OffsetDateTime dueDate = calculateDueDate(dispatchTime, dispatch.getDueDateOffsetMinute());
@@ -411,6 +412,18 @@ public class DispatchServiceImpl implements DispatchService {
 
     private OffsetDateTime calculateDueDate(OffsetDateTime dispatchTime, int dueDateOffsetMinute) {
         return dispatchTime.plusMinutes(dueDateOffsetMinute);
+    }
+
+    private List<DispatchForm> mapDispatchForms(Dispatch dispatch, List<String> formIds) {
+        return formIds.stream()
+                .map(formTreeNodeId -> new DispatchForm(dispatch, formTreeNodeId))
+                .toList();
+    }
+
+    private List<DispatchUser> mapDispatchUsers(Dispatch dispatch, List<Integer> userIds) {
+        return userIds.stream()
+                .map(userId -> new DispatchUser(dispatch, userId))
+                .toList();
     }
 
 }

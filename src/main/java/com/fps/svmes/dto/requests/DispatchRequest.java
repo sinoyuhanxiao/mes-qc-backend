@@ -65,12 +65,16 @@ public class DispatchRequest {
     @Schema(description = "List of user IDs associated with the dispatch", example = "[1001, 1002]")
     private List<Integer> userIds;
 
-    @JsonProperty("created_by")
+    @JsonProperty("createdBy")
     @Schema(description = "User ID that creates this dispatch", example = "14")
     private Integer createdBy;
 
-    @JsonProperty("updated_by")
+    @JsonProperty("updatedBy")
     @Schema(description = "User ID that updates this dispatch", example = "Null")
     private Integer updatedBy;
 
+    @JsonProperty("isActive")
+    @NotNull(message = "is_active cannot be null")
+    @Schema(description = "Boolean that tells whether the dispatch is scheduled for sending task", example = "True")
+    private Boolean isActive;
 }

@@ -60,4 +60,7 @@ public class DispatchDTO {
 
     @JsonProperty("due_date_offset_minute")
     private Integer dueDateOffsetMinute; // Total offset in minutes
+
+    @JsonProperty("is_active")
+    private Boolean isActive;
 }

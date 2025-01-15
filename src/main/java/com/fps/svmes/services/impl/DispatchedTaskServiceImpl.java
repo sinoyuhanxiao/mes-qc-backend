@@ -12,7 +12,7 @@ import com.fps.svmes.repositories.jpaRepo.user.UserRepository;
 
 import java.time.OffsetDateTime;
 import java.time.LocalDateTime;
-import java.time.ZoneOffset;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -30,8 +30,10 @@ public class DispatchedTaskServiceImpl implements DispatchedTaskService {
 
     @Override
     public List<DispatchedTaskDTO> getCurrentTasks(Long userId) {
-        OffsetDateTime startOfDay = LocalDateTime.now().toLocalDate().atStartOfDay().atOffset(ZoneOffset.UTC);
+        ZoneId chinaZone = ZoneId.of("Asia/Shanghai"); // Set timezone to China (UTC+8)
+        OffsetDateTime startOfDay = LocalDateTime.now(chinaZone).toLocalDate().atStartOfDay(chinaZone).toOffsetDateTime();
         OffsetDateTime endOfDay = startOfDay.plusDays(1);
+
         List<DispatchedTask> tasks = dispatchedTaskRepository.findByUserIdAndDueDateBetweenAndStatus(userId, startOfDay, endOfDay, 1);
         return tasks.stream().map(task -> modelMapper.map(task, DispatchedTaskDTO.class)).collect(Collectors.toList());
     }

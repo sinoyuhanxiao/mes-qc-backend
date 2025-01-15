@@ -1,5 +1,8 @@
 package com.fps.svmes.models.sql.taskSchedule;
 
+import lombok.Getter;
+
+@Getter
 public enum TaskType {
     CRON(1),
     FUTURE(2),
@@ -11,7 +14,4 @@ public enum TaskType {
         this.type = type;
     }
 
-    public int getType() {
-        return type;
-    }
 }

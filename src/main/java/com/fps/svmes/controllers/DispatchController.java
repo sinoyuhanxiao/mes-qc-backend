@@ -179,6 +179,7 @@ public class DispatchController {
      * @param id the ID of the dispatch to check.
      * @return true if the task is scheduled, false otherwise.
      */
+    @Operation(summary = "Check if a dispatch has any task scheduled", description = "Retrieves true or false on whether a dispatch has task scheduled")
     @GetMapping("/is-scheduled/{id}")
     public ResponseResult<Boolean> isTaskScheduled(@PathVariable Long id) {
 
@@ -198,6 +199,7 @@ public class DispatchController {
      * @param id the ID of the dispatch to check.
      * @return the next execution time or null if not scheduled.
      */
+    @Operation(summary = "Get next execution time on CRON task of a dispatch", description = "Get next execution time on CRON task of a dispatch, null if no cron task is scheduled")
     @GetMapping("/next-execution-time/{id}")
     public ResponseResult<OffsetDateTime> getNextExecutionTime(@PathVariable Long id) {
         try {

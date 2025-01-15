@@ -71,6 +71,10 @@ public class TaskScheduleServiceImpl implements TaskScheduleService {
 
         // track this cancel runnable in tasks map
         addTask(dispatch.getId(), TaskType.CANCEL, cancelFuture);
+
+        // set as is active since it has cron task scheduled.
+        dispatch.setIsActive(true);
+        dispatchRepo.save(dispatch);
     }
 
     /**

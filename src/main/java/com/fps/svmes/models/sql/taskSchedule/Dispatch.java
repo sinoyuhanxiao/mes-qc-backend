@@ -58,7 +58,7 @@ public class Dispatch extends Common {
     private Integer dueDateOffsetMinute = 60; // Total offset in minutes, default to 1 hour
 
     @Column(name = "is_active", nullable = false)
-    private Boolean isActive;  // indicates whether the dispatch scheduled to assign forms for users
+    private Boolean isActive = false;  // indicates whether the dispatch scheduled to assign forms for users
 
     public boolean isActiveAndWithinScheduledTime() {
         OffsetDateTime now = OffsetDateTime.now();

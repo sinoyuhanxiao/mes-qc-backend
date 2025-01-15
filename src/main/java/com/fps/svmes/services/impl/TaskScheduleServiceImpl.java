@@ -16,7 +16,6 @@ import org.springframework.stereotype.Service;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Map;
-import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -124,7 +123,6 @@ public class TaskScheduleServiceImpl implements TaskScheduleService {
         }
     }
 
-
     /**
      * Check if any task is currently scheduled for a given dispatch ID.
      *
@@ -230,12 +228,5 @@ public class TaskScheduleServiceImpl implements TaskScheduleService {
             return true;
         }
         return false;
-    }
-
-    public void cleanup() {
-        // Iterate and remove completed tasks
-        tasks.values().forEach(typeMap ->
-                typeMap.entrySet().removeIf(entry -> entry.getValue().isDone() || entry.getValue().isCancelled())
-        );
     }
 }

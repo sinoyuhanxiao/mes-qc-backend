@@ -60,12 +60,4 @@ public class Dispatch extends Common {
     @Column(name = "is_active", nullable = false)
     private Boolean isActive = false;  // indicates whether the dispatch scheduled to assign forms for users
 
-    public boolean isActiveAndWithinScheduledTime() {
-        OffsetDateTime now = OffsetDateTime.now();
-        return getStatus() == 1 &&
-                startTime != null &&
-                endTime != null &&
-                !now.isBefore(startTime) && // now >= startTime
-                !now.isAfter(endTime);     // now <= endTime
-    }
 }

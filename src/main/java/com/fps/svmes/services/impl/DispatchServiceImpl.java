@@ -98,13 +98,14 @@ public class DispatchServiceImpl implements DispatchService {
             dispatch.setDispatchUsers(mapDispatchUsers(dispatch, request.getUserIds()));
         }
 
-
-        processDispatch(dispatch);
+        // since manual dispatch only execute once, will default isActive to false
         dispatch.setIsActive(false);
+        dispatch.setExecutedCount(dispatch.getExecutedCount() + 1); // Increment executed count
         Dispatch savedDispatch = dispatchRepo.save(dispatch);
 
-        return convertToDispatchDTO(savedDispatch);
+        createTasksForDispatch(dispatch);
 
+        return convertToDispatchDTO(savedDispatch);
     }
 
     @Transactional
@@ -228,12 +229,12 @@ public class DispatchServiceImpl implements DispatchService {
 
     }
 
-    // Go through all active and existing dispatch to initialize scheduling
+    // Go through all existing dispatch to initialize scheduling
     @Override
     public void scheduleDispatches() {
         dispatchRepo.findByStatus(1).stream()
                 .filter(dispatch -> "SCHEDULED".equals(dispatch.getType()) &&
-                        dispatch.getIsActive() != null && dispatch.getIsActive() &&
+                        dispatch.getStatus() != null && dispatch.getStatus() == 1 &&
                         !taskScheduleService.isScheduled(dispatch.getId()))
                 .forEach(dispatch -> {
                     try {
@@ -311,7 +312,6 @@ public class DispatchServiceImpl implements DispatchService {
         try {
             // insert dispatched task rows and increase executed count
             processDispatch(dispatch);
-            dispatch.setIsActive(dispatch.getEndTime().isAfter(OffsetDateTime.now())); // Set isActive based on time
             dispatchRepo.save(dispatch);
         } catch (Exception e) {
             logger.error("Error executing Dispatch ID: {}", dispatchId, e);

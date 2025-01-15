@@ -37,12 +37,10 @@ public class DispatchRequest {
     private String cronExpression;
 
     @JsonProperty("startTime")
-    @NotNull(message = "Start time cannot be null")
     @Schema(description = "Start time of the dispatch (ISO 8601 format)", example = "2025-01-01T08:00:00Z")
     private OffsetDateTime startTime;
 
     @JsonProperty("endTime")
-    @NotNull(message = "End time cannot be null")
     @Schema(description = "End time of the dispatch (ISO 8601 format)", example = "2025-12-31T18:00:00Z")
     private OffsetDateTime endTime;
 
@@ -72,9 +70,4 @@ public class DispatchRequest {
     @JsonProperty("updatedBy")
     @Schema(description = "User ID that updates this dispatch", example = "Null")
     private Integer updatedBy;
-
-    @JsonProperty("isActive")
-    @NotNull(message = "is_active cannot be null")
-    @Schema(description = "Boolean that tells whether the dispatch is scheduled for sending task", example = "True")
-    private Boolean isActive;
 }

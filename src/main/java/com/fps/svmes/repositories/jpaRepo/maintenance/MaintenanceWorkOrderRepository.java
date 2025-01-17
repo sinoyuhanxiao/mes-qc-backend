@@ -1,6 +1,5 @@
 package com.fps.svmes.repositories.jpaRepo.maintenance;
 
-import com.fps.svmes.models.sql.maintenance.Equipment;
 import com.fps.svmes.models.sql.maintenance.MaintenanceWorkOrder;
 import org.springframework.data.jpa.repository.JpaRepository;
 

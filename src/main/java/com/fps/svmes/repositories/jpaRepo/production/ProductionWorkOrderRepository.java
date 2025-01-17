@@ -1,6 +1,5 @@
 package com.fps.svmes.repositories.jpaRepo.production;
 
-import com.fps.svmes.models.sql.maintenance.MaintenanceWorkOrder;
 import com.fps.svmes.models.sql.production.ProductionWorkOrder;
 import org.springframework.data.jpa.repository.JpaRepository;
 

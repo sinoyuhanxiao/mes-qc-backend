@@ -1,6 +1,5 @@
 package com.fps.svmes.models.sql.production;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fps.svmes.models.sql.Common;
 import jakarta.persistence.*;
 import lombok.Data;

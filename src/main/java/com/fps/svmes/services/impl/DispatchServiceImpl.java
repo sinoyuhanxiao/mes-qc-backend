@@ -1,12 +1,16 @@
 package com.fps.svmes.services.impl;
 
-import com.fps.svmes.dto.dtos.dispatch.DispatchDTO;
-import com.fps.svmes.dto.dtos.dispatch.DispatchedTaskDTO;
+import com.fps.svmes.dto.dtos.dispatch.*;
 import com.fps.svmes.dto.dtos.user.UserDTO;
 import com.fps.svmes.dto.requests.DispatchRequest;
 import com.fps.svmes.models.sql.taskSchedule.*;
 import com.fps.svmes.repositories.jpaRepo.dispatch.DispatchRepository;
 import com.fps.svmes.repositories.jpaRepo.dispatch.DispatchedTaskRepository;
+import com.fps.svmes.repositories.jpaRepo.maintenance.EquipmentRepository;
+import com.fps.svmes.repositories.jpaRepo.maintenance.MaintenanceWorkOrderRepository;
+import com.fps.svmes.repositories.jpaRepo.production.ProductRepository;
+import com.fps.svmes.repositories.jpaRepo.production.ProductionWorkOrderRepository;
+import com.fps.svmes.repositories.jpaRepo.production.RawMaterialRepository;
 import com.fps.svmes.services.DispatchService;
 import com.fps.svmes.services.DispatchedTaskService;
 import com.fps.svmes.services.TaskScheduleService;
@@ -15,6 +19,7 @@ import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
+import org.springframework.data.jpa.repository.support.SimpleJpaRepository;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -44,16 +49,32 @@ public class DispatchServiceImpl implements DispatchService {
     private DispatchedTaskRepository dispatchedTaskRepo;
 
     @Autowired
+    private ProductRepository productRepository;
+
+    @Autowired
+    private RawMaterialRepository rawMaterialRepository;
+
+    @Autowired
+    private ProductionWorkOrderRepository productionWorkOrderRepository;
+
+    @Autowired
+    private EquipmentRepository equipmentRepository;
+
+    @Autowired
+    private MaintenanceWorkOrderRepository maintenanceWorkOrderRepository;
+
+    @Autowired
     private TaskScheduleService taskScheduleService;
 
     @Autowired
     private DispatchedTaskService dispatchedTaskService;
 
     @Autowired
-    private ModelMapper modelMapper;
+    private UserService userService;
 
     @Autowired
-    private UserService userService;
+    private ModelMapper modelMapper;
+
 
     private static final Logger logger = LoggerFactory.getLogger(DispatchServiceImpl.class);
 
@@ -68,6 +89,11 @@ public class DispatchServiceImpl implements DispatchService {
         // Initialize mutable collections
         List<DispatchForm> mutableDispatchForms = new ArrayList<>();
         List<DispatchUser> mutableDispatchUsers = new ArrayList<>();
+        List<DispatchProduct> mutableDispatchProducts = new ArrayList<>();
+        List<DispatchRawMaterial> mutableDispatchRawMaterials = new ArrayList<>();
+        List<DispatchProductionWorkOrder> mutableDispatchProductionWorkOrders = new ArrayList<>();
+        List<DispatchEquipment> mutableDispatchEquipments = new ArrayList<>();
+        List<DispatchMaintenanceWorkOrder> mutableDispatchMaintenanceWorkOrders = new ArrayList<>();
 
         if (request.getFormIds() != null) {
             mutableDispatchForms.addAll(mapDispatchForms(dispatch, request.getFormIds()));
@@ -77,9 +103,35 @@ public class DispatchServiceImpl implements DispatchService {
             mutableDispatchUsers.addAll(mapDispatchUsers(dispatch, request.getUserIds()));
         }
 
+        if (request.getDispatchProducts() != null) {
+            mutableDispatchProducts.addAll(mapDispatchProducts(dispatch, request.getDispatchProducts()));
+        }
+
+        if (request.getDispatchRawMaterials() != null) {
+            mutableDispatchRawMaterials.addAll(mapDispatchRawMaterials(dispatch, request.getDispatchRawMaterials()));
+        }
+
+        if (request.getDispatchProductionWorkOrders() != null) {
+            mutableDispatchProductionWorkOrders.addAll(mapDispatchProductionWorkOrders(dispatch, request.getDispatchProductionWorkOrders()));
+        }
+
+        if (request.getDispatchEquipments() != null) {
+            mutableDispatchEquipments.addAll(mapDispatchEquipments(dispatch, request.getDispatchEquipments()));
+        }
+
+        if (request.getDispatchMaintenanceWorkOrders() != null) {
+            mutableDispatchMaintenanceWorkOrders.addAll(mapDispatchMaintenanceWorkOrders(dispatch, request.getDispatchMaintenanceWorkOrders()));
+        }
+
         // Set the collections back to the entity
         dispatch.setDispatchForms(mutableDispatchForms);
         dispatch.setDispatchUsers(mutableDispatchUsers);
+        dispatch.setDispatchProducts(mutableDispatchProducts);
+        dispatch.setDispatchRawMaterials(mutableDispatchRawMaterials);
+        dispatch.setDispatchProductionWorkOrders(mutableDispatchProductionWorkOrders);
+        dispatch.setDispatchEquipments(mutableDispatchEquipments);
+        dispatch.setDispatchMaintenanceWorkOrders(mutableDispatchMaintenanceWorkOrders);
+
 
         if (dispatch.getType().equals("MANUAL")) {
             // since manual dispatch only execute once, will default isActive to false
@@ -139,20 +191,40 @@ public class DispatchServiceImpl implements DispatchService {
         modelMapper.map(request, dispatch);
         dispatch.setUpdateDetails(request.getUpdatedBy(), 1);
 
+        // Clear and update associations
         if (request.getFormIds() != null) {
-            // Clear old forms
-            dispatch.getDispatchForms().forEach(form -> form.setStatus(dispatch.getStatus())); // Update status
+//            dispatch.getDispatchForms().forEach(form -> form.setStatus(dispatch.getStatus())); // Update status
             dispatch.getDispatchForms().clear();
-            // Add new forms
             dispatch.getDispatchForms().addAll(mapDispatchForms(dispatch, request.getFormIds()));
         }
 
         if (request.getUserIds() != null) {
-            dispatch.getDispatchUsers().forEach(user -> user.setStatus(dispatch.getStatus())); // Update status
+//            dispatch.getDispatchUsers().forEach(user -> user.setStatus(dispatch.getStatus())); // Update status
             dispatch.getDispatchUsers().clear();
             dispatch.getDispatchUsers().addAll(mapDispatchUsers(dispatch, request.getUserIds()));
-
         }
+
+        if (request.getDispatchProducts() != null) {
+            dispatch.getDispatchProducts().clear();
+            dispatch.getDispatchProducts().addAll(mapDispatchProducts(dispatch, request.getDispatchProducts()));
+        }
+        if (request.getDispatchRawMaterials() != null) {
+            dispatch.getDispatchRawMaterials().clear();
+            dispatch.getDispatchRawMaterials().addAll(mapDispatchRawMaterials(dispatch, request.getDispatchRawMaterials()));
+        }
+        if (request.getDispatchProductionWorkOrders() != null) {
+            dispatch.getDispatchProductionWorkOrders().clear();
+            dispatch.getDispatchProductionWorkOrders().addAll(mapDispatchProductionWorkOrders(dispatch, request.getDispatchProductionWorkOrders()));
+        }
+        if (request.getDispatchEquipments() != null) {
+            dispatch.getDispatchEquipments().clear();
+            dispatch.getDispatchEquipments().addAll(mapDispatchEquipments(dispatch, request.getDispatchEquipments()));
+        }
+        if (request.getDispatchMaintenanceWorkOrders() != null) {
+            dispatch.getDispatchMaintenanceWorkOrders().clear();
+            dispatch.getDispatchMaintenanceWorkOrders().addAll(mapDispatchMaintenanceWorkOrders(dispatch, request.getDispatchMaintenanceWorkOrders()));
+        }
+
         if (dispatch.getType().equals("MANUAL")) {
             // since manual dispatch only execute once, will default isActive to false
             dispatch.setIsActive(false);
@@ -195,6 +267,21 @@ public class DispatchServiceImpl implements DispatchService {
         }
         if (dispatch.getDispatchForms() != null) {
             dispatch.getDispatchForms().forEach(form -> form.setStatus(0));
+        }
+        if (dispatch.getDispatchProducts() != null) {
+            dispatch.getDispatchProducts().forEach(product -> product.setStatus(0));
+        }
+        if (dispatch.getDispatchRawMaterials() != null) {
+            dispatch.getDispatchRawMaterials().forEach(rawMaterial -> rawMaterial.setStatus(0));
+        }
+        if (dispatch.getDispatchProductionWorkOrders() != null) {
+            dispatch.getDispatchProductionWorkOrders().forEach(workOrder -> workOrder.setStatus(0));
+        }
+        if (dispatch.getDispatchEquipments() != null) {
+            dispatch.getDispatchEquipments().forEach(equipment -> equipment.setStatus(0));
+        }
+        if (dispatch.getDispatchMaintenanceWorkOrders() != null) {
+            dispatch.getDispatchMaintenanceWorkOrders().forEach(maintenanceWorkOrder -> maintenanceWorkOrder.setStatus(0));
         }
 
         dispatch.setUpdatedAt(OffsetDateTime.now());
@@ -452,4 +539,68 @@ public class DispatchServiceImpl implements DispatchService {
                 .toList();
     }
 
+    private List<DispatchProduct> mapDispatchProducts(Dispatch dispatch, List<DispatchProductDTO> productDTOs) {
+        return productDTOs.stream()
+                .map(dto -> {
+                    DispatchProduct dp = new DispatchProduct();
+                    dp.setDispatch(dispatch);
+                    dp.setProduct(productRepository.findById(Math.toIntExact(dto.getProductId()))
+                            .orElseThrow(() -> new EntityNotFoundException("Product not found")));
+                    dp.setStatus(dto.getStatus());
+                    return dp;
+                })
+                .collect(Collectors.toList());
+    }
+
+    private List<DispatchRawMaterial> mapDispatchRawMaterials(Dispatch dispatch, List<DispatchRawMaterialDTO> rawMaterialDTOs) {
+        return rawMaterialDTOs.stream()
+                .map(dto -> {
+                    DispatchRawMaterial drm = new DispatchRawMaterial();
+                    drm.setDispatch(dispatch);
+                    drm.setRawMaterial(rawMaterialRepository.findById(Math.toIntExact(dto.getRawMaterialId()))
+                            .orElseThrow(() -> new EntityNotFoundException("Raw Material not found")));
+                    drm.setStatus(dto.getStatus());
+                    return drm;
+                })
+                .collect(Collectors.toList());
+    }
+
+    private List<DispatchProductionWorkOrder> mapDispatchProductionWorkOrders(Dispatch dispatch, List<DispatchProductionWorkOrderDTO> productionWorkOrderDTOS) {
+        return productionWorkOrderDTOS.stream()
+                .map(dto -> {
+                    DispatchProductionWorkOrder e = new DispatchProductionWorkOrder();
+                    e.setDispatch(dispatch);
+                    e.setProductionWorkOrder(productionWorkOrderRepository.findById(Math.toIntExact(dto.getProductionWorkOrderId()))
+                            .orElseThrow(() -> new EntityNotFoundException("Production Work Order not found")));
+                    e.setStatus(dto.getStatus());
+                    return e;
+                })
+                .collect(Collectors.toList());
+    }
+
+    private List<DispatchMaintenanceWorkOrder> mapDispatchMaintenanceWorkOrders(Dispatch dispatch, List<DispatchMaintenanceWorkOrderDTO> maintenanceWorkOrderDTOS) {
+        return maintenanceWorkOrderDTOS.stream()
+                .map(dto -> {
+                    DispatchMaintenanceWorkOrder e = new DispatchMaintenanceWorkOrder();
+                    e.setDispatch(dispatch);
+                    e.setMaintenanceWorkOrder(maintenanceWorkOrderRepository.findById(Math.toIntExact(dto.getMaintenanceWorkOrderId()))
+                            .orElseThrow(() -> new EntityNotFoundException("Maintenance Work Order not found")));
+                    e.setStatus(dto.getStatus());
+                    return e;
+                })
+                .collect(Collectors.toList());
+    }
+
+    private List<DispatchEquipment> mapDispatchEquipments(Dispatch dispatch, List<DispatchEquipmentDTO> equipmentDTOS) {
+        return equipmentDTOS.stream()
+                .map(dto -> {
+                    DispatchEquipment e = new DispatchEquipment();
+                    e.setDispatch(dispatch);
+                    e.setEquipment(equipmentRepository.findById(Math.toIntExact(dto.getEquipmentId()))
+                            .orElseThrow(() -> new EntityNotFoundException("Equipment not found")));
+                    e.setStatus(dto.getStatus());
+                    return e;
+                })
+                .collect(Collectors.toList());
+    }
 }

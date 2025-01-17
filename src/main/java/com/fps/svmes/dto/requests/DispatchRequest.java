@@ -1,6 +1,7 @@
 package com.fps.svmes.dto.requests;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fps.svmes.dto.dtos.dispatch.*;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
@@ -50,6 +51,14 @@ public class DispatchRequest {
     @Schema(description = "Offset in minutes to calculate the due date of dispatched tasks", example = "1440")
     private Integer dueDateOffsetMinute;
 
+    @JsonProperty("createdBy")
+    @Schema(description = "User ID that creates this dispatch", example = "14")
+    private Integer createdBy;
+
+    @JsonProperty("updatedBy")
+    @Schema(description = "User ID that updates this dispatch", example = "Null")
+    private Integer updatedBy;
+
     @JsonProperty("formIds")
     @NotNull(message = "List of form IDs cannot be null")
     @Schema(description = "List of form IDs associated with the dispatch", example = "[\"form1\", \"form2\"]")
@@ -60,11 +69,23 @@ public class DispatchRequest {
     @Schema(description = "List of user IDs associated with the dispatch", example = "[1001, 1002]")
     private List<Integer> userIds;
 
-    @JsonProperty("createdBy")
-    @Schema(description = "User ID that creates this dispatch", example = "14")
-    private Integer createdBy;
+    @JsonProperty("dispatchProducts")
+    @Schema(description = "List of Dispatch Products", example = "[{\"productId\": 1, \"status\": 1}]")
+    private List<DispatchProductDTO> dispatchProducts;
 
-    @JsonProperty("updatedBy")
-    @Schema(description = "User ID that updates this dispatch", example = "Null")
-    private Integer updatedBy;
+    @JsonProperty("dispatchRawMaterials")
+    @Schema(description = "List of Dispatch Raw Materials", example = "[{\"rawMaterialId\": 1, \"status\": 1}]")
+    private List<DispatchRawMaterialDTO> dispatchRawMaterials;
+
+    @JsonProperty("dispatchProductionWorkOrders")
+    @Schema(description = "List of Dispatch Production Work Orders", example = "[{\"productionWorkOrderId\": 1, \"status\": 1}]")
+    private List<DispatchProductionWorkOrderDTO> dispatchProductionWorkOrders;
+
+    @JsonProperty("dispatchEquipments")
+    @Schema(description = "List of Dispatch Equipments", example = "[{\"equipmentId\": 1, \"status\": 1}]")
+    private List<DispatchEquipmentDTO> dispatchEquipments;
+
+    @JsonProperty("dispatchMaintenanceWorkOrders")
+    @Schema(description = "List of Dispatch Maintenance Work Orders", example = "[{\"maintenanceWorkOrderId\": 1, \"status\": 1}]")
+    private List<DispatchMaintenanceWorkOrderDTO> dispatchMaintenanceWorkOrders;
 }

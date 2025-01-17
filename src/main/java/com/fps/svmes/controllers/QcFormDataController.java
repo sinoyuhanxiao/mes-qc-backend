@@ -7,6 +7,7 @@ import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.bson.Document; // Ensure this import is in your class
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -38,10 +39,15 @@ public class QcFormDataController {
             document.put("created_at", LocalDateTime.now().toString());
             document.put("created_by", userId);
 
-            // Insert into the specified collection
-            mongoTemplate.insert(document, collectionName);
+            // Insert document and retrieve the inserted document
+            Document insertedDocument = mongoTemplate.insert(new Document(document), collectionName);
 
-            return ResponseEntity.ok("Form data inserted into collection: " + collectionName);
+            // Create a response containing the ObjectId
+            Map<String, Object> response = new HashMap<>();
+            response.put("object_id", insertedDocument.getObjectId("_id").toString());
+            response.put("message", "Form data inserted successfully to " + collectionName);
+
+            return ResponseEntity.ok(response);
         } catch (Exception e) {
             return ResponseEntity.status(500).body("Error inserting form data: " + e.getMessage());
         }

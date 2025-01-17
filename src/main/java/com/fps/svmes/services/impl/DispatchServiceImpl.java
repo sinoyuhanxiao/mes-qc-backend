@@ -23,6 +23,7 @@ import org.modelmapper.ModelMapper;
 
 import java.time.ZoneOffset;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -64,19 +65,36 @@ public class DispatchServiceImpl implements DispatchService {
         Dispatch dispatch = modelMapper.map(request, Dispatch.class);
         dispatch.setCreationDetails(request.getCreatedBy(), 1);
 
+        // Initialize mutable collections
+        List<DispatchForm> mutableDispatchForms = new ArrayList<>();
+        List<DispatchUser> mutableDispatchUsers = new ArrayList<>();
+
         if (request.getFormIds() != null) {
-            dispatch.setDispatchForms(mapDispatchForms(dispatch, request.getFormIds()));
+            mutableDispatchForms.addAll(mapDispatchForms(dispatch, request.getFormIds()));
         }
 
         if (request.getUserIds() != null) {
-            dispatch.setDispatchUsers(mapDispatchUsers(dispatch, request.getUserIds()));
+            mutableDispatchUsers.addAll(mapDispatchUsers(dispatch, request.getUserIds()));
+        }
+
+        // Set the collections back to the entity
+        dispatch.setDispatchForms(mutableDispatchForms);
+        dispatch.setDispatchUsers(mutableDispatchUsers);
+
+        if (dispatch.getType().equals("MANUAL")) {
+            // since manual dispatch only execute once, will default isActive to false
+                dispatch.setIsActive(false);
+                dispatch.setExecutedCount(dispatch.getExecutedCount() + 1); // Increment executed count
         }
 
         Dispatch savedDispatch = dispatchRepo.save(dispatch);
 
-        // Schedule the task or a one-time start-time check
         try {
-            this.initializeDispatch(savedDispatch.getId(), () -> executeDispatch(savedDispatch.getId()));
+            if (dispatch.getType().equals("MANUAL")) {
+                createTasksForDispatch(savedDispatch);
+            } else {
+                this.initializeDispatch(savedDispatch.getId(), () -> executeDispatch(savedDispatch.getId()));
+            }
         } catch (IllegalStateException e) {
             logger.warn("Dispatch created but not immediately scheduled: {}", e.getMessage());
         }
@@ -87,16 +105,21 @@ public class DispatchServiceImpl implements DispatchService {
     @Transactional
     public DispatchDTO createManualDispatch(DispatchRequest request) {
         Dispatch dispatch = modelMapper.map(request, Dispatch.class);
-        dispatch.setExecutedCount(0);
         dispatch.setCreationDetails(request.getCreatedBy(), 1);
 
+
+        List<DispatchForm> mutableDispatchForms = new ArrayList<>();
+        List<DispatchUser> mutableDispatchUsers = new ArrayList<>();
+
         if (request.getFormIds() != null) {
-            dispatch.setDispatchForms(this.mapDispatchForms(dispatch, request.getFormIds()));
+            mutableDispatchForms.addAll(mapDispatchForms(dispatch, request.getFormIds()));
         }
+        dispatch.setDispatchForms(mutableDispatchForms);
 
         if (request.getUserIds() != null) {
-            dispatch.setDispatchUsers(mapDispatchUsers(dispatch, request.getUserIds()));
+            mutableDispatchUsers.addAll(mapDispatchUsers(dispatch, request.getUserIds()));
         }
+        dispatch.setDispatchUsers(mutableDispatchUsers);
 
         // since manual dispatch only execute once, will default isActive to false
         dispatch.setIsActive(false);
@@ -116,34 +139,37 @@ public class DispatchServiceImpl implements DispatchService {
         modelMapper.map(request, dispatch);
         dispatch.setUpdateDetails(request.getUpdatedBy(), 1);
 
-        // Handle DispatchForms
         if (request.getFormIds() != null) {
             // Clear old forms
             dispatch.getDispatchForms().forEach(form -> form.setStatus(dispatch.getStatus())); // Update status
             dispatch.getDispatchForms().clear();
-
             // Add new forms
-            List<DispatchForm> forms = mapDispatchForms(dispatch, request.getFormIds());
-            dispatch.getDispatchForms().addAll(forms);
+            dispatch.getDispatchForms().addAll(mapDispatchForms(dispatch, request.getFormIds()));
         }
 
-        // Handle DispatchUser
         if (request.getUserIds() != null) {
             dispatch.getDispatchUsers().forEach(user -> user.setStatus(dispatch.getStatus())); // Update status
             dispatch.getDispatchUsers().clear();
+            dispatch.getDispatchUsers().addAll(mapDispatchUsers(dispatch, request.getUserIds()));
 
-            List<DispatchUser> users = mapDispatchUsers(dispatch, request.getUserIds());
-            dispatch.getDispatchUsers().addAll(users);
+        }
+        if (dispatch.getType().equals("MANUAL")) {
+            // since manual dispatch only execute once, will default isActive to false
+            dispatch.setIsActive(false);
+            dispatch.setExecutedCount(dispatch.getExecutedCount() + 1); // Increment executed count
         }
 
         Dispatch updatedDispatch = dispatchRepo.save(dispatch);
 
-        // Update scheduled task
-        if (Objects.equals(request.getType(), "SCHEDULED") && isDispatchExistAndActive(updatedDispatch)) {
-            // reset its scheduled task
-            taskScheduleService.removeAllTasks(dispatch.getId());
-
-            initializeDispatch(id, () -> executeDispatch(updatedDispatch.getId()));
+        if (updatedDispatch.getStatus() == 1) {
+            if ("SCHEDULED".equals(request.getType())) {
+                // reset its scheduled task
+                taskScheduleService.removeAllTasks(dispatch.getId());
+                initializeDispatch(id, () -> executeDispatch(updatedDispatch.getId()));
+            } else {
+                // manual dispatch will just create and insert row to dispatched task table
+                createTasksForDispatch(updatedDispatch);
+            }
         }
 
         return convertToDispatchDTO(updatedDispatch);

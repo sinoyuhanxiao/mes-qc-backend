@@ -28,7 +28,7 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/dispatch")
-@Tag(name = "Dispatch API", description = "API for QC Test Dispatch")
+@Tag(name = "Dispatch API", description = "API for QC Dispatch Dispatch")
 public class DispatchController {
 
     @Autowired
@@ -41,7 +41,6 @@ public class DispatchController {
     private DispatchRepository dispatchRepository;
 
     private static final Logger logger = LoggerFactory.getLogger(DispatchController.class);
-
 
     @Operation(summary = "Create a new dispatch", description = "Creates a dispatch in the QC System")
     @PostMapping

@@ -73,6 +73,7 @@ public class TaskScheduleServiceImpl implements TaskScheduleService {
 
         // set as is active since it has cron task scheduled.
         dispatch.setIsActive(true);
+        logger.info("Set dispatch with ID: {} as active", dispatch.getId());
         dispatchRepo.save(dispatch);
     }
 
@@ -113,6 +114,10 @@ public class TaskScheduleServiceImpl implements TaskScheduleService {
 
                 addTask(dispatch.getId(), TaskType.CANCEL, cancelFuture);
                 removeTask(dispatch.getId(), TaskType.FUTURE);
+                // set as is active since it has cron task scheduled.
+                dispatch.setIsActive(true);
+                logger.info("Set dispatch with ID: {} as active", dispatch.getId());
+                dispatchRepo.save(dispatch);
             };
 
             ScheduledFuture<?> futureTask = taskScheduler.schedule(scheduleCronTaskAndCancelTask, dispatch.getStartTime().toInstant());

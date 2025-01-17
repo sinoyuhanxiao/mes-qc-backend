@@ -46,6 +46,12 @@ public class Dispatch extends Common {
     @Column(name = "executed_count", nullable = false)
     private Integer executedCount = 0;
 
+    @Column(name = "due_date_offset_minute", nullable = false)
+    private Integer dueDateOffsetMinute = 60; // Total offset in minutes, default to 1 hour
+
+    @Column(name = "is_active", nullable = false)
+    private Boolean isActive = false;  // indicates whether the dispatch scheduled to assign forms for users
+
     @OneToMany(mappedBy = "dispatch", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonManagedReference
     private List<DispatchUser> dispatchUsers;
@@ -54,10 +60,25 @@ public class Dispatch extends Common {
     @JsonManagedReference
     private List<DispatchForm> dispatchForms;
 
-    @Column(name = "due_date_offset_minute", nullable = false)
-    private Integer dueDateOffsetMinute = 60; // Total offset in minutes, default to 1 hour
+    @OneToMany(mappedBy = "dispatch", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonManagedReference
+    private List<DispatchProduct> dispatchProducts;
 
-    @Column(name = "is_active", nullable = false)
-    private Boolean isActive = false;  // indicates whether the dispatch scheduled to assign forms for users
+    @OneToMany(mappedBy = "dispatch", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonManagedReference
+    private List<DispatchRawMaterial> dispatchRawMaterials;
+
+    @OneToMany(mappedBy = "dispatch", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonManagedReference
+    private List<DispatchProductionWorkOrder> dispatchProductionWorkOrders;
+
+    @OneToMany(mappedBy = "dispatch", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonManagedReference
+    private List<DispatchEquipment> dispatchEquipments;
+
+    @OneToMany(mappedBy = "dispatch", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonManagedReference
+    private List<DispatchMaintenanceWorkOrder> dispatchMaintenanceWorkOrders;
+
 
 }

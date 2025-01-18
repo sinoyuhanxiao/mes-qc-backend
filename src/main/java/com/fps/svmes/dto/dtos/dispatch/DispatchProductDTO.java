@@ -9,15 +9,15 @@ import lombok.Data;
 public class DispatchProductDTO {
 
     @JsonProperty("id")
-    private Long id;
+    private Integer id;
 
     @JsonProperty("dispatch_id")
     private Long dispatchId;
 
     @JsonProperty("product_id")
-    private Long productId;
+    private Integer productId;
 
     @JsonProperty("status")
-    private Integer status;
+    private Short status;
 }
 

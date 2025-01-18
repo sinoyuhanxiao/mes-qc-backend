@@ -9,5 +9,5 @@ public interface QcTaskSubmissionLogsService {
     QcTaskSubmissionLogsDTO insertLog(QcTaskSubmissionLogsDTO dto);
     List<QcTaskSubmissionLogsDTO> getAllByCreatedByAndTaskId(Integer createdBy, Long dispatchedTaskId);
 
-    Document getDocumentBySubmissionId(String submissionId, String formId, Integer createdBy);
+    Document getDocumentBySubmissionId(String submissionId, Long formId, Integer createdBy);
 }

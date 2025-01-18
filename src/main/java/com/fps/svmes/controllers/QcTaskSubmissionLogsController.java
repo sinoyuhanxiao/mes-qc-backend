@@ -56,7 +56,7 @@ public class QcTaskSubmissionLogsController {
     @Operation(summary = "Get Mongo document by submission ID")
     public ResponseEntity<?> getDocument(
             @RequestParam String submissionId,
-            @RequestParam String qcFormTemplateId,
+            @RequestParam Long qcFormTemplateId,
             @RequestParam Integer createdBy) {
         try {
             Document document = qcTaskSubmissionLogsService.getDocumentBySubmissionId(submissionId, qcFormTemplateId, createdBy);

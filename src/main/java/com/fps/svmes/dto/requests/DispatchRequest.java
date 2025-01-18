@@ -69,23 +69,23 @@ public class DispatchRequest {
     @Schema(description = "List of user IDs associated with the dispatch", example = "[1001, 1002]")
     private List<Integer> userIds;
 
-    @JsonProperty("dispatchProducts")
-    @Schema(description = "List of Dispatch Products", example = "[{\"productId\": 1, \"status\": 1}]")
-    private List<DispatchProductDTO> dispatchProducts;
+    @JsonProperty("productIds")
+    @Schema(description = "List of Product IDs associated with the dispatch", example = "[1, 2, 3]")
+    private List<Integer> productIds;
 
-    @JsonProperty("dispatchRawMaterials")
-    @Schema(description = "List of Dispatch Raw Materials", example = "[{\"rawMaterialId\": 1, \"status\": 1}]")
-    private List<DispatchRawMaterialDTO> dispatchRawMaterials;
+    @JsonProperty("rawMaterialIds")
+    @Schema(description = "List of Raw Material IDs associated with the dispatch", example = "[1, 2, 3]")
+    private List<Integer> rawMaterialIds;
 
-    @JsonProperty("dispatchProductionWorkOrders")
-    @Schema(description = "List of Dispatch Production Work Orders", example = "[{\"productionWorkOrderId\": 1, \"status\": 1}]")
-    private List<DispatchProductionWorkOrderDTO> dispatchProductionWorkOrders;
+    @JsonProperty("productionWorkOrderIds")
+    @Schema(description = "List of Production Work Order IDs associated with the dispatch", example = "[1, 2, 3]")
+    private List<Integer> productionWorkOrderIds;
 
-    @JsonProperty("dispatchEquipments")
-    @Schema(description = "List of Dispatch Equipments", example = "[{\"equipmentId\": 1, \"status\": 1}]")
-    private List<DispatchEquipmentDTO> dispatchEquipments;
+    @JsonProperty("equipmentIds")
+    @Schema(description = "List of Equipment IDs associated with the dispatch", example = "[1, 2, 3]")
+    private List<Short> equipmentIds;
 
-    @JsonProperty("dispatchMaintenanceWorkOrders")
-    @Schema(description = "List of Dispatch Maintenance Work Orders", example = "[{\"maintenanceWorkOrderId\": 1, \"status\": 1}]")
-    private List<DispatchMaintenanceWorkOrderDTO> dispatchMaintenanceWorkOrders;
+    @JsonProperty("maintenanceWorkOrderIds")
+    @Schema(description = "List of Maintenance Work Order IDs associated with the dispatch", example = "[1, 2, 3]")
+    private List<Integer> maintenanceWorkOrderIds;
 }

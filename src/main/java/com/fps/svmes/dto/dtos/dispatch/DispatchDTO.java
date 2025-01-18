@@ -5,7 +5,6 @@ import java.util.List;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fps.svmes.dto.dtos.production.ProductDTO;
 import com.fps.svmes.dto.dtos.user.UserDTO;
 import lombok.Data;
 
@@ -66,18 +65,18 @@ public class DispatchDTO {
     @JsonProperty("dispatch_users")
     private List<UserDTO> users;
 
-    @JsonProperty("dispatch_products")
-    private List<DispatchProductDTO> products;
+    @JsonProperty("product_ids")
+    private List<Integer> productIds;
 
-    @JsonProperty("dispatch_raw_materials")
-    private List<DispatchRawMaterialDTO> rawMaterials;
+    @JsonProperty("raw_material_ids")
+    private List<Integer> rawMaterialIds;
 
-    @JsonProperty("dispatch_production_work_orders")
-    private List<DispatchProductionWorkOrderDTO> productionWorkOrders;
+    @JsonProperty("production_work_order_ids")
+    private List<Integer> productionWorkOrderIds;
 
-    @JsonProperty("dispatch_equipments")
-    private List<DispatchEquipmentDTO> equipments;
+    @JsonProperty("equipment_ids")
+    private List<Short> equipmentIds;
 
-    @JsonProperty("dispatch_maintenance_work_orders")
-    private List<DispatchMaintenanceWorkOrderDTO> maintenanceWorkOrders;
+    @JsonProperty("maintenance_work_order_ids")
+    private List<Integer> maintenanceWorkOrderIds;
 }

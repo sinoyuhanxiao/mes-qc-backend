@@ -13,7 +13,7 @@ public class DispatchProduct {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    private Integer id;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "dispatch_id", nullable = false)
@@ -24,7 +24,7 @@ public class DispatchProduct {
     private Product product;
 
     @Column(name = "status", nullable = false, columnDefinition = "SMALLINT DEFAULT 1")
-    private Integer status = 1; // Default active
+    private Short status = 1; // Default active
 
     public DispatchProduct(Dispatch dispatch, Product product) {
         this.dispatch = dispatch;

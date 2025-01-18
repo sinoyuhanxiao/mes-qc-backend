@@ -3,7 +3,13 @@ package com.fps.svmes.services.impl;
 import com.fps.svmes.dto.dtos.dispatch.*;
 import com.fps.svmes.dto.dtos.user.UserDTO;
 import com.fps.svmes.dto.requests.DispatchRequest;
+import com.fps.svmes.models.sql.maintenance.Equipment;
+import com.fps.svmes.models.sql.maintenance.MaintenanceWorkOrder;
+import com.fps.svmes.models.sql.production.Product;
+import com.fps.svmes.models.sql.production.ProductionWorkOrder;
+import com.fps.svmes.models.sql.production.RawMaterial;
 import com.fps.svmes.models.sql.taskSchedule.*;
+import com.fps.svmes.models.sql.user.User;
 import com.fps.svmes.repositories.jpaRepo.dispatch.DispatchRepository;
 import com.fps.svmes.repositories.jpaRepo.dispatch.DispatchedTaskRepository;
 import com.fps.svmes.repositories.jpaRepo.maintenance.EquipmentRepository;
@@ -83,6 +89,8 @@ public class DispatchServiceImpl implements DispatchService {
     // Map dispatch request to a dispatch object,
     @Transactional
     public DispatchDTO createDispatch(DispatchRequest request) {
+        logger.info("Running createDispatch");
+
         Dispatch dispatch = modelMapper.map(request, Dispatch.class);
         dispatch.setCreationDetails(request.getCreatedBy(), 1);
 
@@ -103,24 +111,24 @@ public class DispatchServiceImpl implements DispatchService {
             mutableDispatchUsers.addAll(mapDispatchUsers(dispatch, request.getUserIds()));
         }
 
-        if (request.getDispatchProducts() != null) {
-            mutableDispatchProducts.addAll(mapDispatchProducts(dispatch, request.getDispatchProducts()));
+        if (request.getProductIds() != null) {
+            mutableDispatchProducts.addAll(mapDispatchProducts(dispatch, request.getProductIds()));
         }
 
-        if (request.getDispatchRawMaterials() != null) {
-            mutableDispatchRawMaterials.addAll(mapDispatchRawMaterials(dispatch, request.getDispatchRawMaterials()));
+        if (request.getRawMaterialIds() != null) {
+            mutableDispatchRawMaterials.addAll(mapDispatchRawMaterials(dispatch, request.getRawMaterialIds()));
         }
 
-        if (request.getDispatchProductionWorkOrders() != null) {
-            mutableDispatchProductionWorkOrders.addAll(mapDispatchProductionWorkOrders(dispatch, request.getDispatchProductionWorkOrders()));
+        if (request.getProductionWorkOrderIds() != null) {
+            mutableDispatchProductionWorkOrders.addAll(mapDispatchProductionWorkOrders(dispatch, request.getProductionWorkOrderIds()));
         }
 
-        if (request.getDispatchEquipments() != null) {
-            mutableDispatchEquipments.addAll(mapDispatchEquipments(dispatch, request.getDispatchEquipments()));
+        if (request.getEquipmentIds() != null) {
+            mutableDispatchEquipments.addAll(mapDispatchEquipments(dispatch, request.getEquipmentIds()));
         }
 
-        if (request.getDispatchMaintenanceWorkOrders() != null) {
-            mutableDispatchMaintenanceWorkOrders.addAll(mapDispatchMaintenanceWorkOrders(dispatch, request.getDispatchMaintenanceWorkOrders()));
+        if (request.getMaintenanceWorkOrderIds() != null) {
+            mutableDispatchMaintenanceWorkOrders.addAll(mapDispatchMaintenanceWorkOrders(dispatch, request.getMaintenanceWorkOrderIds()));
         }
 
         // Set the collections back to the entity
@@ -156,6 +164,8 @@ public class DispatchServiceImpl implements DispatchService {
 
     @Transactional
     public DispatchDTO createManualDispatch(DispatchRequest request) {
+        logger.info("Running createManualDispatch");
+
         Dispatch dispatch = modelMapper.map(request, Dispatch.class);
         dispatch.setCreationDetails(request.getCreatedBy(), 1);
 
@@ -185,45 +195,72 @@ public class DispatchServiceImpl implements DispatchService {
 
     @Transactional
     public DispatchDTO updateDispatch(Long id, DispatchRequest request) {
+        logger.info("Running updateDispatch for Dispatch ID: {}", id);
+
         Dispatch dispatch = dispatchRepo.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Dispatch not found"));
 
         modelMapper.map(request, dispatch);
         dispatch.setUpdateDetails(request.getUpdatedBy(), 1);
 
-        // Clear and update associations
-        if (request.getFormIds() != null) {
-//            dispatch.getDispatchForms().forEach(form -> form.setStatus(dispatch.getStatus())); // Update status
-            dispatch.getDispatchForms().clear();
-            dispatch.getDispatchForms().addAll(mapDispatchForms(dispatch, request.getFormIds()));
-        }
+//        // Clear and update associations
+//        if (request.getFormIds() != null) {
+//            dispatch.getDispatchForms().forEach(df -> df.setStatus(dispatch.getStatus())); // Update status
+//            dispatch.getDispatchForms().clear();
+//            dispatch.getDispatchForms().addAll(mapDispatchForms(dispatch, request.getFormIds()));
+//        }
+//
+//        if (request.getUserIds() != null) {
+//            dispatch.getDispatchUsers().forEach(du -> du.setStatus(dispatch.getStatus())); // Update status
+//            dispatch.getDispatchUsers().clear();
+//            dispatch.getDispatchUsers().addAll(mapDispatchUsers(dispatch, request.getUserIds()));
+//        }
+//
+//        if (request.getProductIds() != null) {
+//            dispatch.getDispatchProducts().forEach(dp ->
+//                    dp.setStatus((short) dispatch.getStatus().intValue())
+//            );
+//            dispatch.getDispatchProducts().clear();
+//            dispatch.getDispatchProducts().addAll(mapDispatchProducts(dispatch, request.getProductIds()));
+//        }
+//        if (request.getRawMaterialIds() != null) {
+//            dispatch.getDispatchRawMaterials().forEach(drm ->
+//                    drm.setStatus((short) dispatch.getStatus().intValue())
+//            );
+//            dispatch.getDispatchRawMaterials().clear();
+//            dispatch.getDispatchRawMaterials().addAll(mapDispatchRawMaterials(dispatch, request.getRawMaterialIds()));
+//        }
+//        if (request.getProductionWorkOrderIds() != null) {
+//            dispatch.getDispatchProductionWorkOrders().forEach(dpwo ->
+//                    dpwo.setStatus((short) dispatch.getStatus().intValue())
+//            );
+//            dispatch.getDispatchProductionWorkOrders().clear();
+//            dispatch.getDispatchProductionWorkOrders().addAll(mapDispatchProductionWorkOrders(dispatch, request.getProductionWorkOrderIds()));
+//        }
+//        if (request.getEquipmentIds() != null) {
+//            dispatch.getDispatchEquipments().forEach(de ->
+//                    de.setStatus((short) dispatch.getStatus().intValue())
+//            );
+//            dispatch.getDispatchEquipments().clear();
+//            dispatch.getDispatchEquipments().addAll(mapDispatchEquipments(dispatch, request.getEquipmentIds()));
+//        }
+//        if (request.getMaintenanceWorkOrderIds() != null) {
+//            dispatch.getDispatchMaintenanceWorkOrders().forEach(dmwo ->
+//                    dmwo.setStatus((short) dispatch.getStatus().intValue())
+//            );
+//            dispatch.getDispatchMaintenanceWorkOrders().clear();
+//            dispatch.getDispatchMaintenanceWorkOrders().addAll(mapDispatchMaintenanceWorkOrders(dispatch, request.getMaintenanceWorkOrderIds()));
+//        }
 
-        if (request.getUserIds() != null) {
-//            dispatch.getDispatchUsers().forEach(user -> user.setStatus(dispatch.getStatus())); // Update status
-            dispatch.getDispatchUsers().clear();
-            dispatch.getDispatchUsers().addAll(mapDispatchUsers(dispatch, request.getUserIds()));
-        }
+        // Clear and update associations with proper handling
+        updateDispatchForms(dispatch, request.getFormIds());
+        updateDispatchUsers(dispatch, request.getUserIds());
+        updateDispatchProducts(dispatch, request.getProductIds());
+        updateDispatchRawMaterials(dispatch, request.getRawMaterialIds());
+        updateDispatchProductionWorkOrders(dispatch, request.getProductionWorkOrderIds());
+        updateDispatchEquipments(dispatch, request.getEquipmentIds());
+        updateDispatchMaintenanceWorkOrders(dispatch, request.getMaintenanceWorkOrderIds());
 
-        if (request.getDispatchProducts() != null) {
-            dispatch.getDispatchProducts().clear();
-            dispatch.getDispatchProducts().addAll(mapDispatchProducts(dispatch, request.getDispatchProducts()));
-        }
-        if (request.getDispatchRawMaterials() != null) {
-            dispatch.getDispatchRawMaterials().clear();
-            dispatch.getDispatchRawMaterials().addAll(mapDispatchRawMaterials(dispatch, request.getDispatchRawMaterials()));
-        }
-        if (request.getDispatchProductionWorkOrders() != null) {
-            dispatch.getDispatchProductionWorkOrders().clear();
-            dispatch.getDispatchProductionWorkOrders().addAll(mapDispatchProductionWorkOrders(dispatch, request.getDispatchProductionWorkOrders()));
-        }
-        if (request.getDispatchEquipments() != null) {
-            dispatch.getDispatchEquipments().clear();
-            dispatch.getDispatchEquipments().addAll(mapDispatchEquipments(dispatch, request.getDispatchEquipments()));
-        }
-        if (request.getDispatchMaintenanceWorkOrders() != null) {
-            dispatch.getDispatchMaintenanceWorkOrders().clear();
-            dispatch.getDispatchMaintenanceWorkOrders().addAll(mapDispatchMaintenanceWorkOrders(dispatch, request.getDispatchMaintenanceWorkOrders()));
-        }
 
         if (dispatch.getType().equals("MANUAL")) {
             // since manual dispatch only execute once, will default isActive to false
@@ -249,6 +286,7 @@ public class DispatchServiceImpl implements DispatchService {
 
     @Transactional
     public void deleteDispatch(Long id) {
+        logger.info("Running deleteDispatch for Dispatch ID: {}", id);
         Dispatch dispatch = dispatchRepo.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Dispatch not found"));
 
@@ -263,25 +301,25 @@ public class DispatchServiceImpl implements DispatchService {
 
         // Update the status of related personnel and forms
         if (dispatch.getDispatchUsers() != null) {
-            dispatch.getDispatchUsers().forEach(personnel -> personnel.setStatus(0));
+            dispatch.getDispatchUsers().forEach(user -> user.setStatus(0));
         }
         if (dispatch.getDispatchForms() != null) {
             dispatch.getDispatchForms().forEach(form -> form.setStatus(0));
         }
         if (dispatch.getDispatchProducts() != null) {
-            dispatch.getDispatchProducts().forEach(product -> product.setStatus(0));
+            dispatch.getDispatchProducts().forEach(product -> product.setStatus((short) 0));
         }
         if (dispatch.getDispatchRawMaterials() != null) {
-            dispatch.getDispatchRawMaterials().forEach(rawMaterial -> rawMaterial.setStatus(0));
+            dispatch.getDispatchRawMaterials().forEach(rawMaterial -> rawMaterial.setStatus((short) 0));
         }
         if (dispatch.getDispatchProductionWorkOrders() != null) {
-            dispatch.getDispatchProductionWorkOrders().forEach(workOrder -> workOrder.setStatus(0));
+            dispatch.getDispatchProductionWorkOrders().forEach(workOrder -> workOrder.setStatus((short) 0));
         }
         if (dispatch.getDispatchEquipments() != null) {
-            dispatch.getDispatchEquipments().forEach(equipment -> equipment.setStatus(0));
+            dispatch.getDispatchEquipments().forEach(equipment -> equipment.setStatus((short) 0));
         }
         if (dispatch.getDispatchMaintenanceWorkOrders() != null) {
-            dispatch.getDispatchMaintenanceWorkOrders().forEach(maintenanceWorkOrder -> maintenanceWorkOrder.setStatus(0));
+            dispatch.getDispatchMaintenanceWorkOrders().forEach(maintenanceWorkOrder -> maintenanceWorkOrder.setStatus((short) 0));
         }
 
         dispatch.setUpdatedAt(OffsetDateTime.now());
@@ -488,6 +526,50 @@ public class DispatchServiceImpl implements DispatchService {
                     .toList());
         }
 
+        // map products to product_ids
+        if (dispatch.getDispatchProducts() != null) {
+            dto.setProductIds(dispatch.getDispatchProducts()
+                    .stream()
+                    .map(DispatchProduct::getProduct)
+                    .map(Product::getId)
+                    .toList());
+        }
+
+        if (dispatch.getDispatchRawMaterials() != null) {
+            dto.setRawMaterialIds(dispatch.getDispatchRawMaterials()
+                    .stream()
+                    .map(DispatchRawMaterial::getRawMaterial)
+                    .map(RawMaterial::getId)
+                    .toList());
+        }
+
+        // map entity to ids
+        if (dispatch.getDispatchProductionWorkOrders() != null) {
+            dto.setProductionWorkOrderIds(dispatch.getDispatchProductionWorkOrders()
+                    .stream()
+                    .map(DispatchProductionWorkOrder::getProductionWorkOrder)
+                    .map(ProductionWorkOrder::getId)
+                    .toList());
+        }
+
+        // map entity to ids
+        if (dispatch.getDispatchEquipments() != null) {
+            dto.setEquipmentIds(dispatch.getDispatchEquipments()
+                    .stream()
+                    .map(DispatchEquipment::getEquipment)
+                    .map(Equipment::getId)
+                    .toList());
+        }
+
+        // map entity to ids
+        if (dispatch.getDispatchMaintenanceWorkOrders() != null) {
+            dto.setMaintenanceWorkOrderIds(dispatch.getDispatchMaintenanceWorkOrders()
+                    .stream()
+                    .map(DispatchMaintenanceWorkOrder::getMaintenanceWorkOrder)
+                    .map(MaintenanceWorkOrder::getId)
+                    .toList());
+        }
+
         return dto;
     }
 
@@ -539,68 +621,231 @@ public class DispatchServiceImpl implements DispatchService {
                 .toList();
     }
 
-    private List<DispatchProduct> mapDispatchProducts(Dispatch dispatch, List<DispatchProductDTO> productDTOs) {
-        return productDTOs.stream()
-                .map(dto -> {
+    private List<DispatchProduct> mapDispatchProducts(Dispatch dispatch, List<Integer> ids) {
+        if (ids == null) return new ArrayList<>();
+        return ids.stream()
+                .map(id -> {
                     DispatchProduct dp = new DispatchProduct();
                     dp.setDispatch(dispatch);
-                    dp.setProduct(productRepository.findById(Math.toIntExact(dto.getProductId()))
-                            .orElseThrow(() -> new EntityNotFoundException("Product not found")));
-                    dp.setStatus(dto.getStatus());
+                    dp.setProduct(productRepository.findById(id)
+                            .orElseThrow(() -> new EntityNotFoundException("Product not found: " + id)));
+                    dp.setStatus((short) 1); // Default active status
                     return dp;
                 })
-                .collect(Collectors.toList());
+                .toList();
     }
 
-    private List<DispatchRawMaterial> mapDispatchRawMaterials(Dispatch dispatch, List<DispatchRawMaterialDTO> rawMaterialDTOs) {
-        return rawMaterialDTOs.stream()
-                .map(dto -> {
+    private List<DispatchRawMaterial> mapDispatchRawMaterials(Dispatch dispatch, List<Integer> ids) {
+        if (ids == null) return new ArrayList<>();
+        return ids.stream()
+                .map(id -> {
+                    DispatchRawMaterial dp = new DispatchRawMaterial();
+                    dp.setDispatch(dispatch);
+                    dp.setRawMaterial(rawMaterialRepository.findById(id)
+                            .orElseThrow(() -> new EntityNotFoundException("Raw Material not found: " + id)));
+                    dp.setStatus((short) 1); // Default active status
+                    return dp;
+                })
+                .toList();
+    }
+
+    private List<DispatchProductionWorkOrder> mapDispatchProductionWorkOrders(Dispatch dispatch, List<Integer> ids) {
+        if (ids == null) return new ArrayList<>();
+        return ids.stream()
+                .map(id -> {
+                    DispatchProductionWorkOrder dp = new DispatchProductionWorkOrder();
+                    dp.setDispatch(dispatch);
+                    dp.setProductionWorkOrder(productionWorkOrderRepository.findById(id)
+                            .orElseThrow(() -> new EntityNotFoundException("Production Work Order not found: " + id)));
+                    dp.setStatus((short) 1); // Default active status
+                    return dp;
+                })
+                .toList();
+    }
+
+    private List<DispatchEquipment> mapDispatchEquipments(Dispatch dispatch, List<Short> ids) {
+        if (ids == null) return new ArrayList<>();
+        return ids.stream()
+                .map(id -> {
+                    DispatchEquipment dp = new DispatchEquipment();
+                    dp.setDispatch(dispatch);
+                    dp.setEquipment(equipmentRepository.findById(Integer.valueOf(id))
+                            .orElseThrow(() -> new EntityNotFoundException("Equipment not found: " + id)));
+                    dp.setStatus((short) 1); // Default active status
+                    return dp;
+                })
+                .toList();
+    }
+
+    private List<DispatchMaintenanceWorkOrder> mapDispatchMaintenanceWorkOrders(Dispatch dispatch, List<Integer> ids) {
+        if (ids == null) return new ArrayList<>();
+        return ids.stream()
+                .map(id -> {
+                    DispatchMaintenanceWorkOrder dp = new DispatchMaintenanceWorkOrder();
+                    dp.setDispatch(dispatch);
+                    dp.setMaintenanceWorkOrder(maintenanceWorkOrderRepository.findById(id)
+                            .orElseThrow(() -> new EntityNotFoundException("Product not found: " + id)));
+                    dp.setStatus((short) 1); // Default active status
+                    return dp;
+                })
+                .toList();
+    }
+
+    private void updateDispatchForms(Dispatch dispatch, List<String> formIds) {
+        if (formIds == null) return;
+
+        List<String> existingForms = dispatch.getDispatchForms().stream()
+                .filter(form -> form.getStatus() == 1)
+                .map(DispatchForm::getQcFormTreeNodeId)
+                .toList();
+
+        List<DispatchForm> newForms = formIds.stream()
+                .filter(id -> !existingForms.contains(id))
+                .map(id -> new DispatchForm(dispatch, id))
+                .toList();
+
+        dispatch.getDispatchForms().forEach(form -> form.setStatus(0)); // Soft delete existing
+        dispatch.getDispatchForms().addAll(newForms); // Add only new forms
+    }
+
+    private void updateDispatchUsers(Dispatch dispatch, List<Integer> userIds) {
+        if (userIds == null) return;
+
+        List<Integer> existingUsers = dispatch.getDispatchUsers().stream()
+                .filter(user -> user.getStatus() == 1)
+                .map(DispatchUser::getUser)
+                .map(User::getId)
+                .toList();
+
+        List<DispatchUser> newUsers = userIds.stream()
+                .filter(id -> !existingUsers.contains(id))
+                .map(id -> new DispatchUser(dispatch, id))
+                .toList();
+
+        dispatch.getDispatchUsers().forEach(user -> user.setStatus(0)); // Soft delete existing
+        dispatch.getDispatchUsers().addAll(newUsers); // Add only new users
+    }
+
+    private void updateDispatchProducts(Dispatch dispatch, List<Integer> productIds) {
+        if (productIds == null) return;
+
+        List<Integer> existingProducts = dispatch.getDispatchProducts().stream()
+                .filter(product -> product.getStatus() == 1)
+                .map(dp -> dp.getProduct().getId())
+                .toList();
+
+        List<DispatchProduct> newProducts = productIds.stream()
+                .filter(id -> !existingProducts.contains(id))
+                .map(id -> {
+                    DispatchProduct dp = new DispatchProduct();
+                    dp.setDispatch(dispatch);
+                    dp.setProduct(productRepository.findById(id)
+                            .orElseThrow(() -> new EntityNotFoundException("Product not found: " + id)));
+                    dp.setStatus((short) 1);
+                    return dp;
+                })
+                .toList();
+
+        dispatch.getDispatchProducts().forEach(dp -> dp.setStatus((short) 0)); // Soft delete existing
+        dispatch.getDispatchProducts().addAll(newProducts); // Add only new products
+    }
+
+    private void updateDispatchRawMaterials(Dispatch dispatch, List<Integer> rawMaterialIds) {
+        if (rawMaterialIds == null) return;
+
+        List<Integer> existingRawMaterials = dispatch.getDispatchRawMaterials().stream()
+                .filter(rawMaterial -> rawMaterial.getStatus() == 1)
+                .map(drm -> drm.getRawMaterial().getId())
+                .toList();
+
+        List<DispatchRawMaterial> newRawMaterials = rawMaterialIds.stream()
+                .filter(id -> !existingRawMaterials.contains(id))
+                .map(id -> {
                     DispatchRawMaterial drm = new DispatchRawMaterial();
                     drm.setDispatch(dispatch);
-                    drm.setRawMaterial(rawMaterialRepository.findById(Math.toIntExact(dto.getRawMaterialId()))
-                            .orElseThrow(() -> new EntityNotFoundException("Raw Material not found")));
-                    drm.setStatus(dto.getStatus());
+                    drm.setRawMaterial(rawMaterialRepository.findById(id)
+                            .orElseThrow(() -> new EntityNotFoundException("Raw Material not found: " + id)));
+                    drm.setStatus((short) 1);
                     return drm;
                 })
-                .collect(Collectors.toList());
+                .toList();
+
+        dispatch.getDispatchRawMaterials().forEach(drm -> drm.setStatus((short) 0)); // Soft delete existing
+        dispatch.getDispatchRawMaterials().addAll(newRawMaterials); // Add only new raw materials
     }
 
-    private List<DispatchProductionWorkOrder> mapDispatchProductionWorkOrders(Dispatch dispatch, List<DispatchProductionWorkOrderDTO> productionWorkOrderDTOS) {
-        return productionWorkOrderDTOS.stream()
-                .map(dto -> {
-                    DispatchProductionWorkOrder e = new DispatchProductionWorkOrder();
-                    e.setDispatch(dispatch);
-                    e.setProductionWorkOrder(productionWorkOrderRepository.findById(Math.toIntExact(dto.getProductionWorkOrderId()))
-                            .orElseThrow(() -> new EntityNotFoundException("Production Work Order not found")));
-                    e.setStatus(dto.getStatus());
-                    return e;
+    private void updateDispatchProductionWorkOrders(Dispatch dispatch, List<Integer> productionWorkOrderIds) {
+        if (productionWorkOrderIds == null) return;
+
+        List<Integer> existingWorkOrders = dispatch.getDispatchProductionWorkOrders().stream()
+                .filter(workOrder -> workOrder.getStatus() == 1)
+                .map(dpwo -> dpwo.getProductionWorkOrder().getId())
+                .toList();
+
+        List<DispatchProductionWorkOrder> newWorkOrders = productionWorkOrderIds.stream()
+                .filter(id -> !existingWorkOrders.contains(id))
+                .map(id -> {
+                    DispatchProductionWorkOrder dpwo = new DispatchProductionWorkOrder();
+                    dpwo.setDispatch(dispatch);
+                    dpwo.setProductionWorkOrder(productionWorkOrderRepository.findById(id)
+                            .orElseThrow(() -> new EntityNotFoundException("Production Work Order not found: " + id)));
+                    dpwo.setStatus((short) 1);
+                    return dpwo;
                 })
-                .collect(Collectors.toList());
+                .toList();
+
+        dispatch.getDispatchProductionWorkOrders().forEach(dpwo -> dpwo.setStatus((short) 0)); // Soft delete existing
+        dispatch.getDispatchProductionWorkOrders().addAll(newWorkOrders); // Add only new production work orders
     }
 
-    private List<DispatchMaintenanceWorkOrder> mapDispatchMaintenanceWorkOrders(Dispatch dispatch, List<DispatchMaintenanceWorkOrderDTO> maintenanceWorkOrderDTOS) {
-        return maintenanceWorkOrderDTOS.stream()
-                .map(dto -> {
-                    DispatchMaintenanceWorkOrder e = new DispatchMaintenanceWorkOrder();
-                    e.setDispatch(dispatch);
-                    e.setMaintenanceWorkOrder(maintenanceWorkOrderRepository.findById(Math.toIntExact(dto.getMaintenanceWorkOrderId()))
-                            .orElseThrow(() -> new EntityNotFoundException("Maintenance Work Order not found")));
-                    e.setStatus(dto.getStatus());
-                    return e;
+    private void updateDispatchEquipments(Dispatch dispatch, List<Short> equipmentIds) {
+        if (equipmentIds == null) return;
+        List<Short> existingEquipments = dispatch.getDispatchEquipments()
+                .stream()
+                .filter(equipment->equipment.getStatus() == 1)
+                .map(de->de.getEquipment().getId()).toList();
+
+
+        List<DispatchEquipment> newEquipments = equipmentIds.stream()
+                .filter(id -> !existingEquipments.contains(id))
+                .map(id -> {
+                    DispatchEquipment de = new DispatchEquipment();
+                    de.setDispatch(dispatch);
+                    de.setEquipment(equipmentRepository.findById(Integer.valueOf(id))
+                            .orElseThrow(() -> new EntityNotFoundException("Equipment not found: " + id)));
+                    de.setStatus((short) 1);
+                    return de;
                 })
-                .collect(Collectors.toList());
+                .toList();
+
+        dispatch.getDispatchEquipments().forEach(de -> de.setStatus((short) 0)); // Soft delete existing
+        dispatch.getDispatchEquipments().addAll(newEquipments); // Add only new equipment
     }
 
-    private List<DispatchEquipment> mapDispatchEquipments(Dispatch dispatch, List<DispatchEquipmentDTO> equipmentDTOS) {
-        return equipmentDTOS.stream()
-                .map(dto -> {
-                    DispatchEquipment e = new DispatchEquipment();
-                    e.setDispatch(dispatch);
-                    e.setEquipment(equipmentRepository.findById(Math.toIntExact(dto.getEquipmentId()))
-                            .orElseThrow(() -> new EntityNotFoundException("Equipment not found")));
-                    e.setStatus(dto.getStatus());
-                    return e;
+    private void updateDispatchMaintenanceWorkOrders(Dispatch dispatch, List<Integer> maintenanceWorkOrderIds) {
+        if (maintenanceWorkOrderIds == null) return;
+
+        List<Integer> existingWorkOrders = dispatch.getDispatchMaintenanceWorkOrders().stream()
+                .filter(dmwo -> dmwo.getStatus() == 1)
+                .map(dmwo -> dmwo.getMaintenanceWorkOrder().getId())
+                .toList();
+
+        List<DispatchMaintenanceWorkOrder> newWorkOrders = maintenanceWorkOrderIds.stream()
+                .filter(id -> !existingWorkOrders.contains(id))
+                .map(id -> {
+                    DispatchMaintenanceWorkOrder dmwo = new DispatchMaintenanceWorkOrder();
+                    dmwo.setDispatch(dispatch);
+                    dmwo.setMaintenanceWorkOrder(maintenanceWorkOrderRepository.findById(id)
+                            .orElseThrow(() -> new EntityNotFoundException("Maintenance Work Order not found: " + id)));
+                    dmwo.setStatus((short) 1);
+                    return dmwo;
                 })
-                .collect(Collectors.toList());
+                .toList();
+
+        dispatch.getDispatchMaintenanceWorkOrders().forEach(dmwo -> dmwo.setStatus((short) 0)); // Soft delete existing
+        dispatch.getDispatchMaintenanceWorkOrders().addAll(newWorkOrders); // Add only new maintenance work orders
     }
+
+
+
 }

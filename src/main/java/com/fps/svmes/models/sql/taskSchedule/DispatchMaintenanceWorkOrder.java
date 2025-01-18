@@ -13,7 +13,7 @@ public class DispatchMaintenanceWorkOrder {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    private Integer id;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "dispatch_id", nullable = false)
@@ -24,7 +24,7 @@ public class DispatchMaintenanceWorkOrder {
     private MaintenanceWorkOrder maintenanceWorkOrder;
 
     @Column(name = "status", nullable = false, columnDefinition = "SMALLINT DEFAULT 1")
-    private Integer status = 1; // Default active
+    private Short status = 1; // Default active
 
     public DispatchMaintenanceWorkOrder(Dispatch dispatch, MaintenanceWorkOrder maintenanceWorkOrder) {
         this.dispatch = dispatch;

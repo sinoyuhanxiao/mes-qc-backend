@@ -545,17 +545,23 @@ public class DispatchServiceImpl implements DispatchService {
         taskDTO.setCreationDetails(dispatch.getCreatedBy(), 1);
         taskDTO.setNotes(dispatch.getRemark());
 
-        // Loop through forms and personnel, and insert tasks
-        for (DispatchForm form : dispatch.getDispatchForms()) {
+        // Filter DispatchForms with status = 1
+        List<DispatchForm> activeForms = dispatch.getDispatchForms().stream()
+                .filter(form -> form.getStatus() == 1)
+                .toList();
+
+        // Filter DispatchUsers with status = 1
+        List<Integer> activeUserIds = dispatch.getDispatchUsers().stream()
+                .filter(user -> user.getStatus() == 1)
+                .map(user -> user.getUser().getId())
+                .toList();
+
+        // Loop through active forms and create tasks for active users
+        for (DispatchForm form : activeForms) {
             taskDTO.setQcFormTreeNodeId(form.getQcFormTreeNodeId());
 
-            // Extract user IDs from personnel
-            List<Integer> userIds = dispatch.getDispatchUsers().stream()
-                    .map(user -> user.getUser().getId())
-                    .collect(Collectors.toList());
-
             // Use the service to insert tasks
-            dispatchedTaskService.insertDispatchedTasks(taskDTO, userIds);
+            dispatchedTaskService.insertDispatchedTasks(taskDTO, activeUserIds);
         }
 
         logger.info("Executed Dispatch ID: {}, Created {} tasks.", dispatch.getId(), dispatch.getDispatchForms().size());

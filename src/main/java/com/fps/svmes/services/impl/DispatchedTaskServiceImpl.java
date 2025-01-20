@@ -78,7 +78,7 @@ public class DispatchedTaskServiceImpl implements DispatchedTaskService {
         sendWeComNotification(dispatchedTaskDTO);
     }
 
-    private void sendWeComNotification(DispatchedTaskDTO task) {
+    private void sendWeComNotification(DispatchedTaskDTO task) { // only test for now
         String url = "https://qyapi.weixin.qq.com/cgi-bin/message/send?access_token=npSmdfRWezU7zMHXBXNEG0M-9p1BVp_Y_qPGuoRxY54NIsYJZKcNhwSsYkQgLagOTxHMPQA-JlHljpvUj2lM7OmOs-8gx1NSG3beRrK4LVfoR098FmHOx7A0dw-oV6hGcD9bSEjhMLiUzJ0IA2KlkP9oR1Mp2srRv4YwW-X5UQBj5WCmmkaG_2P8E7EWo7B2_VnpXXO_VbfL8ZPXeKxSkg";
 
         String payload = "{\n" +
@@ -105,7 +105,7 @@ public class DispatchedTaskServiceImpl implements DispatchedTaskService {
 
             int responseCode = connection.getResponseCode();
             if (responseCode == HttpURLConnection.HTTP_OK) {
-                System.out.println("Notification sent successfully.");
+                // System.out.println("Notification sent successfully.");
             } else {
                 try (BufferedReader br = new BufferedReader(new InputStreamReader(connection.getInputStream()))) {
                     StringBuilder response = new StringBuilder();

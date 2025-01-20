@@ -20,6 +20,6 @@ public interface DispatchService {
     List<DispatchDTO> getAllDispatches();
     List<DispatchedTaskDTO> getAllDispatchedTasks();
     void deleteDispatch(Long id);
-    void scheduleDispatchTask(Long dispatchId, Runnable task);
+    void initializeDispatch(Long dispatchId, Runnable task);
     void cancelDispatchTask(Long dispatchId);
 }

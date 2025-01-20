@@ -1,7 +1,11 @@
 package com.fps.svmes.services.impl;
 
+import com.fps.svmes.models.sql.taskSchedule.TaskType;
+
 import com.fps.svmes.models.sql.taskSchedule.Dispatch;
+import com.fps.svmes.repositories.jpaRepo.dispatch.DispatchRepository;
 import com.fps.svmes.services.TaskScheduleService;
+import jakarta.persistence.EntityNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -11,10 +15,10 @@ import org.springframework.stereotype.Service;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
-import java.util.Date;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 
 @Service
 public class TaskScheduleServiceImpl implements TaskScheduleService {
@@ -22,11 +26,13 @@ public class TaskScheduleServiceImpl implements TaskScheduleService {
     @Autowired
     private TaskScheduler taskScheduler;
 
-    // Map to track scheduled tasks by dispatch ID
-    private final Map<Long, ScheduledFuture<?>> scheduledTasks = new ConcurrentHashMap<>();
-    private final Map<Long, Boolean> schedulingInProgress = new ConcurrentHashMap<>();
-    private static final Logger logger = LoggerFactory.getLogger(TaskScheduleServiceImpl.class);
+    @Autowired
+    private DispatchRepository dispatchRepo;
 
+    // Map to track scheduled tasks by dispatch ID
+    private final Map<Long, Map<TaskType, ScheduledFuture<?>>> tasks = new ConcurrentHashMap<>();
+    // Centralized state management
+    private static final Logger logger = LoggerFactory.getLogger(TaskScheduleServiceImpl.class);
 
     /**
      * Schedule a dispatch task if it's active and within the defined period.
@@ -34,114 +40,198 @@ public class TaskScheduleServiceImpl implements TaskScheduleService {
      * @param dispatch the dispatch entity containing scheduling details.
      * @param task     the task to be executed.
      */
-    public void scheduleDispatchTask(Dispatch dispatch, Runnable task) {
-        if (schedulingInProgress.putIfAbsent(dispatch.getId(), true) != null) {
-            logger.warn("Dispatch ID {} is already being scheduled. Skipping redundant request.", dispatch.getId());
-            return;
+    public void scheduleDispatch(Dispatch dispatch, Runnable task) {
+
+        // 1. schedule a cron periodic task for this dispatch
+        CronTrigger ct = new CronTrigger(dispatch.getCronExpression());
+        ScheduledFuture<?> cronFuture = taskScheduler.schedule(task, ct);
+
+        if (cronFuture != null) {
+            // track this cron runnable in tasks map
+            addTask(dispatch.getId(), TaskType.CRON, cronFuture);
+        } else {
+            throw new IllegalStateException("Failed to schedule cron periodic task for Dispatch ID: " + dispatch.getId());
         }
 
-        synchronized (scheduledTasks) { // Lock for task scheduling map to avoid race conditions
-            try {
-                cancelDispatch(dispatch.getId()); // Cancel existing task if any
-                ScheduledFuture<?> future = taskScheduler.schedule(task, new CronTrigger(dispatch.getCronExpression()));
+        Runnable cancelRunnable = ()->{
+            removeTask(dispatch.getId(), TaskType.CRON);
+            removeTask(dispatch.getId(), TaskType.CANCEL);
 
-                if (future != null) {
-                    scheduledTasks.put(dispatch.getId(), future);
-                    logger.info("Scheduled a dispatching task for dispatch id {}", dispatch.getId());
-//                    logger.info("Scheduled a dispatching task for dispatch id {} to assign {} forms to {} users", dispatch.getId(), dispatch.getDispatchForms().size(), dispatch.getDispatchUsers().size());
-                } else {
-                    throw new IllegalStateException("Failed to schedule task for Dispatch ID: " + dispatch.getId());
-                }
-            } finally {
-                schedulingInProgress.remove(dispatch.getId());
-            }
+            // set the dispatch is active to false since all tasks is canceled
+            Dispatch d = dispatchRepo.findById(dispatch.getId())
+                    .orElseThrow(() -> new EntityNotFoundException("Dispatch not found"));
+            d.setIsActive(false);
+            d.setUpdatedAt(OffsetDateTime.now());
+            dispatchRepo.save(d);
+        };
 
-        }
+        // 2. schedule a cancel task at the end time with 30 seconds delay for this dispatch
+        ScheduledFuture<?> cancelFuture = taskScheduler.schedule(cancelRunnable, dispatch.getEndTime().plusSeconds(30).toInstant());
+
+        // track this cancel runnable in tasks map
+        addTask(dispatch.getId(), TaskType.CANCEL, cancelFuture);
+
+        // set as is active since it has cron task scheduled.
+        dispatch.setIsActive(true);
+        logger.info("Set dispatch with ID: {} as active", dispatch.getId());
+        dispatchRepo.save(dispatch);
     }
 
     /**
-     * Cancel a scheduled task by its dispatch ID.
+     * Schedule a dispatch task if it's defined period is in the future.
      *
-     * @param dispatchId the ID of the dispatch to cancel.
+     * @param dispatch the dispatch entity containing scheduling details.
+     * @param task     the task to be executed.
      */
-    public boolean cancelDispatch(Long dispatchId) {
-        ScheduledFuture<?> future = scheduledTasks.get(dispatchId);
-        if (future != null) {
-            future.cancel(false);
-            scheduledTasks.remove(dispatchId);
-            logger.info("Canceled dispatching task for dispatch id {}", dispatchId);
-            return true;
+    @Override
+    public void scheduleFutureDispatch(Dispatch dispatch, Runnable task) {
+        if (dispatch.getStartTime().isBefore(OffsetDateTime.now())) {
+            throw new IllegalArgumentException("Dispatch start time must be in the future");
         }
-        return false;
+
+        if (!isScheduled(dispatch.getId())) {
+            Runnable scheduleCronTaskAndCancelTask = ()->{
+                CronTrigger ct = new CronTrigger(dispatch.getCronExpression());
+                ScheduledFuture<?> cronFuture = taskScheduler.schedule(task, ct);
+
+                if (cronFuture != null) {
+                    addTask(dispatch.getId(), TaskType.CRON, cronFuture);
+                } else {
+                    throw new IllegalStateException("Failed to schedule cron periodic task for Dispatch ID: " + dispatch.getId());
+                }
+
+
+                ScheduledFuture<?> cancelFuture = taskScheduler.schedule(()->{
+                    removeTask(dispatch.getId(), TaskType.CRON);
+                    removeTask(dispatch.getId(), TaskType.CANCEL);
+                    // set the dispatch is active to false since all tasks is canceled
+                    Dispatch d = dispatchRepo.findById(dispatch.getId())
+                            .orElseThrow(() -> new EntityNotFoundException("Dispatch not found"));
+                    d.setIsActive(false);
+                    d.setUpdatedAt(OffsetDateTime.now());
+                    dispatchRepo.save(d);
+                }, dispatch.getEndTime().plusSeconds(30).toInstant());
+
+                addTask(dispatch.getId(), TaskType.CANCEL, cancelFuture);
+                removeTask(dispatch.getId(), TaskType.FUTURE);
+                // set as is active since it has cron task scheduled.
+                dispatch.setIsActive(true);
+                logger.info("Set dispatch with ID: {} as active", dispatch.getId());
+                dispatchRepo.save(dispatch);
+            };
+
+            ScheduledFuture<?> futureTask = taskScheduler.schedule(scheduleCronTaskAndCancelTask, dispatch.getStartTime().toInstant());
+            addTask(dispatch.getId(), TaskType.FUTURE, futureTask);
+
+        } else {
+            logger.warn("Dispatch ID {} is already scheduled for future execution.", dispatch.getId());
+        }
     }
 
-
     /**
-     * Check if a task is currently scheduled for a given dispatch ID.
+     * Check if any task is currently scheduled for a given dispatch ID.
      *
      * @param dispatchId the ID of the dispatch to check.
-     * @return true if the task is scheduled, false otherwise.
+     * @return true if any type of task is scheduled, false otherwise.
      */
     public boolean isScheduled(Long dispatchId) {
-        return scheduledTasks.containsKey(dispatchId);
+        Map<TaskType, ScheduledFuture<?>> typeMap = tasks.get(dispatchId);
+        return typeMap != null && !typeMap.isEmpty();
     }
 
 
     /**
-     * Retrieve the next scheduled execution time for a given dispatch ID.
+     * Retrieve the next scheduled execution time for a given dispatch ID and given type if exist and not cancelled.
      *
      * @param dispatchId the ID of the dispatch to check.
+     * @param type the Type of the task to check
      * @return the next execution time as a OffsetDateTime, or null if not scheduled.
      */
 
-    public OffsetDateTime getNextExecutionTime(Long dispatchId) {
-        ScheduledFuture<?> future = scheduledTasks.get(dispatchId);
-        if (future != null && !future.isCancelled()) {
-            long delay = future.getDelay(java.util.concurrent.TimeUnit.MILLISECONDS);
-            if (delay > 0) {
-                return OffsetDateTime.now(ZoneOffset.UTC).plusNanos(delay * 1_000_000);
+    public OffsetDateTime getNextExecutionTime(Long dispatchId, TaskType type) {
+        Map<TaskType, ScheduledFuture<?>> typeMap = tasks.get(dispatchId);
+        if (typeMap != null) {
+            ScheduledFuture<?> future = tasks.get(dispatchId).get(type);
+            if (future != null && !future.isCancelled()) {
+                long delay = future.getDelay(TimeUnit.MILLISECONDS);
+                if (delay > 0) {
+                    return OffsetDateTime.now(ZoneOffset.UTC).plusNanos(delay * 1_000_000);
+                }
             }
         }
+
         return null; // Return null if no next execution time is available
     }
 
     /**
-     * Retrieve all scheduled tasks with their next execution times.
+     * Retrieve all scheduled dispatch's tasks with their next execution times.
      *
-     * @return A map where the key is the dispatch ID and the value is the next execution time.
+     * @return A map where the key is the dispatch ID and the map of task type and their next execution time.
      */
-    public Map<Long, OffsetDateTime> getAllScheduledTasks() {
-        Map<Long, OffsetDateTime> result = new ConcurrentHashMap<>();
-        scheduledTasks.forEach((id, future) -> {
-            if (future != null && !future.isCancelled()) {
-                long delay = future.getDelay(java.util.concurrent.TimeUnit.MILLISECONDS);
-                result.put(id, delay > 0 ? OffsetDateTime.now(ZoneOffset.UTC).plusNanos(delay * 1_000_000) : null);
+    public Map<Long, Map<TaskType, OffsetDateTime>> getAllScheduledTasks() {
+        Map<Long, Map<TaskType, OffsetDateTime>> result = new ConcurrentHashMap<>();
+
+        tasks.forEach((dispatchId, typeMap) -> {
+            Map<TaskType, OffsetDateTime> taskExecutionTimes = new ConcurrentHashMap<>();
+
+            typeMap.forEach((taskType, future) -> {
+                if (future != null && !future.isCancelled()) {
+                    long delay = future.getDelay(TimeUnit.MILLISECONDS);
+                    OffsetDateTime nextExecutionTime = delay > 0
+                            ? OffsetDateTime.now(ZoneOffset.UTC).plusNanos(delay * 1_000_000)
+                            : null;
+                    taskExecutionTimes.put(taskType, nextExecutionTime);
+                }
+            });
+
+            if (!taskExecutionTimes.isEmpty()) {
+                result.put(dispatchId, taskExecutionTimes);
             }
         });
+
         return result;
     }
 
-    public void scheduleOneTimeTask(OffsetDateTime executionTime, Runnable task) {
-        OffsetDateTime now = OffsetDateTime.now();
+    public void addTask(long dispatchId, TaskType type, ScheduledFuture<?> future) {
+        // Ensure the inner map exists
+        tasks.computeIfAbsent(dispatchId, id -> new ConcurrentHashMap<>())
+                .put(type, future);
 
-        if (executionTime.isAfter(now)) {
-            long delay = executionTime.toInstant().toEpochMilli() - System.currentTimeMillis();
-
-            synchronized (schedulingInProgress) {
-                if (schedulingInProgress.putIfAbsent((long) task.hashCode(), true) != null) {
-                    logger.warn("One-time task for execution at {} is already being scheduled. Skipping.", executionTime);
-                    return;
-                }
-
-                try {
-                    taskScheduler.schedule(task, triggerContext -> Date.from(executionTime.toInstant()).toInstant());
-                    logger.info("One-time task scheduled for execution at {}", executionTime);
-                } finally {
-                    schedulingInProgress.remove((long) task.hashCode());
-                }
-            }
-        } else {
-            logger.warn("Attempted to schedule a one-time task for a past time: {}", executionTime);
+        ScheduledFuture<?> futureAdded = tasks.get(dispatchId).get(type);
+        if (futureAdded != null) {
+            logger.info("Scheduled task of type {} for dispatch id {}", type , dispatchId);
         }
+
+
+    }
+
+    public ScheduledFuture<?> getTask(long dispatchId, TaskType type) {
+        Map<TaskType, ScheduledFuture<?>> typeMap = tasks.get(dispatchId);
+        return (typeMap != null) ? typeMap.get(type) : null;
+    }
+
+    public boolean removeTask(long dispatchId, TaskType type) {
+        Map<TaskType, ScheduledFuture<?>> typeMap = tasks.get(dispatchId);
+        if (typeMap != null) {
+            ScheduledFuture<?> future = typeMap.remove(type);
+            if (future != null) {
+                future.cancel(true);
+                if (future.isCancelled()) {
+                    logger.info("Removed task of type {} for dispatch id {}", type , dispatchId);
+                }
+                return future.isCancelled();
+            }
+        }
+        return false;
+    }
+
+    public boolean removeAllTasks(long dispatchId) {
+        Map<TaskType, ScheduledFuture<?>> typeMap = tasks.remove(dispatchId);
+        if (typeMap != null) {
+            typeMap.values().forEach(future -> future.cancel(true));
+            logger.info("Removed all scheduled tasks for dispatch id {}", dispatchId);
+            return true;
+        }
+        return false;
     }
 }

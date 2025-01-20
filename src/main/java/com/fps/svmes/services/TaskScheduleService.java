@@ -1,17 +1,18 @@
 package com.fps.svmes.services;
 
 import com.fps.svmes.models.sql.taskSchedule.Dispatch;
+import com.fps.svmes.models.sql.taskSchedule.TaskType;
 
-import java.sql.Timestamp;
 import java.time.OffsetDateTime;
 import java.util.Map;
 
 public interface TaskScheduleService {
 
-    void scheduleDispatchTask(Dispatch dispatch, Runnable task);
-    boolean cancelDispatch(Long dispatchId);
+    void scheduleDispatch(Dispatch dispatch, Runnable task);
+    void scheduleFutureDispatch(Dispatch dispatch, Runnable task);
     boolean isScheduled(Long dispatchId);
-    OffsetDateTime getNextExecutionTime(Long dispatchId);
-    public Map<Long, OffsetDateTime> getAllScheduledTasks();
-    public void scheduleOneTimeTask(OffsetDateTime executionTime, Runnable task);
+    OffsetDateTime getNextExecutionTime(Long dispatchId, TaskType type);
+    Map<Long, Map<TaskType, OffsetDateTime>> getAllScheduledTasks();
+    boolean removeTask(long dispatchId, TaskType type);
+    boolean removeAllTasks(long dispatchId);
 }

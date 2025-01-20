@@ -6,20 +6,18 @@ import com.fps.svmes.dto.dtos.dispatch.DispatchedTaskDTO;
 import com.fps.svmes.dto.requests.DispatchRequest;
 import com.fps.svmes.dto.responses.ResponseResult;
 import com.fps.svmes.models.sql.taskSchedule.Dispatch;
+import com.fps.svmes.models.sql.taskSchedule.TaskType;
 import com.fps.svmes.repositories.jpaRepo.dispatch.DispatchRepository;
 import com.fps.svmes.services.DispatchService;
 import com.fps.svmes.services.TaskScheduleService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.sql.Timestamp;
 import java.time.OffsetDateTime;
 import java.util.HashMap;
 import java.util.List;
@@ -30,7 +28,7 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/dispatch")
-@Tag(name = "Dispatch API", description = "API for QC Test Dispatch")
+@Tag(name = "Dispatch API", description = "API for QC Dispatch Dispatch")
 public class DispatchController {
 
     @Autowired
@@ -43,7 +41,6 @@ public class DispatchController {
     private DispatchRepository dispatchRepository;
 
     private static final Logger logger = LoggerFactory.getLogger(DispatchController.class);
-
 
     @Operation(summary = "Create a new dispatch", description = "Creates a dispatch in the QC System")
     @PostMapping
@@ -66,6 +63,30 @@ public class DispatchController {
         } catch (Exception e) {
             logger.error("Error creating manual dispatch", e);
             return ResponseResult.fail("Failed to create a manual dispatch", e);
+        }
+    }
+
+    @Operation(summary = "Update an existing dispatch", description = "Updates a dispatch given an ID")
+    @PutMapping("/{id}")
+    public ResponseResult<DispatchDTO> updateDispatch(@PathVariable Long id, @RequestBody @Valid DispatchRequest request) {
+        try {
+            DispatchDTO dispatchDTO = dispatchService.updateDispatch(id, request);
+            return ResponseResult.success(dispatchDTO);
+        } catch (Exception e) {
+            logger.error("Error updating dispatch with ID: {}",  id);
+            return ResponseResult.fail("Failed to update a dispatch", e);
+        }
+    }
+
+    @Operation(summary = "Delete a dispatch", description = "Deletes a dispatch given its ID")
+    @DeleteMapping("/{id}")
+    public ResponseResult<String> deleteDispatch(@PathVariable Long id) {
+        try {
+            dispatchService.deleteDispatch(id);
+            return ResponseResult.success("Dispatch with ID " + id + " deleted successfully.");
+        } catch (Exception e) {
+            logger.error("Error deleting a dispatch with ID: {}", id );
+            return ResponseResult.fail("Failed to delete a dispatch", e);
         }
     }
 
@@ -110,29 +131,7 @@ public class DispatchController {
         }
     }
 
-    @Operation(summary = "Update an existing dispatch", description = "Updates a dispatch given an ID")
-    @PutMapping("/{id}")
-    public ResponseResult<DispatchDTO> updateDispatch(@PathVariable Long id, @RequestBody @Valid DispatchRequest request) {
-        try {
-            DispatchDTO dispatchDTO = dispatchService.updateDispatch(id, request);
-            return ResponseResult.success(dispatchDTO);
-        } catch (Exception e) {
-            logger.error("Error updating dispatch with ID: {}",  id);
-            return ResponseResult.fail("Failed to update a dispatch", e);
-        }
-    }
 
-    @Operation(summary = "Delete a dispatch", description = "Deletes a dispatch given its ID")
-    @DeleteMapping("/{id}")
-    public ResponseResult<String> deleteDispatch(@PathVariable Long id) {
-        try {
-            dispatchService.deleteDispatch(id);
-            return ResponseResult.success("Dispatch with ID " + id + " deleted successfully.");
-        } catch (Exception e) {
-            logger.error("Error deleting a dispatch with ID: {}", id );
-            return ResponseResult.fail("Failed to delete a dispatch", e);
-        }
-    }
 
     /**
      * Endpoint to schedule a dispatch task.
@@ -144,9 +143,8 @@ public class DispatchController {
     @PostMapping("/schedule/{id}")
     public ResponseResult<String> scheduleTask(@PathVariable Long id) {
         try {
-
             Dispatch dispatch = dispatchRepository.findByIdAndStatus(id, 1);
-            dispatchService.scheduleDispatchTask(dispatch.getId(), () -> dispatchService.executeDispatch(dispatch.getId()));
+            dispatchService.initializeDispatch(dispatch.getId(), () -> dispatchService.executeDispatch(dispatch.getId()));
             return ResponseResult.success("Task scheduled successfully for Dispatch ID: " + id);
         } catch (Exception e) {
             logger.error("Error scheduling a dispatch with ID: {}", id);
@@ -180,6 +178,7 @@ public class DispatchController {
      * @param id the ID of the dispatch to check.
      * @return true if the task is scheduled, false otherwise.
      */
+    @Operation(summary = "Check if a dispatch has any task scheduled", description = "Retrieves true or false on whether a dispatch has task scheduled")
     @GetMapping("/is-scheduled/{id}")
     public ResponseResult<Boolean> isTaskScheduled(@PathVariable Long id) {
 
@@ -199,10 +198,11 @@ public class DispatchController {
      * @param id the ID of the dispatch to check.
      * @return the next execution time or null if not scheduled.
      */
+    @Operation(summary = "Get next execution time on CRON task of a dispatch", description = "Get next execution time on CRON task of a dispatch, null if no cron task is scheduled")
     @GetMapping("/next-execution-time/{id}")
     public ResponseResult<OffsetDateTime> getNextExecutionTime(@PathVariable Long id) {
         try {
-            OffsetDateTime nextExecutionTime = taskScheduleService.getNextExecutionTime(id);
+            OffsetDateTime nextExecutionTime = taskScheduleService.getNextExecutionTime(id, TaskType.CRON);
             return ResponseResult.success(nextExecutionTime);
         } catch (Exception e) {
             logger.error("Error getting next execution time for dispatch ID: {}", id);
@@ -210,24 +210,31 @@ public class DispatchController {
         }
     }
 
-    /**
-     * Endpoint to get all scheduled tasks with their next execution times.
-     *
-     * @return A response result containing the list of scheduled tasks and their next execution times.
-     */
     @Operation(summary = "Get all scheduled tasks", description = "Retrieves all scheduled tasks and their next execution times.")
     @GetMapping("/scheduled-tasks")
     public ResponseResult<List<Map<String, Object>>> getAllScheduledTasks() {
         try {
-            Map<Long, OffsetDateTime> scheduledTasks = taskScheduleService.getAllScheduledTasks();
+            Map<Long, Map<TaskType, OffsetDateTime>> scheduledTasks = taskScheduleService.getAllScheduledTasks();
 
             // Convert Map to List of Maps for JSON-friendly representation
             List<Map<String, Object>> response = scheduledTasks.entrySet().stream()
-                    .map(entry -> {
-                        Map<String, Object> taskInfo = new HashMap<>();
-                        taskInfo.put("dispatchId", entry.getKey());
-                        taskInfo.put("nextExecutionTime", entry.getValue());
-                        return taskInfo;
+                    .map(dispatchEntry -> {
+                        Map<String, Object> dispatchInfo = new HashMap<>();
+
+                        // Convert the inner map of TaskType -> OffsetDateTime into a list for easier representation
+                        List<Map<String, Object>> taskDetails = dispatchEntry.getValue().entrySet().stream()
+                                .map(taskEntry -> {
+                                    Map<String, Object> taskInfo = new HashMap<>();
+                                    taskInfo.put("taskType", taskEntry.getKey().name()); // Use name() for enum
+                                    taskInfo.put("nextExecutionTime", taskEntry.getValue());
+                                    return taskInfo;
+                                })
+                                .toList();
+
+                        dispatchInfo.put("tasks", taskDetails); // Add task details as a list
+                        dispatchInfo.put("dispatchId", dispatchEntry.getKey());
+
+                        return dispatchInfo;
                     })
                     .toList();
 
@@ -235,7 +242,7 @@ public class DispatchController {
                     ? ResponseResult.noContent(response)
                     : ResponseResult.success(response);
         } catch (Exception e) {
-            logger.error("Error retrieving all scheduled tasks details");
+            logger.error("Error retrieving all scheduled tasks details", e);
             return ResponseResult.fail("Failed to retrieve all scheduled tasks", e);
         }
     }

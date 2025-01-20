@@ -23,14 +23,14 @@ public class DispatchedTask extends Common {
     private Long id;
 
     @ManyToOne
-    @JoinColumn(name = "dispatch_id", nullable = true)
+    @JoinColumn(name = "dispatch_id")
     private Dispatch dispatch; // Associated configuration
 
     @ManyToOne
-    @JoinColumn(name = "user_id", nullable = false)
+    @JoinColumn(name = "user_id")
     private User user;
 
-    @Column(name = "qc_form_tree_node_id", nullable = false)
+    @Column(name = "qc_form_tree_node_id")
     private String qcFormTreeNodeId; // ID of the dispatched form
 
     @Column(name = "dispatch_time", nullable = false, updatable = false)

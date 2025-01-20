@@ -10,9 +10,17 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import com.fps.svmes.repositories.jpaRepo.user.UserRepository;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.ProtocolException;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.time.OffsetDateTime;
 import java.time.LocalDateTime;
-import java.time.ZoneOffset;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -30,8 +38,10 @@ public class DispatchedTaskServiceImpl implements DispatchedTaskService {
 
     @Override
     public List<DispatchedTaskDTO> getCurrentTasks(Long userId) {
-        OffsetDateTime startOfDay = LocalDateTime.now().toLocalDate().atStartOfDay().atOffset(ZoneOffset.UTC);
+        ZoneId chinaZone = ZoneId.of("Asia/Shanghai"); // Set timezone to China (UTC+8)
+        OffsetDateTime startOfDay = LocalDateTime.now(chinaZone).toLocalDate().atStartOfDay(chinaZone).toOffsetDateTime();
         OffsetDateTime endOfDay = startOfDay.plusDays(1);
+
         List<DispatchedTask> tasks = dispatchedTaskRepository.findByUserIdAndDueDateBetweenAndStatus(userId, startOfDay, endOfDay, 1);
         return tasks.stream().map(task -> modelMapper.map(task, DispatchedTaskDTO.class)).collect(Collectors.toList());
     }
@@ -64,6 +74,50 @@ public class DispatchedTaskServiceImpl implements DispatchedTaskService {
                     .orElseThrow(() -> new IllegalArgumentException("User not found with ID: " + userId));
             task.setUser(user);
             dispatchedTaskRepository.save(task);
+        }
+        sendWeComNotification(dispatchedTaskDTO);
+    }
+
+    private void sendWeComNotification(DispatchedTaskDTO task) {
+        String url = "https://qyapi.weixin.qq.com/cgi-bin/message/send?access_token=npSmdfRWezU7zMHXBXNEG0M-9p1BVp_Y_qPGuoRxY54NIsYJZKcNhwSsYkQgLagOTxHMPQA-JlHljpvUj2lM7OmOs-8gx1NSG3beRrK4LVfoR098FmHOx7A0dw-oV6hGcD9bSEjhMLiUzJ0IA2KlkP9oR1Mp2srRv4YwW-X5UQBj5WCmmkaG_2P8E7EWo7B2_VnpXXO_VbfL8ZPXeKxSkg";
+
+        String payload = "{\n" +
+                "  \"touser\" : \"erik\",\n" +
+                "  \"msgtype\": \"markdown\",\n" +
+                "  \"agentid\" : 1000002,\n" +
+                "  \"markdown\": {\n" +
+                "       \"content\": \"您有一个新的QC派遣单：\\n>\\n>**任务详情**  \\n>\\n>任务单号：<font color=\\\"info\\\">" + task.getId() + "</font>  \\n>任务名称：<font color=\\\"info\\\">" + task.getName() + "</font>  \\n>负责人：<font color=\\\"info\\\">" + "Erik Yu" + "</font>  \\n>开始日期：<font color=\\\"info\\\">" + task.getDispatchTime() + "</font>  \\n>截止日期：<font color=\\\"warning\\\">" + task.getDueDate() + "</font>  \\n>  \\n> \\n>请点击：[QC质检任务](http://10.10.12.68:3000/form-display/29?usable=true&switchDisplayed=false&dispatchedTaskId=7208) 开始做任务：\"\n" +
+                "  },\n" +
+                "  \"enable_duplicate_check\": 0,\n" +
+                "  \"duplicate_check_interval\": 1800\n" +
+                "}";
+
+        try {
+            HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
+            connection.setRequestMethod("POST");
+            connection.setRequestProperty("Content-Type", "application/json");
+            connection.setDoOutput(true);
+
+            try (OutputStream os = connection.getOutputStream()) {
+                os.write(payload.getBytes(StandardCharsets.UTF_8));
+                os.flush();
+            }
+
+            int responseCode = connection.getResponseCode();
+            if (responseCode == HttpURLConnection.HTTP_OK) {
+                System.out.println("Notification sent successfully.");
+            } else {
+                try (BufferedReader br = new BufferedReader(new InputStreamReader(connection.getInputStream()))) {
+                    StringBuilder response = new StringBuilder();
+                    String line;
+                    while ((line = br.readLine()) != null) {
+                        response.append(line);
+                    }
+                    throw new RuntimeException("Failed to send notification. Response: " + response.toString());
+                }
+            }
+        } catch (IOException e) {
+            throw new RuntimeException("Error while sending WeCom notification: " + e.getMessage(), e);
         }
     }
 

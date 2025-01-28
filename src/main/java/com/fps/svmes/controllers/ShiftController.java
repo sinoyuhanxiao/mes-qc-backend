@@ -28,15 +28,14 @@ public class ShiftController {
     /**
      * Create a new shift.
      *
-     * @param shiftDTO Shift data transfer object
      * @param createdBy   ID of the user creating the shift
      * @return ShiftDTO
      */
     @PostMapping
     @Operation(summary = "Create a new shift", description = "Create a new shift with the provided details")
-    public ResponseResult<ShiftDTO> createShift(@RequestBody ShiftDTO shiftDTO, @RequestParam Integer createdBy) {
+    public ResponseResult<ShiftDTO> createShift(@RequestBody ShiftRequest ShiftRequest, @RequestParam Integer createdBy) {
         try {
-            ShiftDTO createdShift = shiftService.createShift(shiftDTO, createdBy);
+            ShiftDTO createdShift = shiftService.createShift(ShiftRequest, createdBy);
             return ResponseResult.success(createdShift);
         } catch (Exception e) {
             logger.error("Error creating shift", e);

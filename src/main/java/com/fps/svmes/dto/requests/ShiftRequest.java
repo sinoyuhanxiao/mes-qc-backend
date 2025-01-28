@@ -9,6 +9,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.OffsetTime;
+import java.time.OffsetDateTime;
 
 @Data
 @AllArgsConstructor
@@ -29,24 +30,41 @@ public class ShiftRequest {
     @Schema(description = "Type of the shift", example = "Day")
     private String type;
 
-    @JsonProperty("leader_id")
-    @NotNull(message = "Leader ID cannot be null")
+    @JsonProperty("leader_id") // 与前端字段名称一致
     @Schema(description = "User ID of the shift leader", example = "14")
-    private Integer leaderId; // Use leaderId instead of full UserDTO
+    private Integer leaderId;
 
     @Schema(type = "string", pattern = "HH:mm:ssXXX", example = "08:00:00+02:00")
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "HH:mm:ssXXX")
     @JsonProperty("start_time")
-    @NotNull(message = "Start time cannot be null")
     private OffsetTime startTime;
 
     @Schema(type = "string", pattern = "HH:mm:ssXXX", example = "16:00:00+02:00")
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "HH:mm:ssXXX")
     @JsonProperty("end_time")
-    @NotNull(message = "End time cannot be null")
     private OffsetTime endTime;
 
     @JsonProperty("description")
     @Schema(description = "Description of the shift", example = "This is a regular day shift")
     private String description;
+
+    @JsonProperty("status")
+    @Schema(description = "Status of the shift", example = "1")
+    private Integer status;
+
+    @JsonProperty("created_by")
+    @Schema(description = "User ID that creates this shift", example = "14")
+    private Integer createdBy;
+
+    @JsonProperty("updated_by")
+    @Schema(description = "User ID that updates this shift", example = "14")
+    private Integer updatedBy;
+
+    @JsonProperty("created_at")
+    @Schema(description = "Creation timestamp of the shift", example = "12:00:00+00:00")
+    private OffsetDateTime createdAt;
+
+    @JsonProperty("updated_at")
+    @Schema(description = "Last update timestamp of the shift", example = "12:00:00+00:00")
+    private OffsetDateTime updatedAt;
 }

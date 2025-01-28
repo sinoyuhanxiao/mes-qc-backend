@@ -31,7 +31,7 @@ public class Shift extends Common {
     private String type;
 
     @OneToOne(fetch = FetchType.EAGER)
-    @JoinColumn(name = "leader_id", referencedColumnName = "id", insertable = false, updatable = false)
+    @JoinColumn(name = "leader_id", referencedColumnName = "id")
     private User leader;
 
     @Schema(type = "string", pattern = "HH:mm:ssXXX", example = "14:30:00+02:00")

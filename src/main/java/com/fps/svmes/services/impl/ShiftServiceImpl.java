@@ -30,35 +30,49 @@ public class ShiftServiceImpl implements ShiftService {
     private ModelMapper modelMapper;
 
     @Override
-    public ShiftDTO createShift(ShiftDTO shiftDTO, Integer userId) {
-        Shift shift = modelMapper.map(shiftDTO, Shift.class);
-        shift.setCreatedAt(OffsetDateTime.now());
+    public ShiftDTO createShift(ShiftRequest shiftRequest, Integer userId) {
+        // Map the ShiftRequest to the Shift entity
+        Shift shift = modelMapper.map(shiftRequest, Shift.class);
+
+        // Set audit fields
+        OffsetDateTime now = OffsetDateTime.now();
+        shift.setCreatedAt(now);
         shift.setCreatedBy(userId);
-        shift.setUpdatedAt(OffsetDateTime.now());
+        shift.setUpdatedAt(now);
         shift.setUpdatedBy(userId);
 
+        // Set the leader based on leaderId
+        if (shiftRequest.getLeaderId() != null) {
+            User leader = userRepository.findById(shiftRequest.getLeaderId())
+                    .orElseThrow(() -> new IllegalArgumentException("Leader not found with ID: " + shiftRequest.getLeaderId()));
+            shift.setLeader(leader);
+        }
+
+        // Save the Shift entity
         shift = shiftRepository.save(shift);
+
+        // Map the saved Shift entity to the ShiftDTO
         return modelMapper.map(shift, ShiftDTO.class);
     }
 
     @Override
-    public ShiftDTO updateShift(Integer id, @Valid ShiftRequest shiftDTO, Integer userId) {
+    public ShiftDTO updateShift(Integer id, @Valid ShiftRequest shiftRequest, Integer userId) {
         Shift shift = shiftRepository.findById(id).orElseThrow(() -> new RuntimeException("Shift not found"));
 
         // Map only non-null properties from DTO to entity
-        if (shiftDTO.getName() != null) shift.setName(shiftDTO.getName());
-        if (shiftDTO.getType() != null) shift.setType(shiftDTO.getType());
-        if (shiftDTO.getLeader() != null && shiftDTO.getLeader().getId() != null) {
-            User leader = userRepository.findById(shiftDTO.getLeader().getId())
+        if (shiftRequest.getName() != null) shift.setName(shiftRequest.getName());
+        if (shiftRequest.getType() != null) shift.setType(shiftRequest.getType());
+        if (shiftRequest.getLeaderId() != null) {
+            User leader = userRepository.findById(shiftRequest.getLeaderId())
                     .orElseThrow(() -> new RuntimeException("Leader not found"));
             shift.setLeader(leader);
         }
-        if (shiftDTO.getStartTime() != null) shift.setStartTime(shiftDTO.getStartTime());
-        if (shiftDTO.getEndTime() != null) shift.setEndTime(shiftDTO.getEndTime());
-        if (shiftDTO.getDescription() != null) shift.setDescription(shiftDTO.getDescription());
+        if (shiftRequest.getStartTime() != null) shift.setStartTime(shiftRequest.getStartTime());
+        if (shiftRequest.getEndTime() != null) shift.setEndTime(shiftRequest.getEndTime());
+        if (shiftRequest.getDescription() != null) shift.setDescription(shiftRequest.getDescription());
 
-        if (shiftDTO.getStatus() != null && shiftDTO.getStatus() == 0) {
-            shift.setStatus(0); // Soft delete
+        if (shiftRequest.getStatus() != null) {
+            shift.setStatus(shiftRequest.getStatus()); // Soft delete
         }
 
         shift.setUpdatedAt(OffsetDateTime.now());

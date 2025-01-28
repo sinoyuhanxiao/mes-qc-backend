@@ -5,12 +5,15 @@ import java.util.List;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fps.svmes.dto.dtos.CommonDTO;
 import com.fps.svmes.dto.dtos.user.UserDTO;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 
+@EqualsAndHashCode(callSuper = true)
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @Data
-public class DispatchDTO {
+public class DispatchDTO extends CommonDTO {
     @JsonProperty("id")
     private Long id;
 
@@ -20,11 +23,8 @@ public class DispatchDTO {
     @JsonProperty("name")
     private String name;
 
-    @JsonProperty("remark")
-    private String remark;
-
-    @JsonProperty("cron_expression")
-    private String cronExpression;
+    @JsonProperty("state")
+    private Short state;
 
     @JsonProperty("start_time")
     private OffsetDateTime startTime;
@@ -32,32 +32,20 @@ public class DispatchDTO {
     @JsonProperty("end_time")
     private OffsetDateTime endTime;
 
+    @JsonProperty("cron_expression")
+    private String cronExpression;
+
     @JsonProperty("dispatch_limit")
     private Integer dispatchLimit;
 
     @JsonProperty("executed_count")
     private Integer executedCount;
 
-    @JsonProperty("status")
-    private Integer status;
-
-    @JsonProperty("created_at")
-    private OffsetDateTime createdAt;
-
-    @JsonProperty("created_by")
-    private Integer createdBy;
-
-    @JsonProperty("updated_at")
-    private OffsetDateTime updatedAt;
-
-    @JsonProperty("updated_by")
-    private Integer updatedBy;
+    @JsonProperty("remark")
+    private String remark;
 
     @JsonProperty("due_date_offset_minute")
-    private Integer dueDateOffsetMinute; // Total offset in minutes
-
-    @JsonProperty("is_active")
-    private Boolean isActive;
+    private Integer dueDateOffsetMinute;
 
     @JsonProperty("dispatch_forms")
     private List<String> qcFormTreeNodeIds;
@@ -79,4 +67,8 @@ public class DispatchDTO {
 
     @JsonProperty("maintenance_work_order_ids")
     private List<Integer> maintenanceWorkOrderIds;
+
+    // sampling points
+    // test subjects
+    // instruments
 }

@@ -9,6 +9,8 @@ import java.util.Map;
 public interface TaskScheduleService {
 
     void scheduleDispatch(Dispatch dispatch, Runnable task);
+    void setupCronTask(Dispatch dispatch, Runnable task);
+    void setupCancelTask(Dispatch dispatch);
     void scheduleFutureDispatch(Dispatch dispatch, Runnable task);
     boolean isScheduled(Long dispatchId);
     OffsetDateTime getNextExecutionTime(Long dispatchId, TaskType type);

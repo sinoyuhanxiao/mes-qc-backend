@@ -25,7 +25,6 @@ import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
-import org.springframework.data.jpa.repository.support.SimpleJpaRepository;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -143,12 +142,13 @@ public class DispatchServiceImpl implements DispatchService {
 
         if (dispatch.getType().equals("MANUAL")) {
             // since manual dispatch only execute once, will default isActive to false
-                dispatch.setIsActive(false);
+                dispatch.setState(DispatchState.Inactive.getState());
                 dispatch.setExecutedCount(dispatch.getExecutedCount() + 1); // Increment executed count
         }
 
         Dispatch savedDispatch = dispatchRepo.save(dispatch);
 
+        // Insert rows to dispatched task table
         try {
             if (dispatch.getType().equals("MANUAL")) {
                 createTasksForDispatch(savedDispatch);
@@ -158,37 +158,6 @@ public class DispatchServiceImpl implements DispatchService {
         } catch (IllegalStateException e) {
             logger.warn("Dispatch created but not immediately scheduled: {}", e.getMessage());
         }
-
-        return convertToDispatchDTO(savedDispatch);
-    }
-
-    @Transactional
-    public DispatchDTO createManualDispatch(DispatchRequest request) {
-        logger.info("Running createManualDispatch");
-
-        Dispatch dispatch = modelMapper.map(request, Dispatch.class);
-        dispatch.setCreationDetails(request.getCreatedBy(), 1);
-
-
-        List<DispatchForm> mutableDispatchForms = new ArrayList<>();
-        List<DispatchUser> mutableDispatchUsers = new ArrayList<>();
-
-        if (request.getFormIds() != null) {
-            mutableDispatchForms.addAll(mapDispatchForms(dispatch, request.getFormIds()));
-        }
-        dispatch.setDispatchForms(mutableDispatchForms);
-
-        if (request.getUserIds() != null) {
-            mutableDispatchUsers.addAll(mapDispatchUsers(dispatch, request.getUserIds()));
-        }
-        dispatch.setDispatchUsers(mutableDispatchUsers);
-
-        // since manual dispatch only execute once, will default isActive to false
-        dispatch.setIsActive(false);
-        dispatch.setExecutedCount(dispatch.getExecutedCount() + 1); // Increment executed count
-        Dispatch savedDispatch = dispatchRepo.save(dispatch);
-
-        createTasksForDispatch(dispatch);
 
         return convertToDispatchDTO(savedDispatch);
     }
@@ -215,7 +184,7 @@ public class DispatchServiceImpl implements DispatchService {
 
         if (dispatch.getType().equals("MANUAL")) {
             // since manual dispatch only execute once, will default isActive to false
-            dispatch.setIsActive(false);
+            dispatch.setState(DispatchState.Inactive.getState());
             dispatch.setExecutedCount(dispatch.getExecutedCount() + 1); // Increment executed count
         }
 
@@ -249,7 +218,7 @@ public class DispatchServiceImpl implements DispatchService {
             logger.info("Cancelled all scheduled task for Dispatch ID: {}", id);
         }
 
-        dispatch.setIsActive(false);
+        dispatch.setState(DispatchState.Inactive.getState());
         dispatch.setStatus(0);
 
         // Update the status of related personnel and forms
@@ -356,7 +325,7 @@ public class DispatchServiceImpl implements DispatchService {
 
         dispatchRepo.findByStatus(1).stream()
                 .filter(dispatch -> "SCHEDULED".equals(dispatch.getType()) &&
-                        dispatch.getIsActive())
+                        dispatch.getState().equals(DispatchState.Active.getState()))
                 .forEach(dispatch -> {
                     if (dispatch.getEndTime().isBefore(OffsetDateTime.now())) {
                         logger.info("Dispatch ID {} has expired. Canceling task...", dispatch.getId());
@@ -382,8 +351,8 @@ public class DispatchServiceImpl implements DispatchService {
         if (dispatch.getEndTime().isBefore(now)) {
             logger.info("Dispatch ID {} has an end time in the past. Skipping scheduling.", dispatchId);
             // set dispatch to be inactive
-            if (dispatch.getIsActive()) {
-                dispatch.setIsActive(false);
+            if (dispatch.getState() == DispatchState.Active.getState()) {
+                dispatch.setState(DispatchState.Expired.getState());
                 dispatch.setUpdatedAt(OffsetDateTime.now());
                 dispatchRepo.save(dispatch);
             }
@@ -408,7 +377,7 @@ public class DispatchServiceImpl implements DispatchService {
             if(taskScheduleService.isScheduled(dispatch.getId())) {
                 taskScheduleService.removeAllTasks(dispatch.getId());
             }
-            dispatch.setIsActive(false);
+            dispatch.setState(DispatchState.Exhausted.getState());
             dispatchRepo.save(dispatch);
             return;
         }
@@ -432,18 +401,40 @@ public class DispatchServiceImpl implements DispatchService {
         if (taskScheduleService.removeAllTasks(dispatchId)) {
             // Update status after cancellation
             dispatch.setUpdatedAt(OffsetDateTime.now());
-            dispatch.setIsActive(false);
+            dispatch.setState(DispatchState.Inactive.getState());
             dispatchRepo.save(dispatch);
         } else {
             logger.info("No task was scheduled for this dispatch ID.");
         }
     }
 
-    // // ------------- Helper Function  -----------------------------------------------------------------------
+    // This function cancels all tasks of a dispatch
+    @Override
+    public void pauseDispatch(Long dispatchId, Integer userId) {
+        Dispatch dispatch = dispatchRepo.findById(dispatchId)
+                .orElseThrow(() -> new EntityNotFoundException("Dispatch not found"));
 
-    private boolean isDispatchExistAndActive(Dispatch dispatch) {
-        return dispatch.getIsActive() && (dispatch.getStatus() == 1);
+        if (taskScheduleService.removeTask(dispatchId, TaskType.CRON)) {
+            // Update status after cancellation
+            dispatch.setUpdatedAt(OffsetDateTime.now());
+            dispatch.setState(DispatchState.Paused.getState());
+            dispatchRepo.save(dispatch);
+        } else {
+            logger.info("No task was scheduled for this dispatch ID.");
+        }
     }
+
+    public void resumeDispatch(Long dispatchId, Integer userId) {
+        Dispatch dispatch = dispatchRepo.findById(dispatchId)
+                .orElseThrow(() -> new EntityNotFoundException("Dispatch not found"));
+
+        taskScheduleService.setupCronTask(dispatch,() -> executeDispatch(dispatch.getId()));
+        dispatch.setUpdatedAt(OffsetDateTime.now());
+        dispatch.setState(DispatchState.Active.getState());
+        dispatchRepo.save(dispatch);
+    }
+
+    // // ------------- Helper Function  -----------------------------------------------------------------------
 
     private boolean hasReachedDispatchLimit(Dispatch dispatch) {
         return dispatch.getDispatchLimit() != -1 && dispatch.getExecutedCount() >= dispatch.getDispatchLimit();

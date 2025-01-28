@@ -12,6 +12,7 @@ import com.fps.svmes.services.DispatchService;
 import com.fps.svmes.services.TaskScheduleService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -51,18 +52,6 @@ public class DispatchController {
         } catch (Exception e) {
             logger.error("Error creating dispatch", e);
             return ResponseResult.fail("Failed to create dispatch", e);
-        }
-    }
-
-    @Operation(summary = "Create a manual dispatch", description = "Create a manual dispatch that dispatches right away")
-    @PostMapping("/manual")
-    public ResponseResult<DispatchDTO> createManualDispatch(@RequestBody DispatchRequest request) {
-        try {
-            DispatchDTO dispatchDTO = dispatchService.createManualDispatch(request);
-            return ResponseResult.success(dispatchDTO);
-        } catch (Exception e) {
-            logger.error("Error creating manual dispatch", e);
-            return ResponseResult.fail("Failed to create a manual dispatch", e);
         }
     }
 
@@ -132,7 +121,6 @@ public class DispatchController {
     }
 
 
-
     /**
      * Endpoint to schedule a dispatch task.
      *
@@ -149,6 +137,36 @@ public class DispatchController {
         } catch (Exception e) {
             logger.error("Error scheduling a dispatch with ID: {}", id);
             return ResponseResult.fail("Failed to schedule a dispatch", e);
+        }
+    }
+
+    @Operation(summary = "Pause a dispatch", description = "Pauses the specified dispatch and cancels its tasks.")
+    @PutMapping("/{id}/pause")
+    public ResponseResult<String> pauseDispatch(@PathVariable Long id, @RequestParam Integer userId) {
+        try {
+            dispatchService.pauseDispatch(id, userId);
+            return ResponseResult.success("Dispatch with ID " + id + " has been paused.");
+        } catch (EntityNotFoundException e) {
+            logger.error("Error pausing dispatch with ID: {}", id, e);
+            return ResponseResult.fail("Dispatch not found for ID: " + id, e);
+        } catch (Exception e) {
+            logger.error("Error pausing dispatch with ID: {}", id, e);
+            return ResponseResult.fail("Failed to pause dispatch with ID: " + id, e);
+        }
+    }
+
+    @Operation(summary = "Resume a paused dispatch", description = "Resumes the specified dispatch and re-enables its tasks.")
+    @PutMapping("/{id}/resume")
+    public ResponseResult<String> resumeDispatch(@PathVariable Long id, @RequestParam Integer userId) {
+        try {
+            dispatchService.resumeDispatch(id, userId);
+            return ResponseResult.success("Dispatch with ID " + id + " has been resumed.");
+        } catch (EntityNotFoundException e) {
+            logger.error("Error resuming dispatch with ID: {}", id, e);
+            return ResponseResult.fail("Dispatch not found for ID: " + id, e);
+        } catch (Exception e) {
+            logger.error("Error resuming dispatch with ID: {}", id, e);
+            return ResponseResult.fail("Failed to resume dispatch with ID: " + id, e);
         }
     }
 

@@ -14,7 +14,7 @@ import java.util.List;
 @NoArgsConstructor
 @EqualsAndHashCode(callSuper = true)
 @Entity
-@Table(name = "dispatch", schema = "quality_management")
+@Table(name = "dispatch_temp", schema = "quality_management")
 public class Dispatch extends Common {
 
     @Id
@@ -28,29 +28,29 @@ public class Dispatch extends Common {
     @Column(name = "name", nullable = false)
     private String name;
 
-    @Column(name = "remark")
-    private String remark;
-
-    @Column(name = "cron_expression")
-    private String cronExpression;
+    @Column(name = "state", nullable = false)
+    private Short state = 1;
 
     @Column(name = "start_time", nullable = false)
     private OffsetDateTime startTime;
 
-    @Column(name = "end_time", nullable = false)
+    @Column(name = "end_time")
     private OffsetDateTime endTime;
+
+    @Column(name = "cron_expression")
+    private String cronExpression;
 
     @Column(name = "dispatch_limit")
     private Integer dispatchLimit;
 
-    @Column(name = "executed_count", nullable = false)
+    @Column(name = "executed_count")
     private Integer executedCount = 0;
 
-    @Column(name = "due_date_offset_minute", nullable = false)
+    @Column(name = "due_date_offset_minute")
     private Integer dueDateOffsetMinute = 60; // Total offset in minutes, default to 1 hour
 
-    @Column(name = "is_active", nullable = false)
-    private Boolean isActive = false;  // indicates whether the dispatch scheduled to assign forms for users
+    @Column(name = "remark")
+    private String remark;
 
     @OneToMany(mappedBy = "dispatch", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonManagedReference
@@ -79,6 +79,10 @@ public class Dispatch extends Common {
     @OneToMany(mappedBy = "dispatch", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonManagedReference
     private List<DispatchMaintenanceWorkOrder> dispatchMaintenanceWorkOrders;
+
+    // dispatch sampling points
+    // dispatch test subjects
+    // dispatch instruments
 
 
 }

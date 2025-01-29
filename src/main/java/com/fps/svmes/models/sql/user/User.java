@@ -6,6 +6,8 @@ import jakarta.persistence.*;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
+import java.util.Collection;
+
 @Entity
 @Table(name = "user", schema = "quality_management")
 @Data

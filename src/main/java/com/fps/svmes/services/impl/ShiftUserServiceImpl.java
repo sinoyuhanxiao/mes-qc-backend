@@ -3,7 +3,9 @@ package com.fps.svmes.services.impl;
 import com.fps.svmes.dto.dtos.user.ShiftUserDTO;
 import com.fps.svmes.models.sql.user.ShiftUser;
 import com.fps.svmes.models.sql.user.ShiftUserId;
+import com.fps.svmes.repositories.jpaRepo.user.ShiftRepository;
 import com.fps.svmes.repositories.jpaRepo.user.ShiftUserRepository;
+import com.fps.svmes.repositories.jpaRepo.user.UserRepository;
 import com.fps.svmes.services.ShiftUserService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -20,10 +22,21 @@ public class ShiftUserServiceImpl implements ShiftUserService {
 
     private final ShiftUserRepository shiftUserRepository;
 
+    private final ShiftRepository shiftRepository;
+
+    private final UserRepository userRepository;
+
     @Override
     public void assignUserToShifts(Long userId, List<Long> shiftIds) {
         List<ShiftUser> shiftUsers = shiftIds.stream()
-                .map(shiftId -> new ShiftUser(new ShiftUserId(shiftId, userId)))
+                .map(shiftId -> {
+                    ShiftUser shiftUser = new ShiftUser(new ShiftUserId(shiftId, userId));
+                    shiftUser.setShift(shiftRepository.findById(shiftId)
+                            .orElseThrow(() -> new IllegalArgumentException("Shift not found: " + shiftId)));
+                    shiftUser.setUser(userRepository.findById(userId)
+                            .orElseThrow(() -> new IllegalArgumentException("User not found: " + userId)));
+                    return shiftUser;
+                })
                 .collect(Collectors.toList());
         shiftUserRepository.saveAll(shiftUsers);
         log.info("Assigned user {} to shifts {}", userId, shiftIds);
@@ -32,11 +45,19 @@ public class ShiftUserServiceImpl implements ShiftUserService {
     @Override
     public void assignUsersToShift(Long shiftId, List<Long> userIds) {
         List<ShiftUser> shiftUsers = userIds.stream()
-                .map(userId -> new ShiftUser(new ShiftUserId(shiftId, userId)))
+                .map(userId -> {
+                    ShiftUser shiftUser = new ShiftUser(new ShiftUserId(shiftId, userId));
+                    shiftUser.setShift(shiftRepository.findById(Math.toIntExact(shiftId))
+                            .orElseThrow(() -> new IllegalArgumentException("Shift not found: " + shiftId)));
+                    shiftUser.setUser(userRepository.findById(Math.toIntExact(userId))
+                            .orElseThrow(() -> new IllegalArgumentException("User not found: " + userId)));
+                    return shiftUser;
+                })
                 .collect(Collectors.toList());
         shiftUserRepository.saveAll(shiftUsers);
         log.info("Assigned users {} to shift {}", userIds, shiftId);
     }
+
 
     @Override
     @Transactional

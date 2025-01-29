@@ -17,7 +17,6 @@ import java.util.List;
 public class DispatchRequest {
 
     @JsonProperty("name")
-    @NotNull(message = "Name cannot be null")
     @Schema(description = "Name of the dispatch", example = "QC Dispatch Sample")
     private String name;
 
@@ -50,14 +49,6 @@ public class DispatchRequest {
     @NotNull(message = "Due date offset in minutes cannot be null")
     @Schema(description = "Offset in minutes to calculate the due date of dispatched tasks", example = "1440")
     private Integer dueDateOffsetMinute;
-
-    @JsonProperty("createdBy")
-    @Schema(description = "User ID that creates this dispatch", example = "14")
-    private Integer createdBy;
-
-    @JsonProperty("updatedBy")
-    @Schema(description = "User ID that updates this dispatch", example = "Null")
-    private Integer updatedBy;
 
     @JsonProperty("formIds")
     @NotNull(message = "List of form IDs cannot be null")

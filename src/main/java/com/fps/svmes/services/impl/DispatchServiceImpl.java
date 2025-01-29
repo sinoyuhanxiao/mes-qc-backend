@@ -91,7 +91,9 @@ public class DispatchServiceImpl implements DispatchService {
         logger.info("Running createDispatch");
 
         Dispatch dispatch = modelMapper.map(request, Dispatch.class);
-        dispatch.setCreationDetails(request.getCreatedBy(), 1);
+
+        // TODO: add userId in this function
+        dispatch.setCreationDetails(14, 1);
 
         // Initialize mutable collections
         List<DispatchForm> mutableDispatchForms = new ArrayList<>();
@@ -169,8 +171,10 @@ public class DispatchServiceImpl implements DispatchService {
         Dispatch dispatch = dispatchRepo.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Dispatch not found"));
 
+        // TODO: Sync dispatched task previously created by this dispatch. Adjust state for pending task to cancelled.
+        // TODO: add userId in this function
         modelMapper.map(request, dispatch);
-        dispatch.setUpdateDetails(request.getUpdatedBy(), 1);
+        dispatch.setUpdateDetails(14, 1);
 
         // Clear and update associations with proper handling
         updateDispatchForms(dispatch, request.getFormIds());
@@ -190,7 +194,7 @@ public class DispatchServiceImpl implements DispatchService {
 
         Dispatch updatedDispatch = dispatchRepo.save(dispatch);
 
-        // TODO: Removed all the dispatched task for the original dispatch if the task has not been started
+        // TODO: If there are dispatched task created by this dispatch, set all the "pending" dispatched task by this dispatch to "cancelled"
 
         if (updatedDispatch.getStatus() == 1) {
             if ("SCHEDULED".equals(request.getType())) {
@@ -243,6 +247,8 @@ public class DispatchServiceImpl implements DispatchService {
         if (dispatch.getDispatchMaintenanceWorkOrders() != null) {
             dispatch.getDispatchMaintenanceWorkOrders().forEach(maintenanceWorkOrder -> maintenanceWorkOrder.setStatus((short) 0));
         }
+
+        // TODO: If there are dispatched task created by this dispatch, adjust dispatched task that are in pending to cancelled.
 
         dispatch.setUpdatedAt(OffsetDateTime.now());
         dispatchRepo.save(dispatch);

@@ -25,7 +25,7 @@ public class Dispatch extends Common {
     @Column(name = "type", nullable = false)
     private String type;
 
-    @Column(name = "name", nullable = false)
+    @Column(name = "name")
     private String name;
 
     @Column(name = "state", nullable = false)

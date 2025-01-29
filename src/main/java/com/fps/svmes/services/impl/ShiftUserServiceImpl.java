@@ -27,13 +27,13 @@ public class ShiftUserServiceImpl implements ShiftUserService {
     private final UserRepository userRepository;
 
     @Override
-    public void assignUserToShifts(Long userId, List<Long> shiftIds) {
+    public void assignUserToShifts(Integer userId, List<Integer> shiftIds) {
         List<ShiftUser> shiftUsers = shiftIds.stream()
                 .map(shiftId -> {
                     ShiftUser shiftUser = new ShiftUser(new ShiftUserId(shiftId, userId));
-                    shiftUser.setShift(shiftRepository.findById(shiftId)
+                    shiftUser.setShift(shiftRepository.findById(Math.toIntExact(shiftId))
                             .orElseThrow(() -> new IllegalArgumentException("Shift not found: " + shiftId)));
-                    shiftUser.setUser(userRepository.findById(userId)
+                    shiftUser.setUser(userRepository.findById(Math.toIntExact(userId))
                             .orElseThrow(() -> new IllegalArgumentException("User not found: " + userId)));
                     return shiftUser;
                 })
@@ -43,7 +43,7 @@ public class ShiftUserServiceImpl implements ShiftUserService {
     }
 
     @Override
-    public void assignUsersToShift(Long shiftId, List<Long> userIds) {
+    public void assignUsersToShift(Integer shiftId, List<Integer> userIds) {
         List<ShiftUser> shiftUsers = userIds.stream()
                 .map(userId -> {
                     ShiftUser shiftUser = new ShiftUser(new ShiftUserId(shiftId, userId));
@@ -61,21 +61,21 @@ public class ShiftUserServiceImpl implements ShiftUserService {
 
     @Override
     @Transactional
-    public void removeUserFromShift(Long userId, Long shiftId) {
+    public void removeUserFromShift(Integer userId, Integer shiftId) {
         shiftUserRepository.deleteById(new ShiftUserId(shiftId, userId));
         log.info("Removed user {} from shift {}", userId, shiftId);
     }
 
     @Override
     @Transactional
-    public void removeUserFromAllShifts(Long userId) {
+    public void removeUserFromAllShifts(Integer userId) {
         shiftUserRepository.deleteByIdUserId(userId);
         log.info("Removed user {} from all shifts", userId);
     }
 
     @Override
     @Transactional
-    public void removeUsersFromShift(Long shiftId, List<Long> userIds) {
+    public void removeUsersFromShift(Integer shiftId, List<Integer> userIds) {
         userIds.forEach(userId ->
                 shiftUserRepository.deleteById(new ShiftUserId(shiftId, userId))
         );
@@ -83,7 +83,7 @@ public class ShiftUserServiceImpl implements ShiftUserService {
     }
 
     @Override
-    public List<ShiftUserDTO> getShiftsForUser(Long userId) {
+    public List<ShiftUserDTO> getShiftsForUser(Integer userId) {
         List<ShiftUser> shiftUsers = shiftUserRepository.findByIdUserId(userId);
         log.info("Retrieved shifts for user {}: {}", userId, shiftUsers.size());
         return shiftUsers.stream()
@@ -95,7 +95,7 @@ public class ShiftUserServiceImpl implements ShiftUserService {
     }
 
     @Override
-    public List<ShiftUserDTO> getUsersForShift(Long shiftId) {
+    public List<ShiftUserDTO> getUsersForShift(Integer shiftId) {
         List<ShiftUser> shiftUsers = shiftUserRepository.findByIdShiftId(shiftId);
         log.info("Retrieved users for shift {}: {}", shiftId, shiftUsers.size());
         return shiftUsers.stream()

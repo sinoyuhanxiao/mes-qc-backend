@@ -10,29 +10,29 @@ import java.util.Objects;
 @Data
 @Embeddable
 public class ShiftUserId implements Serializable {
-    private Long shiftId;
-    private Long userId;
+    private Integer shiftId;
+    private Integer userId;
 
     public ShiftUserId() {}
 
-    public ShiftUserId(Long shiftId, Long userId) {
+    public ShiftUserId(Integer shiftId, Integer userId) {
         this.shiftId = shiftId;
         this.userId = userId;
     }
 
-    public Long getShiftId() {
+    public Integer getShiftId() {
         return shiftId;
     }
 
-    public void setShiftId(Long shiftId) {
+    public void setShiftId(Integer shiftId) {
         this.shiftId = shiftId;
     }
 
-    public Long getUserId() {
+    public Integer getUserId() {
         return userId;
     }
 
-    public void setUserId(Long userId) {
+    public void setUserId(Integer userId) {
         this.userId = userId;
     }
 

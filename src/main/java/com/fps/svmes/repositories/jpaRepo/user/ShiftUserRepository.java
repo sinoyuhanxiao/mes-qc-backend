@@ -11,13 +11,13 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 
 @Repository
-public interface ShiftUserRepository extends JpaRepository<ShiftUser, Long> {
+public interface ShiftUserRepository extends JpaRepository<ShiftUser, Integer> {
 
-    List<ShiftUser> findByIdShiftId(Long shiftId);
+    List<ShiftUser> findByIdShiftId(Integer shiftId);
 
-    List<ShiftUser> findByIdUserId(Long userId);
+    List<ShiftUser> findByIdUserId(Integer userId);
 
-    void deleteByIdUserId(Long userId);
+    void deleteByIdUserId(Integer userId);
 
     void deleteById(ShiftUserId shiftUserId);
 
@@ -25,6 +25,6 @@ public interface ShiftUserRepository extends JpaRepository<ShiftUser, Long> {
             "FROM ShiftUser su " +
             "JOIN su.shift s " +
             "WHERE su.id.userId = :userId")
-    List<ShiftForUserTableDTO> findShiftsByUserId(@Param("userId") Long userId);
+    List<ShiftForUserTableDTO> findShiftsByUserId(@Param("userId") Integer userId);
 
 }

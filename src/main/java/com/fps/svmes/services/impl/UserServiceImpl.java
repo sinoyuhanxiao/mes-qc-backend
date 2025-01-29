@@ -45,7 +45,7 @@ public class UserServiceImpl implements UserService {
                     UserDTO userDTO = modelMapper.map(user, UserDTO.class);
 
                     // Fetch shifts directly using the repository method that returns ShiftForUserTableDTO
-                    List<ShiftForUserTableDTO> shifts = shiftUserRepository.findShiftsByUserId(Long.valueOf(user.getId()));
+                    List<ShiftForUserTableDTO> shifts = shiftUserRepository.findShiftsByUserId(user.getId());
 
                     // Assign the mapped shifts to the UserDTO
                     userDTO.setShifts(shifts);

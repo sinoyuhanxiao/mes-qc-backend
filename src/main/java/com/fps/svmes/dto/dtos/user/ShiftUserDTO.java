@@ -9,12 +9,12 @@ import lombok.Data;
 public class ShiftUserDTO {
 
     @JsonProperty("shift_id")
-    private Long shiftId;
+    private Integer shiftId;
 
     @JsonProperty("user_id")
-    private Long userId;
+    private Integer userId;
 
-    public ShiftUserDTO(Long userId, Long shiftId) {
+    public ShiftUserDTO(Integer userId, Integer shiftId) {
         this.userId = userId;
         this.shiftId = shiftId;
     }

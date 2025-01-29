@@ -25,7 +25,7 @@ public class ShiftUser {
 
     public ShiftUser() {}
 
-    public ShiftUser(Long userId, Long shiftId) {
+    public ShiftUser(Integer userId, Integer shiftId) {
         this.id = new ShiftUserId(shiftId, userId);
     }
 

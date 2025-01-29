@@ -28,7 +28,7 @@ public class ShiftUserController {
 
     @PostMapping("/users/{userId}/shifts")
     @Operation(summary = "Assign user to multiple shifts", description = "Assign a single user to multiple shifts")
-    public ResponseResult<Void> assignUserToShifts(@PathVariable Long userId, @RequestBody List<Long> shiftIds) {
+    public ResponseResult<Void> assignUserToShifts(@PathVariable Integer userId, @RequestBody List<Integer> shiftIds) {
         try {
             shiftUserService.assignUserToShifts(userId, shiftIds);
             logger.info("User {} assigned to shifts {}", userId, shiftIds);
@@ -41,7 +41,7 @@ public class ShiftUserController {
 
     @PostMapping("/shifts/{shiftId}/users")
     @Operation(summary = "Assign multiple users to a shift", description = "Assign multiple users to a single shift")
-    public ResponseResult<Void> assignUsersToShift(@PathVariable Long shiftId, @RequestBody List<Long> userIds) {
+    public ResponseResult<Void> assignUsersToShift(@PathVariable Integer shiftId, @RequestBody List<Integer> userIds) {
         try {
             shiftUserService.assignUsersToShift(shiftId, userIds);
             logger.info("Users {} assigned to shift {}", userIds, shiftId);
@@ -54,7 +54,7 @@ public class ShiftUserController {
 
     @DeleteMapping("/users/{userId}/shifts/{shiftId}")
     @Operation(summary = "Remove a user from a shift", description = "Unassign a specific user from a specific shift")
-    public ResponseResult<Void> removeUserFromShift(@PathVariable Long userId, @PathVariable Long shiftId) {
+    public ResponseResult<Void> removeUserFromShift(@PathVariable Integer userId, @PathVariable Integer shiftId) {
         try {
             shiftUserService.removeUserFromShift(userId, shiftId);
             logger.info("User {} removed from shift {}", userId, shiftId);
@@ -67,7 +67,7 @@ public class ShiftUserController {
 
     @DeleteMapping("/users/{userId}/shifts")
     @Operation(summary = "Remove user from all shifts", description = "Unassign a specific user from all shifts")
-    public ResponseResult<Void> removeUserFromAllShifts(@PathVariable Long userId) {
+    public ResponseResult<Void> removeUserFromAllShifts(@PathVariable Integer userId) {
         try {
             shiftUserService.removeUserFromAllShifts(userId);
             logger.info("User {} removed from all shifts", userId);
@@ -80,7 +80,7 @@ public class ShiftUserController {
 
     @DeleteMapping("/shifts/{shiftId}/users")
     @Operation(summary = "Remove multiple users from a shift", description = "Unassign multiple users from a specific shift")
-    public ResponseResult<Void> removeUsersFromShift(@PathVariable Long shiftId, @RequestBody List<Long> userIds) {
+    public ResponseResult<Void> removeUsersFromShift(@PathVariable Integer shiftId, @RequestBody List<Integer> userIds) {
         try {
             shiftUserService.removeUsersFromShift(shiftId, userIds);
             logger.info("Users {} removed from shift {}", userIds, shiftId);
@@ -93,7 +93,7 @@ public class ShiftUserController {
 
     @GetMapping("/users/{userId}/shifts")
     @Operation(summary = "Get shifts for user", description = "Retrieve all shifts assigned to a specific user")
-    public ResponseResult<List<ShiftUserDTO>> getShiftsForUser(@PathVariable Long userId) {
+    public ResponseResult<List<ShiftUserDTO>> getShiftsForUser(@PathVariable Integer userId) {
         try {
             List<ShiftUserDTO> shifts = shiftUserService.getShiftsForUser(userId);
             logger.info("Shifts for user {} retrieved: {}", userId, shifts);
@@ -106,7 +106,7 @@ public class ShiftUserController {
 
     @GetMapping("/shifts/{shiftId}/users")
     @Operation(summary = "Get users for shift", description = "Retrieve all users assigned to a specific shift")
-    public ResponseResult<List<ShiftUserDTO>> getUsersForShift(@PathVariable Long shiftId) {
+    public ResponseResult<List<ShiftUserDTO>> getUsersForShift(@PathVariable Integer shiftId) {
         try {
             List<ShiftUserDTO> users = shiftUserService.getUsersForShift(shiftId);
             logger.info("Users for shift {} retrieved: {}", shiftId, users);
@@ -147,7 +147,7 @@ public class ShiftUserController {
 //    @Operation(summary = "Get shifts led by user", description = "Retrieve all shifts where a specific user is the leader")
 //    public ResponseResult<List<ShiftUserDTO>> getLedShiftsForUser(@PathVariable Long userId) {
 //        try {
-//            List<ShiftUserDTO> ledShifts = shiftUserService.getLedShiftsForUser(userId);
+//            List<ShiftUserDTO> ledShifts = shiftUserServi ce.getLedShiftsForUser(userId);
 //            logger.info("Shifts led by user {} retrieved: {}", userId, ledShifts);
 //            return ResponseResult.success(ledShifts);
 //        } catch (Exception e) {

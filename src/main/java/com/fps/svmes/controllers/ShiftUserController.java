@@ -1,6 +1,7 @@
 package com.fps.svmes.controllers;
 
 import com.fps.svmes.dto.dtos.user.ShiftUserDTO;
+import com.fps.svmes.dto.dtos.user.UserForShiftTableDTO;
 import com.fps.svmes.dto.responses.ResponseResult;
 import com.fps.svmes.services.ShiftUserService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -78,6 +79,19 @@ public class ShiftUserController {
         }
     }
 
+    @DeleteMapping("/shifts/{shiftId}/users/all")
+    @Operation(summary = "Remove all users from a shift", description = "Unassign all users from a specific shift")
+    public ResponseResult<Void> removeShiftFromAllUsers(@PathVariable Integer shiftId) {
+        try {
+            shiftUserService.removeShiftFromAllUsers(shiftId);
+            logger.info("All users removed from shift {}", shiftId);
+            return ResponseResult.success(null);
+        } catch (Exception e) {
+            logger.error("Error removing all users from shift {}", shiftId, e);
+            return ResponseResult.fail("Error removing all users from shift", e);
+        }
+    }
+
     @DeleteMapping("/shifts/{shiftId}/users")
     @Operation(summary = "Remove multiple users from a shift", description = "Unassign multiple users from a specific shift")
     public ResponseResult<Void> removeUsersFromShift(@PathVariable Integer shiftId, @RequestBody List<Integer> userIds) {
@@ -106,10 +120,11 @@ public class ShiftUserController {
 
     @GetMapping("/shifts/{shiftId}/users")
     @Operation(summary = "Get users for shift", description = "Retrieve all users assigned to a specific shift")
-    public ResponseResult<List<ShiftUserDTO>> getUsersForShift(@PathVariable Integer shiftId) {
+    public ResponseResult<List<UserForShiftTableDTO>> getUsersForShift(@PathVariable Integer shiftId) {
         try {
-            List<ShiftUserDTO> users = shiftUserService.getUsersForShift(shiftId);
-            logger.info("Users for shift {} retrieved: {}", shiftId, users);
+            // Now returns a list of UserForShiftTableDTO
+            List<UserForShiftTableDTO> users = shiftUserService.getUsersForShift(shiftId);
+            logger.info("Users for shift {} retrieved: {}", shiftId, users.size());
             return ResponseResult.success(users);
         } catch (Exception e) {
             logger.error("Error retrieving users for shift {}", shiftId, e);

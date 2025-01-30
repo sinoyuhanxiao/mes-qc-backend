@@ -1,8 +1,10 @@
 package com.fps.svmes.services.impl;
 
 import com.fps.svmes.dto.dtos.user.ShiftUserDTO;
+import com.fps.svmes.dto.dtos.user.UserForShiftTableDTO;
 import com.fps.svmes.models.sql.user.ShiftUser;
 import com.fps.svmes.models.sql.user.ShiftUserId;
+import com.fps.svmes.models.sql.user.User;
 import com.fps.svmes.repositories.jpaRepo.user.ShiftRepository;
 import com.fps.svmes.repositories.jpaRepo.user.ShiftUserRepository;
 import com.fps.svmes.repositories.jpaRepo.user.UserRepository;
@@ -75,6 +77,13 @@ public class ShiftUserServiceImpl implements ShiftUserService {
 
     @Override
     @Transactional
+    public void removeShiftFromAllUsers(Integer shiftId) {
+        shiftUserRepository.deleteByIdShiftId(shiftId);
+        log.info("Removed all users from shift {}", shiftId);
+    }
+
+    @Override
+    @Transactional
     public void removeUsersFromShift(Integer shiftId, List<Integer> userIds) {
         userIds.forEach(userId ->
                 shiftUserRepository.deleteById(new ShiftUserId(shiftId, userId))
@@ -95,15 +104,37 @@ public class ShiftUserServiceImpl implements ShiftUserService {
     }
 
     @Override
-    public List<ShiftUserDTO> getUsersForShift(Integer shiftId) {
+    public List<UserForShiftTableDTO> getUsersForShift(Integer shiftId) {
+        // 1) Find all ShiftUser records for this shiftId
         List<ShiftUser> shiftUsers = shiftUserRepository.findByIdShiftId(shiftId);
         log.info("Retrieved users for shift {}: {}", shiftId, shiftUsers.size());
-        return shiftUsers.stream()
-                .map(shiftUser -> new ShiftUserDTO(
-                        shiftUser.getId().getUserId(),
-                        shiftUser.getId().getShiftId()
-                ))
+
+        // 2) Extract user IDs
+        List<Integer> userIds = shiftUsers.stream()
+                .map(shiftUser -> shiftUser.getId().getUserId())
                 .collect(Collectors.toList());
+
+        // 3) Get all User entities for these userIds
+        List<User> users = userRepository.findAllById(userIds);
+
+        // 4) Map each User to UserForShiftTableDTO
+        return users.stream()
+                .map(this::mapToUserForShiftTableDTO)
+                .collect(Collectors.toList());
+    }
+
+    // Helper method to map User entity -> UserForShiftTableDTO
+    private UserForShiftTableDTO mapToUserForShiftTableDTO(User user) {
+        UserForShiftTableDTO dto = new UserForShiftTableDTO();
+        dto.setId(user.getId());
+        dto.setName(user.getName());
+        dto.setRoleId(user.getRoleId());
+        dto.setWecomId(user.getWecomId());
+        dto.setUsername(user.getUsername());
+        dto.setPassword(user.getPassword());
+        dto.setEmail(user.getEmail());
+        dto.setPhoneNumber(user.getPhoneNumber());
+        return dto;
     }
 
     @Override

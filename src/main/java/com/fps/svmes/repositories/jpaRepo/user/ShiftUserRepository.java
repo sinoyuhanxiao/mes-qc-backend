@@ -19,6 +19,8 @@ public interface ShiftUserRepository extends JpaRepository<ShiftUser, Integer> {
 
     void deleteByIdUserId(Integer userId);
 
+    void deleteByIdShiftId(Integer shiftId);
+
     void deleteById(ShiftUserId shiftUserId);
 
     @Query("SELECT new com.fps.svmes.dto.dtos.user.ShiftForUserTableDTO(s.id, s.name, s.leader.name) " +
@@ -26,5 +28,4 @@ public interface ShiftUserRepository extends JpaRepository<ShiftUser, Integer> {
             "JOIN su.shift s " +
             "WHERE su.id.userId = :userId")
     List<ShiftForUserTableDTO> findShiftsByUserId(@Param("userId") Integer userId);
-
 }

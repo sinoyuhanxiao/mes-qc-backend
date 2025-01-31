@@ -1,50 +1,38 @@
-package com.fps.svmes.models.sql.user;
+package com.fps.svmes.dto.dtos.user;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fps.svmes.models.sql.Common;
-import jakarta.persistence.*;
+import com.fps.svmes.dto.dtos.CommonDTO;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
-import java.util.Collection;
-
-@Entity
-@Table(name = "user", schema = "quality_management")
 @Data
+@JsonInclude(JsonInclude.Include.NON_NULL)
 @EqualsAndHashCode(callSuper = true)
-public class User extends Common {
-    @Id
+public class UserForShiftTableDTO extends CommonDTO {
+
     @JsonProperty("id")
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "id")
     private Integer id;
 
     @JsonProperty("name")
-    @Column(name = "name")
     private String name;
 
     @JsonProperty("role_id")
-    @Column(name = "role_id")
     private Short roleId;
 
     @JsonProperty("wecom_id")
-    @Column(name = "wecom_id")
     private String wecomId;
 
     @JsonProperty("username")
-    @Column(name = "username")
     private String username;
 
     @JsonProperty("password")
-    @Column(name = "password")
     private String password;
 
     @JsonProperty("email")
-    @Column(name = "email")
     private String email;
 
     @JsonProperty("phone_number")
-    @Column(name = "phone_number")
     private String phoneNumber;
 
 }

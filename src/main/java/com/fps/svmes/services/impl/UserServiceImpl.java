@@ -1,7 +1,11 @@
 package com.fps.svmes.services.impl;
 
+import com.fps.svmes.dto.dtos.user.ShiftForUserTableDTO;
 import com.fps.svmes.dto.dtos.user.UserDTO;
+import com.fps.svmes.models.sql.user.ShiftUser;
 import com.fps.svmes.models.sql.user.User;
+import com.fps.svmes.repositories.jpaRepo.user.ShiftRepository;
+import com.fps.svmes.repositories.jpaRepo.user.ShiftUserRepository;
 import com.fps.svmes.repositories.jpaRepo.user.UserRepository;
 import com.fps.svmes.services.UserService;
 import lombok.RequiredArgsConstructor;
@@ -22,17 +26,35 @@ public class UserServiceImpl implements UserService {
     private UserRepository userRepository;
 
     @Autowired
+    private ShiftUserRepository shiftUserRepository;
+
+    @Autowired
     private ModelMapper modelMapper;
+    @Autowired
+    private ShiftRepository shiftRepository;
 
     // Get all users
+    // TODO: add the shifts
     @Override
     @Transactional(readOnly = true)
     public List<UserDTO> getAllUsers() {
         return userRepository.findAll()
                 .stream()
-                .map(user -> modelMapper.map(user, UserDTO.class))
+                .map(user -> {
+                    // Map the user entity to UserDTO
+                    UserDTO userDTO = modelMapper.map(user, UserDTO.class);
+
+                    // Fetch shifts directly using the repository method that returns ShiftForUserTableDTO
+                    List<ShiftForUserTableDTO> shifts = shiftUserRepository.findShiftsByUserId(user.getId());
+
+                    // Assign the mapped shifts to the UserDTO
+                    userDTO.setShifts(shifts);
+
+                    return userDTO;
+                })
                 .collect(Collectors.toList());
     }
+
 
     // Create a new user
     @Override
@@ -44,6 +66,7 @@ public class UserServiceImpl implements UserService {
     }
 
     // Update an existing user
+    // TODO: add the shifts
     @Override
     @Transactional
     public UserDTO updateUser(Integer id, UserDTO userDTO) {

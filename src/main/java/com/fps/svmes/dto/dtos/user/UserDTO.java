@@ -6,6 +6,8 @@ import com.fps.svmes.dto.dtos.CommonDTO;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
+import java.util.List;
+
 @Data
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @EqualsAndHashCode(callSuper = true)
@@ -34,4 +36,7 @@ public class UserDTO extends CommonDTO {
 
     @JsonProperty("phone_number")
     private String phoneNumber;
+
+    @JsonProperty("shifts")
+    private List<ShiftForUserTableDTO> shifts;
 }

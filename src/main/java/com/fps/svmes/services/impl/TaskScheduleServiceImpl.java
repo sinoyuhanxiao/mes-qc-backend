@@ -136,6 +136,36 @@ public class TaskScheduleServiceImpl implements TaskScheduleService {
         }
     }
 
+    public void scheduleCustomDispatch(Dispatch dispatch, Runnable task) {
+        if (dispatch.getCustomTime().isBefore(OffsetDateTime.now())) {
+            throw new IllegalArgumentException("Dispatch custom time  is in the past");
+        }
+        ScheduledFuture<?> sf = taskScheduler.schedule(()->
+        {
+            // Insert rows to dispatched task table
+            task.run();
+
+            Dispatch d = dispatchRepo.findById(dispatch.getId())
+                    .orElseThrow(() -> new EntityNotFoundException("Dispatch not found"));
+
+            // Set dispatch as inactive as custom dispatch only execute once.
+            d.setState(DispatchState.Inactive.getState());
+
+            d.setUpdatedAt(OffsetDateTime.now());
+            dispatchRepo.save(d);
+
+            // Remove task from audit map since it is completed
+            removeTask(dispatch.getId(), TaskType.CUSTOM);
+        }, dispatch.getCustomTime().toInstant());
+
+        addTask(dispatch.getId(), TaskType.CUSTOM, sf);
+
+        // Set dispatch as active now that custom dispatch is scheduled
+        dispatch.setState(DispatchState.Active.getState());
+        logger.info("Set dispatch with ID: {} as active", dispatch.getId());
+        dispatchRepo.save(dispatch);
+    }
+
     /**
      * Check if any task is currently scheduled for a given dispatch ID.
      *

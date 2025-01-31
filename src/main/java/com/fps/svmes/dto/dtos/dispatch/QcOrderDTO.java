@@ -21,7 +21,9 @@ public class QcOrderDTO extends CommonDTO {
     @JsonProperty("state")
     private Short state;
 
+    @JsonProperty("description")
+    private String description;
+
     @JsonProperty("dispatches")
     private List<DispatchDTO> dispatches;
-
 }

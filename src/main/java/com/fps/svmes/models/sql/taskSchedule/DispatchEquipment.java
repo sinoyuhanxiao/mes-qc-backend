@@ -6,14 +6,13 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name = "dispatch_equipment", schema = "quality_management")
+@Table(name = "dispatch_equipment_temp", schema = "quality_management")
 @Data
 @NoArgsConstructor
 public class DispatchEquipment {
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Integer id;
+    private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "dispatch_id", nullable = false)
@@ -25,11 +24,6 @@ public class DispatchEquipment {
 
     @Column(name = "status", nullable = false, columnDefinition = "SMALLINT DEFAULT 1")
     private Short status = 1; // Default active
-
-    public DispatchEquipment(Dispatch dispatch, Equipment equipment) {
-        this.dispatch = dispatch;
-        this.equipment = equipment;
-    }
 }
 
 

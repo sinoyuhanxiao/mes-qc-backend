@@ -26,6 +26,9 @@ public class QcOrder extends Common {
     @Column(name = "state")
     private Short state = 1;
 
+    @Column(name = "description")
+    private String description;
+
     @OneToMany(mappedBy = "qcOrder", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonManagedReference
     private List<QcOrderDispatch> qcOrderDispatches;

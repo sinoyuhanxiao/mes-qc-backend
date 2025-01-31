@@ -12,7 +12,6 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 public class DispatchUser {
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -26,24 +25,7 @@ public class DispatchUser {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    @Column(name = "status", nullable = false, columnDefinition = "SMALLINT DEFAULT 1")
-    private Integer status = 1; // Active by default
-
-    public DispatchUser(Dispatch dispatch, Integer userId) {
-        this.dispatch = dispatch;
-        user = new User();
-        user.setId(userId);
-        this.setUser(user);
-    }
-
-
-    @Override
-    public String toString() {
-        return "DispatchUser{" +
-                "id=" + id +
-                ", userId=" + (user != null ? user.getId() : "null") +
-                '}';
-    }
-
+    @Column(name = "status", nullable = false)
+    private Short status = 1; // Active by default
 }
 

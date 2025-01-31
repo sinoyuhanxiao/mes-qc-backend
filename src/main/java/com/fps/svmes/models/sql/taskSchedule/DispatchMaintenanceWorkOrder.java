@@ -6,14 +6,13 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name = "dispatch_maintenance_work_order", schema = "quality_management")
+@Table(name = "dispatch_maintenance_work_order_temp", schema = "quality_management")
 @Data
 @NoArgsConstructor
 public class DispatchMaintenanceWorkOrder {
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Integer id;
+    private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "dispatch_id", nullable = false)
@@ -23,13 +22,8 @@ public class DispatchMaintenanceWorkOrder {
     @JoinColumn(name = "maintenance_work_order_id", nullable = false)
     private MaintenanceWorkOrder maintenanceWorkOrder;
 
-    @Column(name = "status", nullable = false, columnDefinition = "SMALLINT DEFAULT 1")
+    @Column(name = "status", nullable = false)
     private Short status = 1; // Default active
-
-    public DispatchMaintenanceWorkOrder(Dispatch dispatch, MaintenanceWorkOrder maintenanceWorkOrder) {
-        this.dispatch = dispatch;
-        this.maintenanceWorkOrder = maintenanceWorkOrder;
-    }
 }
 
 

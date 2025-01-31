@@ -136,10 +136,10 @@ public class QcOrderController {
      * Deletes a QC Order by ID.
      */
     @Operation(summary = "Delete a QC Order", description = "Soft deletes a QC Order and its associated dispatches.")
-    @DeleteMapping("/{orderId}")
-    public ResponseResult<String> deleteQcOrder(@PathVariable Long orderId) {
+    @DeleteMapping("/{orderId}/{userId}")
+    public ResponseResult<String> deleteQcOrder(@PathVariable Long orderId, @PathVariable Integer userId) {
         try {
-            qcOrderService.deleteQcOrder(orderId);
+            qcOrderService.deleteQcOrder(orderId, userId);
             return ResponseResult.success("QC Order deleted successfully.");
         } catch (EntityNotFoundException e) {
             logger.error("QC Order not found with ID: {}", orderId, e);

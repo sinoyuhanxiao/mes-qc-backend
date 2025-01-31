@@ -17,6 +17,7 @@ import com.fps.svmes.repositories.jpaRepo.maintenance.MaintenanceWorkOrderReposi
 import com.fps.svmes.repositories.jpaRepo.production.ProductRepository;
 import com.fps.svmes.repositories.jpaRepo.production.ProductionWorkOrderRepository;
 import com.fps.svmes.repositories.jpaRepo.production.RawMaterialRepository;
+import com.fps.svmes.repositories.jpaRepo.user.UserRepository;
 import com.fps.svmes.services.DispatchService;
 import com.fps.svmes.services.DispatchedTaskService;
 import com.fps.svmes.services.TaskScheduleService;
@@ -67,6 +68,9 @@ public class DispatchServiceImpl implements DispatchService {
 
     @Autowired
     private MaintenanceWorkOrderRepository maintenanceWorkOrderRepository;
+
+    @Autowired
+    private UserRepository userRepository;
 
     @Autowired
     private TaskScheduleService taskScheduleService;
@@ -227,10 +231,10 @@ public class DispatchServiceImpl implements DispatchService {
 
         // Update the status of related personnel and forms
         if (dispatch.getDispatchUsers() != null) {
-            dispatch.getDispatchUsers().forEach(user -> user.setStatus(0));
+            dispatch.getDispatchUsers().forEach(user -> user.setStatus((short) 0));
         }
         if (dispatch.getDispatchForms() != null) {
-            dispatch.getDispatchForms().forEach(form -> form.setStatus(0));
+            dispatch.getDispatchForms().forEach(form -> form.setStatus((short) 0));
         }
         if (dispatch.getDispatchProducts() != null) {
             dispatch.getDispatchProducts().forEach(product -> product.setStatus((short) 0));
@@ -348,27 +352,35 @@ public class DispatchServiceImpl implements DispatchService {
 
         OffsetDateTime now = OffsetDateTime.now();
 
-        // Dispatch is already scheduled
-        if (taskScheduleService.isScheduled(dispatchId)){
-            logger.info("Dispatch ID {} is already scheduled.", dispatchId);
-            return;
-        }
+        // Setup schedule type dispatch (Dispatch during start to end time based on cron expression, dispatch limit)
+        if (dispatch.getType().equals("regular")) {
 
-        if (dispatch.getEndTime().isBefore(now)) {
-            logger.info("Dispatch ID {} has an end time in the past. Skipping scheduling.", dispatchId);
-            // set dispatch to be inactive
-            if (dispatch.getState() == DispatchState.Active.getState()) {
-                dispatch.setState(DispatchState.Expired.getState());
-                dispatch.setUpdatedAt(OffsetDateTime.now());
-                dispatchRepo.save(dispatch);
+            // Dispatch is already scheduled
+            if (taskScheduleService.isScheduled(dispatchId)){
+                logger.info("Dispatch ID {} is already scheduled.", dispatchId);
+                return;
             }
-            return;
-        }
 
-        if (dispatch.getStartTime().isAfter(now)) {
-            taskScheduleService.scheduleFutureDispatch(dispatch, task);
+            if (dispatch.getEndTime().isBefore(now)) {
+                logger.info("Dispatch ID {} has an end time in the past. Skipping scheduling.", dispatchId);
+                // set dispatch to be inactive
+                if (dispatch.getState() == DispatchState.Active.getState()) {
+                    dispatch.setState(DispatchState.Expired.getState());
+                    dispatch.setUpdatedAt(OffsetDateTime.now());
+                    dispatchRepo.save(dispatch);
+                }
+                return;
+            }
+
+            if (dispatch.getStartTime().isAfter(now)) {
+                taskScheduleService.scheduleFutureDispatch(dispatch, task);
+            } else {
+                taskScheduleService.scheduleDispatch(dispatch, task);
+            }
         } else {
-            taskScheduleService.scheduleDispatch(dispatch, task);
+            // Set up custom type dispatch (Only dispatch once at custom time. start time, end time, dispatch limit,
+            // and cron expression are all ignored)
+            taskScheduleService.scheduleCustomDispatch(dispatch, task);
         }
     }
 
@@ -535,12 +547,12 @@ public class DispatchServiceImpl implements DispatchService {
         taskDTO.setDispatchId(dispatch.getId());
         taskDTO.setDispatchTime(dispatchTime);
         taskDTO.setName(dispatch.getName());
-        taskDTO.setDescription(dispatch.getRemark());
+        taskDTO.setDescription(dispatch.getDescription());
         taskDTO.setDueDate(dueDate);
         taskDTO.setIsOverdue(false);
         taskDTO.setStateId((short) 1); // Default state ID
         taskDTO.setCreationDetails(dispatch.getCreatedBy(), 1);
-        taskDTO.setNotes(dispatch.getRemark());
+        taskDTO.setNotes(dispatch.getDescription());
 
         // Filter DispatchForms with status = 1
         List<DispatchForm> activeForms = dispatch.getDispatchForms().stream()
@@ -574,9 +586,16 @@ public class DispatchServiceImpl implements DispatchService {
                 .toList();
     }
 
-    private List<DispatchUser> mapDispatchUsers(Dispatch dispatch, List<Integer> userIds) {
-        return userIds.stream()
-                .map(userId -> new DispatchUser(dispatch, userId))
+    private List<DispatchUser> mapDispatchUsers(Dispatch dispatch, List<Integer> ids) {
+        return ids.stream()
+                .map(userId -> {
+                    User user = userRepository.findById(userId)
+                            .orElseThrow(() -> new EntityNotFoundException("User not found with ID: " + userId));
+                    DispatchUser du = new DispatchUser();
+                    du.setDispatch(dispatch);
+                    du.setUser(user);
+                    return du;
+                })
                 .toList();
     }
 
@@ -654,7 +673,7 @@ public class DispatchServiceImpl implements DispatchService {
         if (formIds == null) return;
 
         // Mark all existing rows as inactive
-        dispatch.getDispatchForms().forEach(form -> form.setStatus(0));
+        dispatch.getDispatchForms().forEach(form -> form.setStatus((short) 0));
 
         // Reactivate or add new rows
         formIds.forEach(id -> {
@@ -665,11 +684,11 @@ public class DispatchServiceImpl implements DispatchService {
 
             if (existing != null) {
                 // Reactivate if already exists
-                existing.setStatus(1);
+                existing.setStatus((short) 1);
             } else {
                 // Add new row
                 DispatchForm newForm = new DispatchForm(dispatch, id);
-                newForm.setStatus(1); // Default active status
+                newForm.setStatus((short) 1); // Default active status
                 dispatch.getDispatchForms().add(newForm);
             }
         });}
@@ -693,19 +712,23 @@ public class DispatchServiceImpl implements DispatchService {
 
             if (existing != null) {
                 // Reactivate if already exists but marked inactive
-                existing.setStatus(1);
+                existing.setStatus((short) 1);
             } else {
                 // Add new row if not already associated
-                DispatchUser newUser = new DispatchUser(dispatch, id);
-                newUser.setStatus(1);
-                dispatch.getDispatchUsers().add(newUser);
+                User user = userRepository.findById(id)
+                        .orElseThrow(() -> new EntityNotFoundException("User not found with ID: " + id));
+                DispatchUser du = new DispatchUser();
+                du.setDispatch(dispatch);
+                du.setUser(user);
+                du.setStatus((short) 1);
+                dispatch.getDispatchUsers().add(du);
             }
         });
 
         // Deactivate rows that are no longer associated
         dispatch.getDispatchUsers().stream()
                 .filter(user -> !userIds.contains(user.getUser().getId()))
-                .forEach(user -> user.setStatus(0));
+                .forEach(user -> user.setStatus((short) 0));
     }
 
     private void updateDispatchProducts(Dispatch dispatch, List<Integer> productIds) {

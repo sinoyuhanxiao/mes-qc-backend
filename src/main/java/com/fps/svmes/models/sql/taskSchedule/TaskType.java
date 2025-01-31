@@ -6,7 +6,8 @@ import lombok.Getter;
 public enum TaskType {
     CRON(1),
     FUTURE(2),
-    CANCEL(3);
+    CANCEL(3),
+    CUSTOM(4);
 
     private final int type;
 

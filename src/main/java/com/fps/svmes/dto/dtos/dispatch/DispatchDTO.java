@@ -23,6 +23,9 @@ public class DispatchDTO extends CommonDTO {
     @JsonProperty("name")
     private String name;
 
+    @JsonProperty("description")
+    private String description;
+
     @JsonProperty("state")
     private Short state;
 
@@ -38,20 +41,20 @@ public class DispatchDTO extends CommonDTO {
     @JsonProperty("dispatch_limit")
     private Integer dispatchLimit;
 
+    @JsonProperty("custom_time")
+    private OffsetDateTime customTime;
+
     @JsonProperty("executed_count")
     private Integer executedCount;
-
-    @JsonProperty("remark")
-    private String remark;
 
     @JsonProperty("due_date_offset_minute")
     private Integer dueDateOffsetMinute;
 
-    @JsonProperty("dispatch_forms")
-    private List<String> qcFormTreeNodeIds;
-
     @JsonProperty("dispatch_users")
     private List<UserDTO> users;
+
+    @JsonProperty("dispatch_forms")
+    private List<String> qcFormTreeNodeIds;
 
     @JsonProperty("product_ids")
     private List<Integer> productIds;
@@ -68,7 +71,12 @@ public class DispatchDTO extends CommonDTO {
     @JsonProperty("maintenance_work_order_ids")
     private List<Integer> maintenanceWorkOrderIds;
 
-    // sampling points
-    // test subjects
-    // instruments
+    @JsonProperty("sampling_location_ids")
+    private List<Long> samplingLocationIds;
+
+    @JsonProperty("instrument_ids")
+    private List<Long> instrumentIds;
+
+    @JsonProperty("test_subject_ids")
+    private List<Long> testSubjectIds;
 }

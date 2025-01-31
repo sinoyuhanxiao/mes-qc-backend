@@ -19,5 +19,9 @@ public class QcOrderRequest {
     @Schema(description = "Name of the order", example = "QC Order Testing Sample")
     private String name;
 
+    @JsonProperty("description")
+    @Schema(description = "Description for the QC order", example = "This is a test QC order.")
+    private String description;
+
     private List<DispatchRequest> dispatchRequestList;
 }

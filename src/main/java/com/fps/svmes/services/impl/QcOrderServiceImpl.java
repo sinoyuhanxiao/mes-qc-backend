@@ -2,8 +2,14 @@ package com.fps.svmes.services.impl;
 
 import com.fps.svmes.dto.dtos.dispatch.DispatchDTO;
 import com.fps.svmes.dto.dtos.dispatch.QcOrderDTO;
+import com.fps.svmes.dto.dtos.user.UserDTO;
 import com.fps.svmes.dto.requests.DispatchRequest;
 import com.fps.svmes.dto.requests.QcOrderRequest;
+import com.fps.svmes.models.sql.maintenance.Equipment;
+import com.fps.svmes.models.sql.maintenance.MaintenanceWorkOrder;
+import com.fps.svmes.models.sql.production.Product;
+import com.fps.svmes.models.sql.production.ProductionWorkOrder;
+import com.fps.svmes.models.sql.production.RawMaterial;
 import com.fps.svmes.models.sql.taskSchedule.*;
 import com.fps.svmes.models.sql.user.User;
 import com.fps.svmes.repositories.jpaRepo.dispatch.DispatchRepository;
@@ -22,6 +28,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.ArrayList;
 import java.util.List;
 import java.util.function.BiFunction;
 import java.util.stream.Collectors;
@@ -151,27 +159,132 @@ public class QcOrderServiceImpl implements QcOrderService {
         Dispatch savedDispatch = dispatchRepo.save(dispatch); // Ensure dispatch is persisted first
 
         // Map associations
-        savedDispatch.setDispatchForms(mapDispatchForms(savedDispatch, request.getFormIds()));
-        savedDispatch.setDispatchUsers(mapEntities(savedDispatch, request.getUserIds(), userRepository, "User", DispatchUser::new));
-        savedDispatch.setDispatchProducts(mapEntities(savedDispatch, request.getProductIds(), productRepository, "Product", DispatchProduct::new));
-        savedDispatch.setDispatchRawMaterials(mapEntities(savedDispatch, request.getRawMaterialIds(), rawMaterialRepository, "Raw Material", DispatchRawMaterial::new));
-        savedDispatch.setDispatchProductionWorkOrders(mapEntities(savedDispatch, request.getProductionWorkOrderIds(), productionWorkOrderRepository, "Production Work Order", DispatchProductionWorkOrder::new));
-        savedDispatch.setDispatchEquipments(mapEntities(savedDispatch, request.getEquipmentIds(), equipmentRepository, "Equipment", DispatchEquipment::new));
-        savedDispatch.setDispatchMaintenanceWorkOrders(mapEntities(savedDispatch, request.getMaintenanceWorkOrderIds(), maintenanceWorkOrderRepository, "Maintenance Work Order", DispatchMaintenanceWorkOrder::new));
+        List<DispatchForm> df_list = new ArrayList<>(request.getFormIds()
+                .stream()
+                .map(formTreeNodeId -> new DispatchForm(dispatch, formTreeNodeId))
+                .toList());
+
+        savedDispatch.setDispatchForms(df_list);
+
+        List<DispatchUser> du_list = new ArrayList<>(request.getUserIds()
+                .stream()
+                .map(uid ->
+                {
+                  User user = userRepository.findById(Math.toIntExact(uid)).orElseThrow(() -> new EntityNotFoundException("user not found: " + uid));
+                  DispatchUser du = new DispatchUser();
+                  du.setDispatch(dispatch);
+                  du.setUser(user);
+                  return du;
+                })
+                .toList());
+        savedDispatch.setDispatchUsers(du_list);
+
+        List<DispatchInstrument> di_list = new ArrayList<>(request.getInstrumentIds()
+                .stream()
+                .map(instrument_id ->
+                {
+                    DispatchInstrument di = new DispatchInstrument();
+                    di.setDispatch(dispatch);
+                    di.setInstrumentId(instrument_id);
+                    di.setCreationDetails(userId, 1);
+                    return di;
+                })
+                .toList());
+        savedDispatch.setDispatchInstruments(di_list);
+
+        List<DispatchTestSubject> dt_list = new ArrayList<>(request.getTestSubjectIds()
+                .stream()
+                .map(test_subject_id ->
+                {
+                    DispatchTestSubject dt = new DispatchTestSubject();
+                    dt.setDispatch(dispatch);
+                    dt.setTestSubjectId(test_subject_id);
+                    dt.setCreationDetails(userId, 1);
+                    return dt;
+                })
+                .toList());
+        savedDispatch.setDispatchTestSubjects(dt_list);
+
+        List<DispatchSamplingLocation> ds_list = new ArrayList<>(request.getSamplingLocationIds()
+                .stream()
+                .map(sampling_location_id ->
+                {
+                    DispatchSamplingLocation ds = new DispatchSamplingLocation();
+                    ds.setDispatch(dispatch);
+                    ds.setSamplingLocationId(sampling_location_id);
+                    ds.setCreationDetails(userId, 1);
+                    return ds;
+                })
+                .toList());
+        savedDispatch.setDispatchSamplingLocations(ds_list);
+
+        // Other module data association for junction table
+        List<DispatchProduct> dp_list = new ArrayList<>(request.getProductIds()
+                .stream()
+                .map(product_id ->
+                {
+                    Product product = productRepository.findById(product_id).orElseThrow(() -> new EntityNotFoundException("product not found: " + product_id));
+                    DispatchProduct dp = new DispatchProduct();
+                    dp.setDispatch(dispatch);
+                    dp.setProduct(product);
+                    return dp;
+                })
+                .toList());
+        savedDispatch.setDispatchProducts(dp_list);
+
+        List<DispatchRawMaterial> dr_list = new ArrayList<>(request.getRawMaterialIds()
+                .stream()
+                .map(raw_material_id ->
+                {
+                    RawMaterial rawMaterial = rawMaterialRepository.findById(raw_material_id).orElseThrow(() -> new EntityNotFoundException("raw material not found: " + raw_material_id));
+                    DispatchRawMaterial dr = new DispatchRawMaterial();
+                    dr.setDispatch(dispatch);
+                    dr.setRawMaterial(rawMaterial);
+                    return dr;
+                })
+                .toList());
+        savedDispatch.setDispatchRawMaterials(dr_list);
+
+        List<DispatchProductionWorkOrder> pwo_list = new ArrayList<>(request.getProductionWorkOrderIds()
+                .stream()
+                .map(pwo_id ->
+                {
+                    ProductionWorkOrder productionWorkOrder = productionWorkOrderRepository.findById(pwo_id).orElseThrow(() -> new EntityNotFoundException("production work order not found: " + pwo_id));
+                    DispatchProductionWorkOrder dpwo = new DispatchProductionWorkOrder();
+                    dpwo.setDispatch(dispatch);
+                    dpwo.setProductionWorkOrder(productionWorkOrder);
+                    return dpwo;
+                })
+                .toList());
+        savedDispatch.setDispatchProductionWorkOrders(pwo_list);
+
+        List<DispatchMaintenanceWorkOrder> mwo_list = new ArrayList<>(request.getMaintenanceWorkOrderIds()
+                .stream()
+                .map(mwo_id ->
+                {
+                    MaintenanceWorkOrder maintenanceWorkOrder = maintenanceWorkOrderRepository.findById(mwo_id).orElseThrow(() -> new EntityNotFoundException("maintenance work order not found: " + mwo_id));
+                    DispatchMaintenanceWorkOrder dmwo = new DispatchMaintenanceWorkOrder();
+                    dmwo.setDispatch(dispatch);
+                    dmwo.setMaintenanceWorkOrder(maintenanceWorkOrder);
+                    return dmwo;
+                })
+                .toList());
+        savedDispatch.setDispatchMaintenanceWorkOrders(mwo_list);
+
+        List<DispatchEquipment> de_list = new ArrayList<>(request.getEquipmentIds()
+                .stream()
+                .map(equipment_id ->
+                {
+                    Equipment equipment = equipmentRepository.findById(equipment_id).orElseThrow(() -> new EntityNotFoundException("equipment not found: " + equipment_id));
+                    DispatchEquipment de = new DispatchEquipment();
+                    de.setDispatch(dispatch);
+                    de.setEquipment(equipment);
+                    return de;
+                })
+                .toList());
+        savedDispatch.setDispatchEquipments(de_list);
 
         return dispatchRepo.save(savedDispatch); // Save again after setting associations
-    }
-
-    // ✅ **Generic Mapper for Entity Fetching**
-    private <ID, E, R> List<R> mapEntities(Dispatch dispatch, List<ID> ids, JpaRepository<E, ID> repository, String entityName, BiFunction<Dispatch, E, R> mapper) {
-        if (ids == null || ids.isEmpty()) return List.of();
-        return ids.stream()
-                .map(id -> {
-                    E entity = repository.findById(id)
-                            .orElseThrow(() -> new EntityNotFoundException(entityName + " not found: " + id));
-                    return mapper.apply(dispatch, entity);
-                })
-                .toList();
     }
 
     // ✅ **Helper: Map QC Order to Dispatches**
@@ -190,16 +303,71 @@ public class QcOrderServiceImpl implements QcOrderService {
         QcOrderDTO qcOrderDTO = modelMapper.map(qcOrder, QcOrderDTO.class);
 
         List<DispatchDTO> dispatchDTOs = qcOrder.getQcOrderDispatches().stream()
-                .map(qcOrderDispatch -> modelMapper.map(qcOrderDispatch.getDispatch(), DispatchDTO.class))
+                .map(qcOrderDispatch ->
+                {
+                    Dispatch dispatch = qcOrderDispatch.getDispatch();
+                    DispatchDTO dispatchDTO = modelMapper.map(qcOrderDispatch.getDispatch(), DispatchDTO.class);
+
+                    dispatchDTO.setUsers(dispatch.getDispatchUsers()
+                            .stream()
+                            .map(dispatchUser -> modelMapper.map(dispatchUser.getUser(), UserDTO.class))
+                            .toList());
+
+                    dispatchDTO.setQcFormTreeNodeIds(
+                            dispatch.getDispatchForms()
+                            .stream()
+                            .map(DispatchForm::getQcFormTreeNodeId).toList());
+
+                    dispatchDTO.setProductIds(dispatch.getDispatchProducts()
+                            .stream()
+                            .map(DispatchProduct::getProduct)
+                            .map(Product::getId)
+                            .toList());
+
+                    dispatchDTO.setRawMaterialIds(dispatch.getDispatchRawMaterials()
+                            .stream()
+                            .map(DispatchRawMaterial::getRawMaterial)
+                            .map(RawMaterial::getId)
+                            .toList());
+
+                    dispatchDTO.setProductionWorkOrderIds(dispatch.getDispatchProductionWorkOrders()
+                            .stream()
+                            .map(DispatchProductionWorkOrder::getProductionWorkOrder)
+                            .map(ProductionWorkOrder::getId)
+                            .toList());
+
+                    dispatchDTO.setEquipmentIds(dispatch.getDispatchEquipments()
+                            .stream()
+                            .map(DispatchEquipment::getEquipment)
+                            .map(Equipment::getId)
+                            .toList());
+
+                    dispatchDTO.setMaintenanceWorkOrderIds(dispatch.getDispatchMaintenanceWorkOrders()
+                            .stream()
+                            .map(DispatchMaintenanceWorkOrder::getMaintenanceWorkOrder)
+                            .map(MaintenanceWorkOrder::getId)
+                            .toList());
+
+                    dispatchDTO.setInstrumentIds(dispatch.getDispatchInstruments()
+                            .stream()
+                            .map(DispatchInstrument::getInstrumentId)
+                            .toList());
+
+                    dispatchDTO.setSamplingLocationIds(dispatch.getDispatchSamplingLocations()
+                            .stream()
+                            .map(DispatchSamplingLocation::getSamplingLocationId)
+                            .toList());
+
+                    dispatchDTO.setTestSubjectIds(dispatch.getDispatchTestSubjects()
+                            .stream()
+                            .map(DispatchTestSubject::getTestSubjectId)
+                            .toList());
+
+                    return dispatchDTO;
+                })
                 .toList();
 
         qcOrderDTO.setDispatches(dispatchDTOs);
         return qcOrderDTO;
-    }
-
-    private List<DispatchForm> mapDispatchForms(Dispatch dispatch, List<String> formIds) {
-        return formIds.stream()
-                .map(formTreeNodeId -> new DispatchForm(dispatch, formTreeNodeId))
-                .toList();
     }
 }

@@ -84,14 +84,14 @@ public class DispatchRequest {
 
     @JsonProperty("samplingLocationIds")
     @Schema(description = "List of sampling location IDs associated with the dispatch", example = "[1, 2, 3]")
-    private List<Integer> samplingLocationIds;
+    private List<Long> samplingLocationIds;
 
     @JsonProperty("instrumentIds")
     @Schema(description = "List of instrument IDs associated with the dispatch", example = "[1, 2, 3]")
-    private List<Integer> instrumentIds;
+    private List<Long> instrumentIds;
 
     @JsonProperty("testSubjectIds")
     @Schema(description = "List of test subject IDs associated with the dispatch", example = "[1, 2, 3]")
-    private List<Integer> testSubjectIds;
+    private List<Long> testSubjectIds;
 
 }

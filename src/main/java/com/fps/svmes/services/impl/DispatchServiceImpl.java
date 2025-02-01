@@ -23,6 +23,7 @@ import com.fps.svmes.services.DispatchedTaskService;
 import com.fps.svmes.services.TaskScheduleService;
 import com.fps.svmes.services.UserService;
 import jakarta.persistence.EntityNotFoundException;
+import jakarta.validation.constraints.NotNull;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
@@ -586,7 +587,7 @@ public class DispatchServiceImpl implements DispatchService {
                 .toList();
     }
 
-    private List<DispatchUser> mapDispatchUsers(Dispatch dispatch, List<Integer> ids) {
+    private List<DispatchUser> mapDispatchUsers(Dispatch dispatch, @NotNull(message = "List of user IDs cannot be null") List<Integer> ids) {
         return ids.stream()
                 .map(userId -> {
                     User user = userRepository.findById(userId)
@@ -647,7 +648,7 @@ public class DispatchServiceImpl implements DispatchService {
                 .map(id -> {
                     DispatchEquipment dp = new DispatchEquipment();
                     dp.setDispatch(dispatch);
-                    dp.setEquipment(equipmentRepository.findById(Integer.valueOf(id))
+                    dp.setEquipment(equipmentRepository.findById(id)
                             .orElseThrow(() -> new EntityNotFoundException("Equipment not found: " + id)));
                     dp.setStatus((short) 1); // Default active status
                     return dp;
@@ -706,7 +707,8 @@ public class DispatchServiceImpl implements DispatchService {
         // Reactivate or add new rows for the provided user IDs
         userIds.forEach(id -> {
             DispatchUser existing = dispatch.getDispatchUsers().stream()
-                    .filter(du -> du.getUser().getId().equals(id))
+                    .filter(du -> du.getUser().getId()
+                            .equals(id))
                     .findFirst()
                     .orElse(null);
 
@@ -837,7 +839,7 @@ public class DispatchServiceImpl implements DispatchService {
                 // Add new row
                 DispatchEquipment de = new DispatchEquipment();
                 de.setDispatch(dispatch);
-                de.setEquipment(equipmentRepository.findById(Integer.valueOf(id))
+                de.setEquipment(equipmentRepository.findById(id)
                         .orElseThrow(() -> new EntityNotFoundException("Equipment not found: " + id)));
                 de.setStatus((short) 1);
                 dispatch.getDispatchEquipments().add(de);

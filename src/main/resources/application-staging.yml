@@ -1,0 +1,33 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://10.10.12.11:5432/mes
+    username: postgres
+    password: postgres
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: none
+    show-sql: false
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+        transaction.jta.platform: org.hibernate.engine.transaction.jta.platform.internal.NoJtaPlatform
+
+  data:
+    mongodb:
+      uri: mongodb://root:password@10.10.12.11:27017/dev-mes?authSource=admin
+
+  security:
+    user:
+      name: fps-control
+      password: fpscontrols12#
+
+feign:
+  client:
+    config:
+      s3-adapter-service:
+        url: http://10.10.12.11:8083
+        connect-timeout: 5000
+        read-timeout: 5000

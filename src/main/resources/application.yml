@@ -1,0 +1,37 @@
+spring:
+  profiles:
+    active: local
+
+  datasource:
+    hikari:
+      minimum-idle: 10
+      maximum-pool-size: 20
+      idle-timeout: 30000
+      max-lifetime: 600000
+
+server:
+  port: 8090
+
+  tomcat:
+    threads:
+      max: 200
+    connection-timeout: 20000
+
+java:
+  awt:
+    headless: false
+
+logging:
+  level:
+    org.hibernate: WARN
+    org.mongodb: WARN
+    org.springframework: INFO
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info
+  endpoint:
+    health:
+      show-details: always

@@ -4,18 +4,20 @@ FROM openjdk:17-jdk-slim
 # Set the working directory
 WORKDIR /app
 
-# Define an argument for the JAR file location
-ARG JAR_FILE=target/mes-qc-service-0.0.1-SNAPSHOT.jar
+# Expose port 8085
+EXPOSE 8090
 
-# Copy the JAR file into the container
-COPY ${JAR_FILE} app.jar
+# Accept an argument to set the active profile
+ARG SPRING_PROFILES_ACTIVE
+ENV SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE}
+ENV JAVA_OPTS="-Djava.awt.headless=true"
 
-# Default environment variables (can be overridden at runtime)
-ENV SPRING_PROFILES_ACTIVE=local
-ENV SERVER_PORT=8086
+# Add the JAR file to the container
+COPY target/mes-qc-service.jar mes-qc-service.jar
 
-# Expose the application port (default: 8086)
-EXPOSE ${SERVER_PORT}
+# Command to run the JAR service when the container starts
+ENTRYPOINT ["sh", "-c", "java ${JAVA_OPTS} -jar /app/mes-qc-service.jar"]
 
-# Run the application with the active profile and port
-ENTRYPOINT ["java", "-Dspring.profiles.active=${SPRING_PROFILES_ACTIVE}", "-Dserver.port=${SERVER_PORT}", "-jar", "app.jar"]
+# Optional: Add a health check
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+    CMD curl -f http://localhost:8090/actuator/health || exit 1

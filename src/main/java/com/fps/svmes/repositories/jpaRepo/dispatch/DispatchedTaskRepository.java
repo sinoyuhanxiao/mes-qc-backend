@@ -20,4 +20,6 @@ public interface DispatchedTaskRepository extends JpaRepository<DispatchedTask, 
     // Find overdue tasks
     List<DispatchedTask> findByUserIdAndIsOverdueAndStatus(Long userId, Boolean isOverdue, Integer status);
 
+    // Find tasks with dispatch id that are in pending
+    List<DispatchedTask> findByDispatchIdAndStateIdAndStatus(Long dispatchId, Integer stateId, Integer status);
 }

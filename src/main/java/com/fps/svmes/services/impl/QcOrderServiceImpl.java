@@ -13,6 +13,7 @@ import com.fps.svmes.models.sql.production.RawMaterial;
 import com.fps.svmes.models.sql.taskSchedule.*;
 import com.fps.svmes.models.sql.user.User;
 import com.fps.svmes.repositories.jpaRepo.dispatch.DispatchRepository;
+import com.fps.svmes.repositories.jpaRepo.dispatch.DispatchedTaskRepository;
 import com.fps.svmes.repositories.jpaRepo.dispatch.QcOrderRepository;
 import com.fps.svmes.repositories.jpaRepo.maintenance.EquipmentRepository;
 import com.fps.svmes.repositories.jpaRepo.maintenance.MaintenanceWorkOrderRepository;
@@ -39,6 +40,7 @@ public class QcOrderServiceImpl implements QcOrderService {
 
     @Autowired private QcOrderRepository qcOrderRepo;
     @Autowired private DispatchRepository dispatchRepo;
+    @Autowired private DispatchedTaskRepository dispatchedTaskRepository;
     @Autowired private UserRepository userRepository;
     @Autowired private ProductRepository productRepository;
     @Autowired private RawMaterialRepository rawMaterialRepository;
@@ -48,11 +50,12 @@ public class QcOrderServiceImpl implements QcOrderService {
     @Autowired private DispatchService dispatchService;
     @Autowired private ModelMapper modelMapper;
 
-    // ✅ **Create QC Order**
+    //  **Create QC Order**
     @Transactional
     public QcOrderDTO createQcOrder(QcOrderRequest request, Integer userId) {
         QcOrder qcOrder = new QcOrder();
         qcOrder.setName(request.getName());
+        qcOrder.setDescription(request.getDescription());
         qcOrder.setCreationDetails(userId, 1);
 
         // **Create Dispatches & Map Associations**
@@ -82,32 +85,12 @@ public class QcOrderServiceImpl implements QcOrderService {
     public QcOrderDTO updateQcOrder(Long id, QcOrderRequest request, Integer userId) {
         QcOrder qcOrder = qcOrderRepo.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("QC Order not found"));
-//
-//        qcOrder.setName(request.getName());
-//
-//        // **Soft-delete existing dispatches & remove tasks**
-//        qcOrder.getQcOrderDispatches().forEach(qcOrderDispatch -> {
-//            dispatchService.deleteDispatch(qcOrderDispatch.getDispatch().getId());
-//            qcOrderDispatch.setStatus(0);
-//        });
-//        qcOrder.getQcOrderDispatches().clear();
-//
-//        // **Create updated Dispatches**
-//        List<Dispatch> updatedDispatches = request.getDispatchRequestList().stream()
-//                .map(dispatchRequest -> {
-//                    Dispatch dispatch = modelMapper.map(dispatchRequest, Dispatch.class);
-//                    dispatch.setCreationDetails(userId, 1);
-//                    dispatchRepo.save(dispatch);
-//                    mapDispatchAssociations(dispatch, dispatchRequest, userId);
-//                    return dispatch;
-//                })
-//                .collect(Collectors.toList());
-//
-//        // **Update QC Order Dispatch Mappings**
-//        qcOrder.setQcOrderDispatches(mapQcOrderDispatch(qcOrder, updatedDispatches, userId));
-//
-//        return mapQcOrderToDTO(qcOrderRepo.save(qcOrder));
-        return new QcOrderDTO();
+
+        qcOrder.setName(request.getName());
+        qcOrder.setDescription(request.getDescription());
+        qcOrder.setUpdateDetails(userId, 1);
+
+        return mapQcOrderToDTO(qcOrderRepo.save(qcOrder));
     }
 
     // ✅ **Get QC Order by ID**
@@ -130,12 +113,29 @@ public class QcOrderServiceImpl implements QcOrderService {
         QcOrder qcOrder = qcOrderRepo.findById(orderId)
                 .orElseThrow(() -> new EntityNotFoundException("QC Order not found"));
 
-        // **Soft-delete order & associated dispatches**
+        // ** Soft-delete order & associated dispatches**
         qcOrder.setStatus(0);
         qcOrder.getQcOrderDispatches().forEach(qcOrderDispatch -> {
-            dispatchService.deleteDispatch(qcOrderDispatch.getDispatch().getId());
+            dispatchService.deleteDispatch(qcOrderDispatch.getDispatch().getId(), userId);
             qcOrderDispatch.setStatus(0);
         });
+
+        // Set all dispatched tasks under this order that are in pending mode (state 1) to canceled mode (state 5)
+        qcOrder.getQcOrderDispatches().forEach(qcOrderDispatch -> {
+            Long dispatchId = qcOrderDispatch.getDispatch().getId();
+
+            // Fetch all dispatched tasks under this dispatch that are in pending state
+            List<DispatchedTask> dispatchTasks = dispatchedTaskRepository.findByDispatchIdAndStateIdAndStatus(dispatchId, 1, 1);
+
+            if (!dispatchTasks.isEmpty()) {
+                // Update state for all fetched tasks in one go
+                dispatchTasks.forEach(task -> task.setStateId((short) 5));
+
+                // Batch save the updated tasks
+                dispatchedTaskRepository.saveAll(dispatchTasks);
+            }
+        });
+
 
         qcOrderRepo.save(qcOrder);
     }

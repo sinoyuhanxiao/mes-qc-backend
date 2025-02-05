@@ -138,8 +138,14 @@ public class TaskScheduleServiceImpl implements TaskScheduleService {
 
     public void scheduleCustomDispatch(Dispatch dispatch, Runnable task) {
         if (dispatch.getCustomTime().isBefore(OffsetDateTime.now())) {
-            throw new IllegalArgumentException("Dispatch custom time  is in the past");
+            task.run();
+
+            dispatch.setState(DispatchState.Inactive.getState());
+            dispatchRepo.save(dispatch);
+            return;
         }
+
+        // custom time is in the future
         ScheduledFuture<?> sf = taskScheduler.schedule(()->
         {
             // Insert rows to dispatched task table

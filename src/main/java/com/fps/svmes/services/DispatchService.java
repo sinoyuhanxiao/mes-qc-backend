@@ -13,14 +13,14 @@ import java.util.List;
 public interface DispatchService {
     void executeDispatch(Long dispatchId);
     void scheduleDispatches();
-    DispatchDTO createDispatch(@Valid DispatchRequest request);
-    DispatchDTO updateDispatch(Long id, @Valid DispatchRequest request);
+    DispatchDTO createDispatch(@Valid DispatchRequest request, Integer userId);
+    DispatchDTO updateDispatch(Long id, @Valid DispatchRequest request, Integer userId);
     DispatchDTO getDispatch(Long id);
     List<DispatchDTO> getAllDispatches();
     List<DispatchedTaskDTO> getAllDispatchedTasks();
     void pauseDispatch(Long dispatchId, Integer userId);
     void resumeDispatch(Long dispatchId, Integer userId);
-    void deleteDispatch(Long id);
+    void deleteDispatch(Long id, Integer userId);
     void initializeDispatch(Long dispatchId, Runnable task);
     void cancelDispatchTask(Long dispatchId);
 }

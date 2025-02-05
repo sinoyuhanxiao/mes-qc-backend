@@ -6,7 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name = "dispatch_form_temp", schema = "quality_management")
+@Table(name = "dispatch_form", schema = "quality_management")
 @Data
 @NoArgsConstructor
 public class DispatchForm {

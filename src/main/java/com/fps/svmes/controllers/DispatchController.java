@@ -45,9 +45,9 @@ public class DispatchController {
 
     @Operation(summary = "Create a new dispatch", description = "Creates a dispatch in the QC System")
     @PostMapping
-    public ResponseResult<DispatchDTO> createDispatch(@RequestBody DispatchRequest request) {
+    public ResponseResult<DispatchDTO> createDispatch(@RequestBody DispatchRequest request, @PathVariable Integer userId) {
         try {
-            DispatchDTO dispatchDTO = dispatchService.createDispatch(request);
+            DispatchDTO dispatchDTO = dispatchService.createDispatch(request, userId);
             return ResponseResult.success(dispatchDTO);
         } catch (Exception e) {
             logger.error("Error creating dispatch", e);
@@ -57,9 +57,9 @@ public class DispatchController {
 
     @Operation(summary = "Update an existing dispatch", description = "Updates a dispatch given an ID")
     @PutMapping("/{id}")
-    public ResponseResult<DispatchDTO> updateDispatch(@PathVariable Long id, @RequestBody @Valid DispatchRequest request) {
+    public ResponseResult<DispatchDTO> updateDispatch(@PathVariable Long id, @RequestBody @Valid DispatchRequest request, @PathVariable Integer userId) {
         try {
-            DispatchDTO dispatchDTO = dispatchService.updateDispatch(id, request);
+            DispatchDTO dispatchDTO = dispatchService.updateDispatch(id, request, userId);
             return ResponseResult.success(dispatchDTO);
         } catch (Exception e) {
             logger.error("Error updating dispatch with ID: {}",  id);
@@ -69,9 +69,9 @@ public class DispatchController {
 
     @Operation(summary = "Delete a dispatch", description = "Deletes a dispatch given its ID")
     @DeleteMapping("/{id}")
-    public ResponseResult<String> deleteDispatch(@PathVariable Long id) {
+    public ResponseResult<String> deleteDispatch(@PathVariable Long id, @PathVariable Integer userId) {
         try {
-            dispatchService.deleteDispatch(id);
+            dispatchService.deleteDispatch(id, userId);
             return ResponseResult.success("Dispatch with ID " + id + " deleted successfully.");
         } catch (Exception e) {
             logger.error("Error deleting a dispatch with ID: {}", id );

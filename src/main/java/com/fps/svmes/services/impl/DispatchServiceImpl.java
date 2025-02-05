@@ -92,13 +92,10 @@ public class DispatchServiceImpl implements DispatchService {
 
     // Map dispatch request to a dispatch object,
     @Transactional
-    public DispatchDTO createDispatch(DispatchRequest request) {
-        logger.info("Running createDispatch");
-
+    public DispatchDTO createDispatch(DispatchRequest request, Integer userId) {
         Dispatch dispatch = modelMapper.map(request, Dispatch.class);
 
-        // TODO: add userId in this function
-        dispatch.setCreationDetails(14, 1);
+        dispatch.setCreationDetails(userId, 1);
 
         // Initialize mutable collections
         List<DispatchForm> mutableDispatchForms = new ArrayList<>();
@@ -147,7 +144,7 @@ public class DispatchServiceImpl implements DispatchService {
         dispatch.setDispatchMaintenanceWorkOrders(mutableDispatchMaintenanceWorkOrders);
 
 
-        if (dispatch.getType().equals("MANUAL")) {
+        if (dispatch.getType().equals("custom")) {
             // since manual dispatch only execute once, will default isActive to false
                 dispatch.setState(DispatchState.Inactive.getState());
                 dispatch.setExecutedCount(dispatch.getExecutedCount() + 1); // Increment executed count
@@ -157,7 +154,7 @@ public class DispatchServiceImpl implements DispatchService {
 
         // Insert rows to dispatched task table
         try {
-            if (dispatch.getType().equals("MANUAL")) {
+            if (dispatch.getType().equals("custom")) {
                 createTasksForDispatch(savedDispatch);
             } else {
                 this.initializeDispatch(savedDispatch.getId(), () -> executeDispatch(savedDispatch.getId()));
@@ -170,16 +167,32 @@ public class DispatchServiceImpl implements DispatchService {
     }
 
     @Transactional
-    public DispatchDTO updateDispatch(Long id, DispatchRequest request) {
+    public DispatchDTO updateDispatch(Long id, DispatchRequest request, Integer userId) {
         logger.info("Running updateDispatch for Dispatch ID: {}", id);
 
         Dispatch dispatch = dispatchRepo.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Dispatch not found"));
 
-        // TODO: Sync dispatched task previously created by this dispatch. Adjust state for pending task to cancelled.
-        // TODO: add userId in this function
-        modelMapper.map(request, dispatch);
-        dispatch.setUpdateDetails(14, 1);
+        // Set all dispatched tasks by this dispatch to cancel state if in pending state
+        List<DispatchedTask> dispatchedTasks = dispatchedTaskRepo.findByDispatchIdAndStateIdAndStatus(dispatch.getId(), 1, 1);
+        if (!dispatchedTasks.isEmpty()) {
+            // Update state for all fetched tasks in one go
+            dispatchedTasks.forEach(task -> task.setStateId((short) 5));
+
+            // Batch save the updated tasks
+            dispatchedTaskRepo.saveAll(dispatchedTasks);
+        }
+
+        // Update dispatch based on request
+        dispatch.setUpdateDetails(userId, 1);
+        dispatch.setDispatchLimit(request.getDispatchLimit());
+        dispatch.setType(request.getType());
+        dispatch.setDescription(request.getDescription());
+        dispatch.setName(request.getName());
+        dispatch.setStartTime(request.getStartTime());
+        dispatch.setEndTime(request.getEndTime());
+        dispatch.setCustomTime( request.getCustomTime());
+        dispatch.setCronExpression(request.getCronExpression());
 
         // Clear and update associations with proper handling
         updateDispatchForms(dispatch, request.getFormIds());
@@ -191,7 +204,7 @@ public class DispatchServiceImpl implements DispatchService {
         updateDispatchMaintenanceWorkOrders(dispatch, request.getMaintenanceWorkOrderIds());
 
 
-        if (dispatch.getType().equals("MANUAL")) {
+        if (dispatch.getType().equals("custom")) {
             // since manual dispatch only execute once, will default isActive to false
             dispatch.setState(DispatchState.Inactive.getState());
             dispatch.setExecutedCount(dispatch.getExecutedCount() + 1); // Increment executed count
@@ -199,10 +212,8 @@ public class DispatchServiceImpl implements DispatchService {
 
         Dispatch updatedDispatch = dispatchRepo.save(dispatch);
 
-        // TODO: If there are dispatched task created by this dispatch, set all the "pending" dispatched task by this dispatch to "cancelled"
-
         if (updatedDispatch.getStatus() == 1) {
-            if ("SCHEDULED".equals(request.getType())) {
+            if ("regular".equals(request.getType())) {
                 // reset its scheduled task
                 taskScheduleService.removeAllTasks(dispatch.getId());
                 initializeDispatch(id, () -> executeDispatch(updatedDispatch.getId()));
@@ -216,7 +227,7 @@ public class DispatchServiceImpl implements DispatchService {
     }
 
     @Transactional
-    public void deleteDispatch(Long id) {
+    public void deleteDispatch(Long id, Integer userId) {
         logger.info("Running deleteDispatch for Dispatch ID: {}", id);
         Dispatch dispatch = dispatchRepo.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Dispatch not found"));
@@ -228,7 +239,7 @@ public class DispatchServiceImpl implements DispatchService {
         }
 
         dispatch.setState(DispatchState.Inactive.getState());
-        dispatch.setStatus(0);
+        dispatch.setUpdateDetails(userId, 0);
 
         // Update the status of related personnel and forms
         if (dispatch.getDispatchUsers() != null) {
@@ -252,8 +263,6 @@ public class DispatchServiceImpl implements DispatchService {
         if (dispatch.getDispatchMaintenanceWorkOrders() != null) {
             dispatch.getDispatchMaintenanceWorkOrders().forEach(maintenanceWorkOrder -> maintenanceWorkOrder.setStatus((short) 0));
         }
-
-        // TODO: If there are dispatched task created by this dispatch, adjust dispatched task that are in pending to cancelled.
 
         dispatch.setUpdatedAt(OffsetDateTime.now());
         dispatchRepo.save(dispatch);
@@ -674,12 +683,12 @@ public class DispatchServiceImpl implements DispatchService {
         if (formIds == null) return;
 
         // Mark all existing rows as inactive
-        dispatch.getDispatchForms().forEach(form -> form.setStatus((short) 0));
+        dispatch.getDispatchForms().forEach(dispatchForm -> dispatchForm.setStatus((short) 0));
 
         // Reactivate or add new rows
         formIds.forEach(id -> {
             DispatchForm existing = dispatch.getDispatchForms().stream()
-                    .filter(form -> form.getQcFormTreeNodeId().equals(id))
+                    .filter(dispatchForm -> dispatchForm.getQcFormTreeNodeId().equals(id))
                     .findFirst()
                     .orElse(null);
 

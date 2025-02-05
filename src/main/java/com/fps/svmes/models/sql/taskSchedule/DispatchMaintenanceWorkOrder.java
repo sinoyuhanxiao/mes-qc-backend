@@ -6,7 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name = "dispatch_maintenance_work_order_temp", schema = "quality_management")
+@Table(name = "dispatch_maintenance_work_order", schema = "quality_management")
 @Data
 @NoArgsConstructor
 public class DispatchMaintenanceWorkOrder {

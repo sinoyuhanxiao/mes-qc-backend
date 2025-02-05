@@ -17,7 +17,7 @@ spring:
 
   data:
     mongodb:
-      uri: mongodb://root:password@10.10.12.12:27017/dev-mes?authSource=admin
+      uri: mongodb://root:password@10.10.12.12:27017/dev-mes-qc?authSource=admin
 
   security:
     user:

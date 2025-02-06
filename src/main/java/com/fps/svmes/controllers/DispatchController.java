@@ -23,6 +23,7 @@ import java.time.OffsetDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * REST Controller for managing dispatch configurations.
@@ -45,9 +46,9 @@ public class DispatchController {
 
     @Operation(summary = "Create a new dispatch", description = "Creates a dispatch in the QC System")
     @PostMapping
-    public ResponseResult<DispatchDTO> createDispatch(@RequestBody DispatchRequest request, @PathVariable Integer userId) {
+    public ResponseResult<DispatchDTO> createDispatch(@RequestBody DispatchDTO request) {
         try {
-            DispatchDTO dispatchDTO = dispatchService.createDispatch(request, userId);
+            DispatchDTO dispatchDTO = dispatchService.convertToDispatchDTO(dispatchService.createDispatch(request));
             return ResponseResult.success(dispatchDTO);
         } catch (Exception e) {
             logger.error("Error creating dispatch", e);
@@ -57,9 +58,9 @@ public class DispatchController {
 
     @Operation(summary = "Update an existing dispatch", description = "Updates a dispatch given an ID")
     @PutMapping("/{id}")
-    public ResponseResult<DispatchDTO> updateDispatch(@PathVariable Long id, @RequestBody @Valid DispatchRequest request, @PathVariable Integer userId) {
+    public ResponseResult<DispatchDTO> updateDispatch(@PathVariable Long id, @RequestBody @Valid DispatchDTO request) {
         try {
-            DispatchDTO dispatchDTO = dispatchService.updateDispatch(id, request, userId);
+            DispatchDTO dispatchDTO = dispatchService.convertToDispatchDTO(dispatchService.updateDispatch(id, request));
             return ResponseResult.success(dispatchDTO);
         } catch (Exception e) {
             logger.error("Error updating dispatch with ID: {}",  id);
@@ -131,9 +132,14 @@ public class DispatchController {
     @PostMapping("/schedule/{id}")
     public ResponseResult<String> scheduleTask(@PathVariable Long id) {
         try {
-            Dispatch dispatch = dispatchRepository.findByIdAndStatus(id, 1);
-            dispatchService.initializeDispatch(dispatch.getId(), () -> dispatchService.executeDispatch(dispatch.getId()));
-            return ResponseResult.success("Task scheduled successfully for Dispatch ID: " + id);
+            Optional<Dispatch> dispatch = dispatchRepository.findByIdAndStatus(id, 1);
+            if (dispatch.isPresent()){
+                Long dispatch_id = dispatch.get().getId();
+                dispatchService.initializeDispatch(dispatch_id, () -> dispatchService.executeDispatch(dispatch_id));
+                return ResponseResult.success("Task scheduled successfully for Dispatch ID: " + id);
+            } else {
+                return ResponseResult.fail("Failed to schedule a dispatch's task, dispatch not found with ID: " + id);
+            }
         } catch (Exception e) {
             logger.error("Error scheduling a dispatch with ID: {}", id);
             return ResponseResult.fail("Failed to schedule a dispatch", e);

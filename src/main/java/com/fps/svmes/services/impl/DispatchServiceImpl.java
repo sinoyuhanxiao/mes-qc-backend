@@ -2,7 +2,6 @@ package com.fps.svmes.services.impl;
 
 import com.fps.svmes.dto.dtos.dispatch.*;
 import com.fps.svmes.dto.dtos.user.UserDTO;
-import com.fps.svmes.dto.requests.DispatchRequest;
 import com.fps.svmes.models.sql.maintenance.Equipment;
 import com.fps.svmes.models.sql.maintenance.MaintenanceWorkOrder;
 import com.fps.svmes.models.sql.production.Product;
@@ -38,6 +37,7 @@ import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -92,10 +92,9 @@ public class DispatchServiceImpl implements DispatchService {
 
     // Map dispatch request to a dispatch object,
     @Transactional
-    public DispatchDTO createDispatch(DispatchRequest request, Integer userId) {
+    public Dispatch createDispatch(DispatchDTO request) {
         Dispatch dispatch = modelMapper.map(request, Dispatch.class);
-
-        dispatch.setCreationDetails(userId, 1);
+        dispatch.setCreationDetails(request.getCreatedBy(), 1);
 
         // Initialize mutable collections
         List<DispatchForm> mutableDispatchForms = new ArrayList<>();
@@ -105,7 +104,11 @@ public class DispatchServiceImpl implements DispatchService {
         List<DispatchProductionWorkOrder> mutableDispatchProductionWorkOrders = new ArrayList<>();
         List<DispatchEquipment> mutableDispatchEquipments = new ArrayList<>();
         List<DispatchMaintenanceWorkOrder> mutableDispatchMaintenanceWorkOrders = new ArrayList<>();
+        List<DispatchInstrument> mutableDispatchInstruments = new ArrayList<>();
+        List<DispatchSamplingLocation> mutableDispatchSamplingLocations = new ArrayList<>();
+        List<DispatchTestSubject> mutableDispatchTestSubjects = new ArrayList<>();
 
+        // Create list of association entities
         if (request.getFormIds() != null) {
             mutableDispatchForms.addAll(mapDispatchForms(dispatch, request.getFormIds()));
         }
@@ -134,14 +137,31 @@ public class DispatchServiceImpl implements DispatchService {
             mutableDispatchMaintenanceWorkOrders.addAll(mapDispatchMaintenanceWorkOrders(dispatch, request.getMaintenanceWorkOrderIds()));
         }
 
+        if (request.getInstrumentIds() != null) {
+            mutableDispatchInstruments.addAll(mapDispatchInstruments(dispatch, request.getInstrumentIds()));
+        }
+
+        if (request.getSamplingLocationIds() != null) {
+            mutableDispatchSamplingLocations.addAll(mapDispatchSamplingLocations(dispatch, request.getSamplingLocationIds()));
+        }
+
+        if (request.getTestSubjectIds() != null) {
+            mutableDispatchTestSubjects.addAll(mapDispatchTestSubjects(dispatch, request.getTestSubjectIds()));
+        }
+
         // Set the collections back to the entity
         dispatch.setDispatchForms(mutableDispatchForms);
         dispatch.setDispatchUsers(mutableDispatchUsers);
+
         dispatch.setDispatchProducts(mutableDispatchProducts);
         dispatch.setDispatchRawMaterials(mutableDispatchRawMaterials);
         dispatch.setDispatchProductionWorkOrders(mutableDispatchProductionWorkOrders);
         dispatch.setDispatchEquipments(mutableDispatchEquipments);
         dispatch.setDispatchMaintenanceWorkOrders(mutableDispatchMaintenanceWorkOrders);
+
+        dispatch.setDispatchInstruments(mutableDispatchInstruments);
+        dispatch.setDispatchSamplingLocations(mutableDispatchSamplingLocations);
+        dispatch.setDispatchTestSubjects(mutableDispatchTestSubjects);
 
 
         if (dispatch.getType().equals("custom")) {
@@ -163,13 +183,12 @@ public class DispatchServiceImpl implements DispatchService {
             logger.warn("Dispatch created but not immediately scheduled: {}", e.getMessage());
         }
 
-        return convertToDispatchDTO(savedDispatch);
+        return savedDispatch;
     }
 
     @Transactional
-    public DispatchDTO updateDispatch(Long id, DispatchRequest request, Integer userId) {
+    public Dispatch updateDispatch(Long id, DispatchDTO request) {
         logger.info("Running updateDispatch for Dispatch ID: {}", id);
-
         Dispatch dispatch = dispatchRepo.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Dispatch not found"));
 
@@ -177,32 +196,72 @@ public class DispatchServiceImpl implements DispatchService {
         List<DispatchedTask> dispatchedTasks = dispatchedTaskRepo.findByDispatchIdAndStateIdAndStatus(dispatch.getId(), 1, 1);
         if (!dispatchedTasks.isEmpty()) {
             // Update state for all fetched tasks in one go
-            dispatchedTasks.forEach(task -> task.setStateId((short) 5));
+            dispatchedTasks.forEach(task -> task.setStateId((short) 4));
 
             // Batch save the updated tasks
             dispatchedTaskRepo.saveAll(dispatchedTasks);
         }
 
         // Update dispatch based on request
-        dispatch.setUpdateDetails(userId, 1);
-        dispatch.setDispatchLimit(request.getDispatchLimit());
-        dispatch.setType(request.getType());
-        dispatch.setDescription(request.getDescription());
-        dispatch.setName(request.getName());
-        dispatch.setStartTime(request.getStartTime());
-        dispatch.setEndTime(request.getEndTime());
-        dispatch.setCustomTime( request.getCustomTime());
-        dispatch.setCronExpression(request.getCronExpression());
+        if (request.getUpdatedBy() != null) {
+            dispatch.setUpdateDetails(request.getUpdatedBy(), 1);
+        }
+
+        if (request.getType() != null) {
+            dispatch.setType(request.getType());
+        }
+
+        if (request.getName() != null) {
+            dispatch.setName(request.getName());
+        }
+
+        if (request.getDescription() != null) {
+            dispatch.setDescription(request.getDescription());
+        }
+
+        if (request.getState() != null) {
+            dispatch.setState(request.getState());
+        }
+
+        if (request.getStartTime() != null) {
+            dispatch.setStartTime(request.getStartTime());
+        }
+
+        if (request.getEndTime() != null) {
+            dispatch.setEndTime(request.getEndTime());
+        }
+
+        if (request.getCronExpression() != null) {
+            dispatch.setCronExpression(request.getCronExpression());
+        }
+
+        if (request.getDispatchLimit() != null) {
+            dispatch.setDispatchLimit(request.getDispatchLimit());
+        }
+
+        if (request.getCustomTime() != null) {
+            dispatch.setCustomTime(request.getCustomTime());
+        }
+
+        if (request.getExecutedCount() != null) {
+            dispatch.setExecutedCount(request.getExecutedCount());
+        }
+
+        if (request.getDueDateOffsetMinute() != null) {
+            dispatch.setDueDateOffsetMinute(request.getDueDateOffsetMinute());
+        }
 
         // Clear and update associations with proper handling
-        updateDispatchForms(dispatch, request.getFormIds());
         updateDispatchUsers(dispatch, request.getUserIds());
+        updateDispatchForms(dispatch, request.getFormIds());
         updateDispatchProducts(dispatch, request.getProductIds());
         updateDispatchRawMaterials(dispatch, request.getRawMaterialIds());
         updateDispatchProductionWorkOrders(dispatch, request.getProductionWorkOrderIds());
         updateDispatchEquipments(dispatch, request.getEquipmentIds());
         updateDispatchMaintenanceWorkOrders(dispatch, request.getMaintenanceWorkOrderIds());
-
+        updateDispatchSamplingLocations(dispatch, request.getSamplingLocationIds());
+        updateDispatchInstruments(dispatch, request.getInstrumentIds());
+        updateDispatchTestSubjects(dispatch, request.getTestSubjectIds());
 
         if (dispatch.getType().equals("custom")) {
             // since manual dispatch only execute once, will default isActive to false
@@ -218,12 +277,11 @@ public class DispatchServiceImpl implements DispatchService {
                 taskScheduleService.removeAllTasks(dispatch.getId());
                 initializeDispatch(id, () -> executeDispatch(updatedDispatch.getId()));
             } else {
-                // manual dispatch will just create and insert row to dispatched task table
+                // custom dispatch will just create and insert row to dispatched task table
                 createTasksForDispatch(updatedDispatch);
             }
         }
-
-        return convertToDispatchDTO(updatedDispatch);
+        return updatedDispatch;
     }
 
     @Transactional
@@ -232,10 +290,21 @@ public class DispatchServiceImpl implements DispatchService {
         Dispatch dispatch = dispatchRepo.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Dispatch not found"));
 
-        // Cancel any task of this dispatch if scheduled
+        // Cancel any scheduled task of this dispatch if scheduled
         boolean taskCancelled = taskScheduleService.removeAllTasks(id);
         if (taskCancelled) {
             logger.info("Cancelled all scheduled task for Dispatch ID: {}", id);
+        }
+
+        // Set all dispatched tasks under this order that are in pending mode (state 1) to canceled mode (state 4)
+        List<DispatchedTask> dispatchTasks = dispatchedTaskRepo.findByDispatchIdAndStateIdAndStatus(dispatch.getId(), 1, 1);
+
+        if (!dispatchTasks.isEmpty()) {
+            // Update state for all fetched tasks in one go
+            dispatchTasks.forEach(task -> task.setStateId((short) 4));
+
+            // Batch save the updated tasks
+            dispatchedTaskRepo.saveAll(dispatchTasks);
         }
 
         dispatch.setState(DispatchState.Inactive.getState());
@@ -243,43 +312,58 @@ public class DispatchServiceImpl implements DispatchService {
 
         // Update the status of related personnel and forms
         if (dispatch.getDispatchUsers() != null) {
-            dispatch.getDispatchUsers().forEach(user -> user.setStatus((short) 0));
+            dispatch.getDispatchUsers().forEach(dispatchUser -> dispatchUser.setStatus((short) 0));
         }
         if (dispatch.getDispatchForms() != null) {
-            dispatch.getDispatchForms().forEach(form -> form.setStatus((short) 0));
+            dispatch.getDispatchForms().forEach(dispatchForm -> dispatchForm.setStatus((short) 0));
         }
         if (dispatch.getDispatchProducts() != null) {
-            dispatch.getDispatchProducts().forEach(product -> product.setStatus((short) 0));
+            dispatch.getDispatchProducts().forEach(dispatchProduct -> dispatchProduct.setStatus((short) 0));
         }
         if (dispatch.getDispatchRawMaterials() != null) {
-            dispatch.getDispatchRawMaterials().forEach(rawMaterial -> rawMaterial.setStatus((short) 0));
+            dispatch.getDispatchRawMaterials().forEach(dispatchRawMaterial -> dispatchRawMaterial.setStatus((short) 0));
         }
         if (dispatch.getDispatchProductionWorkOrders() != null) {
-            dispatch.getDispatchProductionWorkOrders().forEach(workOrder -> workOrder.setStatus((short) 0));
+            dispatch.getDispatchProductionWorkOrders().forEach(dispatchProductionWorkOrder -> dispatchProductionWorkOrder.setStatus((short) 0));
         }
         if (dispatch.getDispatchEquipments() != null) {
-            dispatch.getDispatchEquipments().forEach(equipment -> equipment.setStatus((short) 0));
+            dispatch.getDispatchEquipments().forEach(dispatchEquipment -> dispatchEquipment.setStatus((short) 0));
         }
         if (dispatch.getDispatchMaintenanceWorkOrders() != null) {
-            dispatch.getDispatchMaintenanceWorkOrders().forEach(maintenanceWorkOrder -> maintenanceWorkOrder.setStatus((short) 0));
+            dispatch.getDispatchMaintenanceWorkOrders().forEach(dispatchMaintenanceWorkOrder -> dispatchMaintenanceWorkOrder.setStatus((short) 0));
         }
 
-        dispatch.setUpdatedAt(OffsetDateTime.now());
+        if (dispatch.getDispatchInstruments() != null) {
+            dispatch.getDispatchInstruments().forEach(dispatchInstrument -> dispatchInstrument.setStatus(0));
+        }
+
+        if (dispatch.getDispatchSamplingLocations() != null) {
+            dispatch.getDispatchSamplingLocations().forEach(dispatchSamplingLocation -> dispatchSamplingLocation.setStatus(0));
+        }
+
+        if (dispatch.getDispatchTestSubjects() != null) {
+            dispatch.getDispatchTestSubjects().forEach(dispatchTestSubject -> dispatchTestSubject.setStatus(0));
+        }
+
         dispatchRepo.save(dispatch);
         logger.warn("Soft-deleted Dispatch ID: {}", id);
     }
 
     @Transactional(readOnly = true)
     public DispatchDTO getDispatch(Long id) {
-        Dispatch dispatch = dispatchRepo.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("Dispatch with ID " + id + " not found"));
-
-        return convertToDispatchDTO(dispatch);
+        Optional<Dispatch> dispatch = dispatchRepo.findByIdAndStatus(id, 1);
+        if (dispatch.isPresent()){
+            return convertToDispatchDTO(dispatch.get());
+        } else {
+            throw new EntityNotFoundException("Dispatch with ID " + id + " not found");
+        }
     }
 
     @Transactional(readOnly = true)
     public List<DispatchDTO> getAllDispatches() {
-        return dispatchRepo.findAll().stream()
+        return dispatchRepo.findAll()
+                .stream()
+                .filter(dispatch -> dispatch.getStatus() == 1)
                 .map(this::convertToDispatchDTO)
                 .collect(Collectors.toList());
     }
@@ -481,30 +565,32 @@ public class DispatchServiceImpl implements DispatchService {
         return dispatch;
     }
 
-    private DispatchDTO convertToDispatchDTO(Dispatch dispatch) {
+    public DispatchDTO convertToDispatchDTO(Dispatch dispatch) {
         DispatchDTO dto = modelMapper.map(dispatch, DispatchDTO.class);
 
-        // Map dispatch_forms to list of form tree node IDs
+        // Convert dispatchForms to formIds
         if (dispatch.getDispatchForms() != null) {
-            dto.setQcFormTreeNodeIds(dispatch.getDispatchForms().stream()
-                    .filter(form -> form.getStatus() == 1)
+            dto.setFormIds(dispatch.getDispatchForms()
+                    .stream()
+                    .filter(dispatchForm -> dispatchForm.getStatus() == 1)
                     .map(DispatchForm::getQcFormTreeNodeId)
                     .toList());
         }
 
-        // Map dispatch_personnel to list of UserDTOs
+        // Convert dispatchUsers to userIds
         if (dispatch.getDispatchUsers() != null) {
-            dto.setUsers(dispatch.getDispatchUsers().stream()
-                    .filter(product -> product.getStatus() == 1)
-                    .map(personnel -> modelMapper
-                    .map(personnel.getUser(), UserDTO.class))
+            dto.setUserIds(dispatch.getDispatchUsers()
+                    .stream()
+                    .filter(dispatchUser -> dispatchUser.getStatus() == 1)
+                    .map(DispatchUser::getUser)
+                    .map(User::getId)
                     .toList());
         }
 
-        // map products to product_ids
+        // Convert system association rows to respective ids.
         if (dispatch.getDispatchProducts() != null) {
             dto.setProductIds(dispatch.getDispatchProducts().stream()
-                    .filter(product -> product.getStatus() == 1)
+                    .filter(dispatchProduct -> dispatchProduct.getStatus() == 1)
                     .map(DispatchProduct::getProduct)
                     .map(Product::getId)
                     .toList());
@@ -512,36 +598,57 @@ public class DispatchServiceImpl implements DispatchService {
 
         if (dispatch.getDispatchRawMaterials() != null) {
             dto.setRawMaterialIds(dispatch.getDispatchRawMaterials().stream()
-                    .filter(rawMaterial -> rawMaterial.getStatus() == 1)
+                    .filter(dispatchRawMaterial -> dispatchRawMaterial.getStatus() == 1)
                     .map(DispatchRawMaterial::getRawMaterial)
                     .map(RawMaterial::getId)
                     .toList());
         }
 
-        // map entity to ids
         if (dispatch.getDispatchProductionWorkOrders() != null) {
             dto.setProductionWorkOrderIds(dispatch.getDispatchProductionWorkOrders().stream()
-                    .filter(workOrder -> workOrder.getStatus() == 1)
+                    .filter(dispatchProductionWorkOrder -> dispatchProductionWorkOrder.getStatus() == 1)
                     .map(DispatchProductionWorkOrder::getProductionWorkOrder)
                     .map(ProductionWorkOrder::getId)
                     .toList());
         }
 
-        // map entity to ids
         if (dispatch.getDispatchEquipments() != null) {
             dto.setEquipmentIds(dispatch.getDispatchEquipments().stream()
-                    .filter(equipment -> equipment.getStatus() == 1)
+                    .filter(dispatchEquipment -> dispatchEquipment.getStatus() == 1)
                     .map(DispatchEquipment::getEquipment)
                     .map(Equipment::getId)
                     .toList());
         }
 
-        // map entity to ids
         if (dispatch.getDispatchMaintenanceWorkOrders() != null) {
             dto.setMaintenanceWorkOrderIds(dispatch.getDispatchMaintenanceWorkOrders().stream()
-                    .filter(workOrder -> workOrder.getStatus() == 1)
+                    .filter(dispatchMaintenanceWorkOrder -> dispatchMaintenanceWorkOrder.getStatus() == 1)
                     .map(DispatchMaintenanceWorkOrder::getMaintenanceWorkOrder)
                     .map(MaintenanceWorkOrder::getId)
+                    .toList());
+        }
+
+        if (dispatch.getDispatchInstruments() != null) {
+            dto.setInstrumentIds(dispatch.getDispatchInstruments()
+                    .stream()
+                    .filter(dispatchInstrument -> dispatchInstrument.getStatus() == 1)
+                    .map(DispatchInstrument::getInstrumentId)
+                    .toList());
+        }
+
+        if (dispatch.getDispatchSamplingLocations() != null) {
+            dto.setSamplingLocationIds(dispatch.getDispatchSamplingLocations()
+                    .stream()
+                    .filter(dispatchSamplingLocation -> dispatchSamplingLocation.getStatus() == 1)
+                    .map(DispatchSamplingLocation::getSamplingLocationId)
+                    .toList());
+        }
+
+        if (dispatch.getDispatchTestSubjects() != null) {
+            dto.setTestSubjectIds(dispatch.getDispatchTestSubjects()
+                    .stream()
+                    .filter(dispatchTestSubject -> dispatchTestSubject.getStatus() == 1)
+                    .map(DispatchTestSubject::getTestSubjectId)
                     .toList());
         }
 
@@ -610,7 +717,6 @@ public class DispatchServiceImpl implements DispatchService {
     }
 
     private List<DispatchProduct> mapDispatchProducts(Dispatch dispatch, List<Integer> ids) {
-        if (ids == null) return new ArrayList<>();
         return ids.stream()
                 .map(id -> {
                     DispatchProduct dp = new DispatchProduct();
@@ -624,7 +730,6 @@ public class DispatchServiceImpl implements DispatchService {
     }
 
     private List<DispatchRawMaterial> mapDispatchRawMaterials(Dispatch dispatch, List<Integer> ids) {
-        if (ids == null) return new ArrayList<>();
         return ids.stream()
                 .map(id -> {
                     DispatchRawMaterial dp = new DispatchRawMaterial();
@@ -638,7 +743,6 @@ public class DispatchServiceImpl implements DispatchService {
     }
 
     private List<DispatchProductionWorkOrder> mapDispatchProductionWorkOrders(Dispatch dispatch, List<Integer> ids) {
-        if (ids == null) return new ArrayList<>();
         return ids.stream()
                 .map(id -> {
                     DispatchProductionWorkOrder dp = new DispatchProductionWorkOrder();
@@ -652,7 +756,6 @@ public class DispatchServiceImpl implements DispatchService {
     }
 
     private List<DispatchEquipment> mapDispatchEquipments(Dispatch dispatch, List<Short> ids) {
-        if (ids == null) return new ArrayList<>();
         return ids.stream()
                 .map(id -> {
                     DispatchEquipment dp = new DispatchEquipment();
@@ -666,7 +769,6 @@ public class DispatchServiceImpl implements DispatchService {
     }
 
     private List<DispatchMaintenanceWorkOrder> mapDispatchMaintenanceWorkOrders(Dispatch dispatch, List<Integer> ids) {
-        if (ids == null) return new ArrayList<>();
         return ids.stream()
                 .map(id -> {
                     DispatchMaintenanceWorkOrder dp = new DispatchMaintenanceWorkOrder();
@@ -675,6 +777,42 @@ public class DispatchServiceImpl implements DispatchService {
                             .orElseThrow(() -> new EntityNotFoundException("Product not found: " + id)));
                     dp.setStatus((short) 1); // Default active status
                     return dp;
+                })
+                .toList();
+    }
+
+    private List<DispatchInstrument> mapDispatchInstruments(Dispatch dispatch, List<Long> ids) {
+        return ids.stream()
+                .map(id -> {
+                    DispatchInstrument di = new DispatchInstrument();
+                    di.setDispatch(dispatch);
+                    di.setInstrumentId(id);
+                    di.setStatus(1);
+                    return di;
+                })
+                .toList();
+    }
+
+    private List<DispatchSamplingLocation> mapDispatchSamplingLocations(Dispatch dispatch, List<Long> ids) {
+        return ids.stream()
+                .map(id -> {
+                    DispatchSamplingLocation ds = new DispatchSamplingLocation();
+                    ds.setDispatch(dispatch);
+                    ds.setSamplingLocationId(id);
+                    ds.setStatus(1);
+                    return ds;
+                })
+                .toList();
+    }
+
+    private List<DispatchTestSubject> mapDispatchTestSubjects(Dispatch dispatch, List<Long> ids) {
+        return ids.stream()
+                .map(id -> {
+                    DispatchTestSubject dt = new DispatchTestSubject();
+                    dt.setDispatch(dispatch);
+                    dt.setTestSubjectId(id);
+                    dt.setStatus(1);
+                    return dt;
                 })
                 .toList();
     }
@@ -885,6 +1023,89 @@ public class DispatchServiceImpl implements DispatchService {
             }
         });
     }
+
+    private void updateDispatchSamplingLocations(Dispatch dispatch, List<Long> samplingLocationIds) {
+        if (samplingLocationIds == null) return;
+
+        // Mark all existing rows as inactive
+        dispatch.getDispatchSamplingLocations().forEach(ds -> ds.setStatus(0));
+
+        // Reactivate or add new rows
+        samplingLocationIds.forEach(id -> {
+            DispatchSamplingLocation existing = dispatch.getDispatchSamplingLocations().stream()
+                    .filter(ds -> id.equals(ds.getSamplingLocationId()))
+                    .findFirst()
+                    .orElse(null);
+
+            if (existing != null) {
+                // Reactivate if already exists
+                existing.setStatus(1);
+            } else {
+                // Add new row
+                DispatchSamplingLocation ds = new DispatchSamplingLocation();
+                ds.setDispatch(dispatch);
+                ds.setSamplingLocationId(id);
+                ds.setStatus(1);
+                dispatch.getDispatchSamplingLocations().add(ds);
+            }
+        });
+    }
+
+    private void updateDispatchInstruments(Dispatch dispatch, List<Long> instrumentIds) {
+        if (instrumentIds == null) return;
+
+        // Mark all existing rows as inactive
+        dispatch.getDispatchInstruments().forEach(di -> di.setStatus(0));
+
+        // Reactivate or add new rows
+        instrumentIds.forEach(id -> {
+            DispatchInstrument existing = dispatch.getDispatchInstruments().stream()
+                    .filter(di -> id.equals(di.getInstrumentId()))
+                    .findFirst()
+                    .orElse(null);
+
+            if (existing != null) {
+                // Reactivate if already exists
+                existing.setStatus(1);
+            } else {
+                // Add new row
+                DispatchInstrument di = new DispatchInstrument();
+                di.setDispatch(dispatch);
+                di.setInstrumentId(id);
+                di.setStatus(1);
+                dispatch.getDispatchInstruments().add(di);
+            }
+        });
+    }
+
+    private void updateDispatchTestSubjects(Dispatch dispatch, List<Long> testSubjectIds) {
+        if (testSubjectIds == null) return;
+
+        // Mark all existing rows as inactive
+        dispatch.getDispatchTestSubjects().forEach(dt -> dt.setStatus(0));
+
+        // Reactivate or add new rows
+        testSubjectIds.forEach(id -> {
+            DispatchTestSubject existing = dispatch.getDispatchTestSubjects().stream()
+                    .filter(dt -> id.equals(dt.getTestSubjectId()))
+                    .findFirst()
+                    .orElse(null);
+
+            if (existing != null) {
+                // Reactivate if already exists
+                existing.setStatus(1);
+            } else {
+                // Add new row
+                DispatchTestSubject dt = new DispatchTestSubject();
+                dt.setDispatch(dispatch);
+                dt.setTestSubjectId(id);
+                dt.setStatus(1);
+                dispatch.getDispatchTestSubjects().add(dt);
+            }
+        });
+    }
+
+
 
 
 

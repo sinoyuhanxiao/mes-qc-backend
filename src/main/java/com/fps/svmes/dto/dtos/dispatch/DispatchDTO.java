@@ -50,11 +50,11 @@ public class DispatchDTO extends CommonDTO {
     @JsonProperty("due_date_offset_minute")
     private Integer dueDateOffsetMinute;
 
-    @JsonProperty("dispatch_users")
-    private List<UserDTO> users;
+    @JsonProperty("user_ids")
+    private List<Integer> userIds;
 
-    @JsonProperty("dispatch_forms")
-    private List<String> qcFormTreeNodeIds;
+    @JsonProperty("form_ids")
+    private List<String> formIds;
 
     @JsonProperty("product_ids")
     private List<Integer> productIds;

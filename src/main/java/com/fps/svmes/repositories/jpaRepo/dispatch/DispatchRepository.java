@@ -12,7 +12,7 @@ import org.springframework.data.repository.query.Param;
 public interface DispatchRepository extends JpaRepository<Dispatch, Long> {
     List<Dispatch> findByStatus(int i);
 
-    Dispatch findByIdAndStatus(Long id, int status);
+    Optional<Dispatch> findByIdAndStatus(Long id, int status);
 
     @Query("SELECT d FROM Dispatch d LEFT JOIN FETCH d.dispatchForms WHERE d.id = :id")
     Optional<Dispatch> findByIdWithForms(@Param("id") Long id);

@@ -7,11 +7,9 @@ import java.util.List;
 
 
 public interface QcOrderService {
-    QcOrderDTO createQcOrder(QcOrderRequest request, Integer userId);
-    QcOrderDTO updateQcOrder(Long id, QcOrderRequest request, Integer userId);
-    QcOrderDTO getQcOrderById(Long orderId);
+    QcOrderDTO createQcOrder(QcOrderDTO request);
+    QcOrderDTO updateQcOrder(Long id, QcOrderDTO request);
+    QcOrderDTO getQcOrderById(Long id);
     List<QcOrderDTO> getAllQcOrders();
-    void deleteQcOrder(Long orderId, Integer userId);
-    void pauseDispatch(Long orderId, Long dispatchId, Integer userId);
-    void resumeDispatch(Long orderId, Long dispatchId, Integer userId);
+    void deleteQcOrder(Long id, Integer userId);
 }

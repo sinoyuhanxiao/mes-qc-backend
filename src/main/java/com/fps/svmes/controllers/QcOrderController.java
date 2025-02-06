@@ -3,6 +3,7 @@ package com.fps.svmes.controllers;
 import com.fps.svmes.dto.dtos.dispatch.QcOrderDTO;
 import com.fps.svmes.dto.requests.QcOrderRequest;
 import com.fps.svmes.dto.responses.ResponseResult;
+import com.fps.svmes.services.DispatchService;
 import com.fps.svmes.services.QcOrderService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -26,6 +27,9 @@ public class QcOrderController {
     @Autowired
     private QcOrderService qcOrderService;
 
+
+    @Autowired
+    DispatchService dispatchService;
     private static final Logger logger = LoggerFactory.getLogger(QcOrderController.class);
 
     /**
@@ -33,9 +37,9 @@ public class QcOrderController {
      */
     @Operation(summary = "Create a new QC Order", description = "Creates a QC Order along with its dispatches.")
     @PostMapping("/{userId}")
-    public ResponseResult<QcOrderDTO> createQcOrder(@RequestBody @Valid QcOrderRequest request, @PathVariable Integer userId) {
+    public ResponseResult<QcOrderDTO> createQcOrder(@RequestBody @Valid QcOrderDTO request) {
         try {
-            QcOrderDTO qcOrderDTO = qcOrderService.createQcOrder(request, userId);
+            QcOrderDTO qcOrderDTO = qcOrderService.createQcOrder(request);
             return ResponseResult.success(qcOrderDTO);
         } catch (Exception e) {
             logger.error("Error creating QC Order", e);
@@ -48,9 +52,9 @@ public class QcOrderController {
      */
     @Operation(summary = "Update an existing QC Order", description = "Updates a QC Order and its associated dispatches.")
     @PutMapping("/{orderId}/{userId}")
-    public ResponseResult<QcOrderDTO> updateQcOrder(@PathVariable Long orderId, @RequestBody @Valid QcOrderRequest request, @PathVariable Integer userId) {
+    public ResponseResult<QcOrderDTO> updateQcOrder(@PathVariable Long orderId, @RequestBody @Valid QcOrderDTO request) {
         try {
-            QcOrderDTO updatedQcOrder = qcOrderService.updateQcOrder(orderId, request, userId);
+            QcOrderDTO updatedQcOrder = qcOrderService.updateQcOrder(orderId, request);
             return ResponseResult.success(updatedQcOrder);
         } catch (EntityNotFoundException e) {
             logger.error("QC Order not found with ID: {}", orderId, e);
@@ -66,9 +70,9 @@ public class QcOrderController {
      */
     @Operation(summary = "Pause a Dispatch", description = "Pauses a dispatch within a QC Order and cancels its tasks.")
     @PutMapping("/{orderId}/dispatch/{dispatchId}/pause/{userId}")
-    public ResponseResult<String> pauseDispatch(@PathVariable Long orderId, @PathVariable Long dispatchId, @PathVariable Integer userId) {
+    public ResponseResult<String> pauseDispatch(@PathVariable Long dispatchId, @PathVariable Integer userId) {
         try {
-            qcOrderService.pauseDispatch(orderId, dispatchId, userId);
+            dispatchService.pauseDispatch(dispatchId, userId);
             return ResponseResult.success("Dispatch paused successfully.");
         } catch (EntityNotFoundException e) {
             logger.error("Dispatch not found with ID: {}", dispatchId, e);
@@ -84,9 +88,9 @@ public class QcOrderController {
      */
     @Operation(summary = "Resume a Dispatch", description = "Resumes a paused dispatch within a QC Order.")
     @PutMapping("/{orderId}/dispatch/{dispatchId}/resume/{userId}")
-    public ResponseResult<String> resumeDispatch(@PathVariable Long orderId, @PathVariable Long dispatchId, @PathVariable Integer userId) {
+    public ResponseResult<String> resumeDispatch(@PathVariable Long dispatchId, @PathVariable Integer userId) {
         try {
-            qcOrderService.resumeDispatch(orderId, dispatchId, userId);
+            dispatchService.resumeDispatch(dispatchId, userId);
             return ResponseResult.success("Dispatch resumed successfully.");
         } catch (EntityNotFoundException e) {
             logger.error("Dispatch not found with ID: {}", dispatchId, e);

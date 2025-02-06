@@ -1,6 +1,7 @@
 package com.fps.svmes.dto.requests;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fps.svmes.dto.dtos.dispatch.DispatchDTO;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
@@ -14,14 +15,20 @@ import java.util.List;
 @NoArgsConstructor
 public class QcOrderRequest {
 
+    @JsonProperty("order_id")
+    private Long id;
+
     @JsonProperty("name")
     @NotNull(message = "Name cannot be null")
     @Schema(description = "Name of the order", example = "QC Order Testing Sample")
     private String name;
 
+    @JsonProperty("state")
+    private Short state;
+
     @JsonProperty("description")
     @Schema(description = "Description for the QC order", example = "This is a test QC order.")
     private String description;
 
-    private List<DispatchRequest> dispatchRequestList;
+    private List<DispatchRequest> dispatches;
 }

@@ -1,5 +1,6 @@
 package com.fps.svmes.models.sql.taskSchedule;
 
+import com.fps.svmes.models.sql.Common;
 import com.fps.svmes.models.sql.production.Product;
 import jakarta.persistence.*;
 import lombok.Data;
@@ -9,7 +10,7 @@ import lombok.NoArgsConstructor;
 @Table(name = "dispatch_product", schema = "quality_management")
 @Data
 @NoArgsConstructor
-public class DispatchProduct {
+public class DispatchProduct extends Common {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -22,7 +23,5 @@ public class DispatchProduct {
     @JoinColumn(name = "product_id", nullable = false)
     private Product product;
 
-    @Column(name = "status", nullable = false)
-    private Short status = 1; // Default active
 }
 

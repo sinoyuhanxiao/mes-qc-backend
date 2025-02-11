@@ -1,5 +1,6 @@
 package com.fps.svmes.models.sql.taskSchedule;
 
+import com.fps.svmes.models.sql.Common;
 import com.fps.svmes.models.sql.maintenance.MaintenanceWorkOrder;
 import jakarta.persistence.*;
 import lombok.Data;
@@ -9,7 +10,7 @@ import lombok.NoArgsConstructor;
 @Table(name = "dispatch_maintenance_work_order", schema = "quality_management")
 @Data
 @NoArgsConstructor
-public class DispatchMaintenanceWorkOrder {
+public class DispatchMaintenanceWorkOrder extends Common {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -21,9 +22,6 @@ public class DispatchMaintenanceWorkOrder {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "maintenance_work_order_id", nullable = false)
     private MaintenanceWorkOrder maintenanceWorkOrder;
-
-    @Column(name = "status", nullable = false)
-    private Short status = 1; // Default active
 }
 
 

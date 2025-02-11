@@ -3,7 +3,6 @@ package com.fps.svmes.controllers;
 
 import com.fps.svmes.dto.dtos.dispatch.DispatchDTO;
 import com.fps.svmes.dto.dtos.dispatch.DispatchedTaskDTO;
-import com.fps.svmes.dto.requests.DispatchRequest;
 import com.fps.svmes.dto.responses.ResponseResult;
 import com.fps.svmes.models.sql.taskSchedule.Dispatch;
 import com.fps.svmes.models.sql.taskSchedule.TaskType;
@@ -69,7 +68,7 @@ public class DispatchController {
     }
 
     @Operation(summary = "Delete a dispatch", description = "Deletes a dispatch given its ID")
-    @DeleteMapping("/{id}")
+    @DeleteMapping("/{id}/{userId}")
     public ResponseResult<String> deleteDispatch(@PathVariable Long id, @PathVariable Integer userId) {
         try {
             dispatchService.deleteDispatch(id, userId);
@@ -147,8 +146,8 @@ public class DispatchController {
     }
 
     @Operation(summary = "Pause a dispatch", description = "Pauses the specified dispatch and cancels its tasks.")
-    @PutMapping("/{id}/pause")
-    public ResponseResult<String> pauseDispatch(@PathVariable Long id, @RequestParam Integer userId) {
+    @PutMapping("/pause/{id}/{userId}")
+    public ResponseResult<String> pauseDispatch(@PathVariable Long id, @PathVariable Integer userId) {
         try {
             dispatchService.pauseDispatch(id, userId);
             return ResponseResult.success("Dispatch with ID " + id + " has been paused.");
@@ -162,8 +161,8 @@ public class DispatchController {
     }
 
     @Operation(summary = "Resume a paused dispatch", description = "Resumes the specified dispatch and re-enables its tasks.")
-    @PutMapping("/{id}/resume")
-    public ResponseResult<String> resumeDispatch(@PathVariable Long id, @RequestParam Integer userId) {
+    @PutMapping("/resume/{id}/{userId}")
+    public ResponseResult<String> resumeDispatch(@PathVariable Long id, @PathVariable Integer userId) {
         try {
             dispatchService.resumeDispatch(id, userId);
             return ResponseResult.success("Dispatch with ID " + id + " has been resumed.");

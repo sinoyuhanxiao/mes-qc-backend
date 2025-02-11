@@ -21,6 +21,7 @@ public class DispatchTestSubject extends Common {
     @JoinColumn(name = "dispatch_id")
     private Dispatch dispatch;
 
-    @Column(name = "test_subject_id")
-    private Long testSubjectId;
+    @ManyToOne
+    @JoinColumn(name = "test_subject_id")
+    private TestSubject testSubject;
 }

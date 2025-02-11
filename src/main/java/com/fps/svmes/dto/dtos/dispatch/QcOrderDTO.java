@@ -12,7 +12,7 @@ import java.util.List;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @Data
 public class QcOrderDTO extends CommonDTO {
-    @JsonProperty("order_id")
+    @JsonProperty("id")
     private Long id;
 
     @JsonProperty("name")

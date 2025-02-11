@@ -22,6 +22,7 @@ public class DispatchSamplingLocation extends Common {
     @JoinColumn(name = "dispatch_id")
     private Dispatch dispatch;
 
-    @Column(name = "sampling_location_id")
-    private Long samplingLocationId;
+    @ManyToOne
+    @JoinColumn(name = "sampling_location_id")
+    private SamplingLocation samplingLocation;
 }

@@ -1,7 +1,6 @@
 package com.fps.svmes.controllers;
 
 import com.fps.svmes.dto.dtos.dispatch.QcOrderDTO;
-import com.fps.svmes.dto.requests.QcOrderRequest;
 import com.fps.svmes.dto.responses.ResponseResult;
 import com.fps.svmes.services.DispatchService;
 import com.fps.svmes.services.QcOrderService;
@@ -36,7 +35,7 @@ public class QcOrderController {
      * Creates a new QC Order with its Dispatches.
      */
     @Operation(summary = "Create a new QC Order", description = "Creates a QC Order along with its dispatches.")
-    @PostMapping("/{userId}")
+    @PostMapping
     public ResponseResult<QcOrderDTO> createQcOrder(@RequestBody @Valid QcOrderDTO request) {
         try {
             QcOrderDTO qcOrderDTO = qcOrderService.createQcOrder(request);
@@ -51,53 +50,17 @@ public class QcOrderController {
      * Updates an existing QC Order and its Dispatches.
      */
     @Operation(summary = "Update an existing QC Order", description = "Updates a QC Order and its associated dispatches.")
-    @PutMapping("/{orderId}/{userId}")
-    public ResponseResult<QcOrderDTO> updateQcOrder(@PathVariable Long orderId, @RequestBody @Valid QcOrderDTO request) {
+    @PutMapping("/{id}")
+    public ResponseResult<QcOrderDTO> updateQcOrder(@PathVariable Long id, @RequestBody @Valid QcOrderDTO request) {
         try {
-            QcOrderDTO updatedQcOrder = qcOrderService.updateQcOrder(orderId, request);
+            QcOrderDTO updatedQcOrder = qcOrderService.updateQcOrder(id, request);
             return ResponseResult.success(updatedQcOrder);
         } catch (EntityNotFoundException e) {
-            logger.error("QC Order not found with ID: {}", orderId, e);
+            logger.error("QC Order not found with ID: {}", id, e);
             return ResponseResult.fail("QC Order not found", e);
         } catch (Exception e) {
-            logger.error("Error updating QC Order with ID: {}", orderId, e);
+            logger.error("Error updating QC Order with ID: {}", id, e);
             return ResponseResult.fail("Failed to update QC Order", e);
-        }
-    }
-
-    /**
-     * Pauses a Dispatch within a QC Order.
-     */
-    @Operation(summary = "Pause a Dispatch", description = "Pauses a dispatch within a QC Order and cancels its tasks.")
-    @PutMapping("/{orderId}/dispatch/{dispatchId}/pause/{userId}")
-    public ResponseResult<String> pauseDispatch(@PathVariable Long dispatchId, @PathVariable Integer userId) {
-        try {
-            dispatchService.pauseDispatch(dispatchId, userId);
-            return ResponseResult.success("Dispatch paused successfully.");
-        } catch (EntityNotFoundException e) {
-            logger.error("Dispatch not found with ID: {}", dispatchId, e);
-            return ResponseResult.fail("Dispatch not found", e);
-        } catch (Exception e) {
-            logger.error("Error pausing dispatch with ID: {}", dispatchId, e);
-            return ResponseResult.fail("Failed to pause dispatch", e);
-        }
-    }
-
-    /**
-     * Resumes a paused Dispatch within a QC Order.
-     */
-    @Operation(summary = "Resume a Dispatch", description = "Resumes a paused dispatch within a QC Order.")
-    @PutMapping("/{orderId}/dispatch/{dispatchId}/resume/{userId}")
-    public ResponseResult<String> resumeDispatch(@PathVariable Long dispatchId, @PathVariable Integer userId) {
-        try {
-            dispatchService.resumeDispatch(dispatchId, userId);
-            return ResponseResult.success("Dispatch resumed successfully.");
-        } catch (EntityNotFoundException e) {
-            logger.error("Dispatch not found with ID: {}", dispatchId, e);
-            return ResponseResult.fail("Dispatch not found", e);
-        } catch (Exception e) {
-            logger.error("Error resuming dispatch with ID: {}", dispatchId, e);
-            return ResponseResult.fail("Failed to resume dispatch", e);
         }
     }
 
@@ -105,16 +68,16 @@ public class QcOrderController {
      * Retrieves a single QC Order by ID.
      */
     @Operation(summary = "Get QC Order by ID", description = "Fetches a QC Order along with its associated dispatches.")
-    @GetMapping("/{orderId}")
-    public ResponseResult<QcOrderDTO> getQcOrderById(@PathVariable Long orderId) {
+    @GetMapping("/{id}")
+    public ResponseResult<QcOrderDTO> getQcOrderById(@PathVariable Long id) {
         try {
-            QcOrderDTO qcOrderDTO = qcOrderService.getQcOrderById(orderId);
+            QcOrderDTO qcOrderDTO = qcOrderService.getQcOrderById(id);
             return ResponseResult.success(qcOrderDTO);
         } catch (EntityNotFoundException e) {
-            logger.error("QC Order not found with ID: {}", orderId, e);
+            logger.error("QC Order not found with ID: {}", id, e);
             return ResponseResult.fail("QC Order not found", e);
         } catch (Exception e) {
-            logger.error("Error retrieving QC Order with ID: {}", orderId, e);
+            logger.error("Error retrieving QC Order with ID: {}", id, e);
             return ResponseResult.fail("Failed to retrieve QC Order", e);
         }
     }
@@ -140,17 +103,19 @@ public class QcOrderController {
      * Deletes a QC Order by ID.
      */
     @Operation(summary = "Delete a QC Order", description = "Soft deletes a QC Order and its associated dispatches.")
-    @DeleteMapping("/{orderId}/{userId}")
-    public ResponseResult<String> deleteQcOrder(@PathVariable Long orderId, @PathVariable Integer userId) {
+    @DeleteMapping("/{id}/{userId}")
+    public ResponseResult<String> deleteQcOrder(@PathVariable Long id, @PathVariable Integer userId) {
         try {
-            qcOrderService.deleteQcOrder(orderId, userId);
+            qcOrderService.deleteQcOrder(id, userId);
             return ResponseResult.success("QC Order deleted successfully.");
         } catch (EntityNotFoundException e) {
-            logger.error("QC Order not found with ID: {}", orderId, e);
+            logger.error("QC Order not found with ID: {}", id, e);
             return ResponseResult.fail("QC Order not found", e);
         } catch (Exception e) {
-            logger.error("Error deleting QC Order with ID: {}", orderId, e);
+            logger.error("Error deleting QC Order with ID: {}", id, e);
             return ResponseResult.fail("Failed to delete QC Order", e);
         }
     }
+
+
 }

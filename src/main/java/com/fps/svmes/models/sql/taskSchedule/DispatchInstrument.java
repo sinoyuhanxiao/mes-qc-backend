@@ -21,6 +21,7 @@ public class DispatchInstrument extends Common {
     @JoinColumn(name = "dispatch_id")
     private Dispatch dispatch;
 
-    @Column(name = "instrument_id")
-    private Long instrumentId;
+    @ManyToOne
+    @JoinColumn(name = "instrument_id")
+    private Instrument instrument;
 }

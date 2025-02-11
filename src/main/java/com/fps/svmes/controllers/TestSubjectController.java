@@ -23,7 +23,7 @@ public class TestSubjectController {
     private static final Logger logger = LoggerFactory.getLogger(TestSubjectController.class);
 
     @Operation(summary = "Create a new test subject", description = "Adds a new test subject")
-    @PostMapping()
+    @PostMapping
     public ResponseResult<TestSubjectDTO> createTestSubject(@RequestBody TestSubjectDTO testSubjectDTO) {
         try {
             TestSubjectDTO createdSubject = service.createTestSubject(testSubjectDTO);

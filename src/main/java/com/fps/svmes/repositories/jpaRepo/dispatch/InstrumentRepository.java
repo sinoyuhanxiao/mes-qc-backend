@@ -10,5 +10,4 @@ import java.util.Optional;
 public interface InstrumentRepository extends JpaRepository<Instrument, Long> {
     List<Instrument> findByStatus(Integer status);
     Optional<Instrument> findByIdAndStatus(Long id, Integer status);
-
 }

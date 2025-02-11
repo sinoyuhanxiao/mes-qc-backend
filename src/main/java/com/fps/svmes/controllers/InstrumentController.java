@@ -1,8 +1,7 @@
 package com.fps.svmes.controllers;
 
-import com.fps.svmes.dto.requests.InstrumentRequest;
+import com.fps.svmes.dto.dtos.dispatch.InstrumentDTO;
 import com.fps.svmes.dto.responses.ResponseResult;
-import com.fps.svmes.models.sql.taskSchedule.Instrument;
 import com.fps.svmes.services.InstrumentService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -29,10 +28,10 @@ public class InstrumentController {
     private static final Logger logger = LoggerFactory.getLogger(InstrumentController.class);
 
     @Operation(summary = "Create a new instrument", description = "Creates a new instrument in the QC system")
-    @PostMapping("/{userId}")
-    public ResponseResult<Instrument> createInstrument(@RequestBody @Valid InstrumentRequest instrumentRequest, @PathVariable Integer userId) {
+    @PostMapping
+    public ResponseResult<InstrumentDTO> createInstrument(@RequestBody @Valid InstrumentDTO instrumentDTO) {
         try {
-            Instrument instrument = instrumentService.createInstrument(instrumentRequest, userId);
+            InstrumentDTO instrument = instrumentService.createInstrument(instrumentDTO);
             return ResponseResult.success(instrument);
         } catch (Exception e) {
             logger.error("Error creating instrument", e);
@@ -42,12 +41,11 @@ public class InstrumentController {
 
     @Operation(summary = "Get a single instrument by ID", description = "Retrieves an active instrument by its ID")
     @GetMapping("/{id}")
-    public ResponseResult<Instrument> getInstrumentById(@PathVariable Long id) {
+    public ResponseResult<InstrumentDTO> getInstrumentById(@PathVariable Long id) {
         try {
-            return instrumentService.getInstrumentById(id)
-                    .map(ResponseResult::success)
-                    .orElseGet(() -> ResponseResult.fail("Instrument not found with ID: " + id));
-        } catch (Exception e) {
+            return ResponseResult.success(instrumentService.getInstrumentById(id));
+            }
+        catch (Exception e) {
             logger.error("Error retrieving instrument with ID: {}", id, e);
             return ResponseResult.fail("Failed to retrieve instrument", e);
         }
@@ -55,12 +53,12 @@ public class InstrumentController {
 
     @Operation(summary = "Get all active instruments", description = "Retrieves a list of all active instruments")
     @GetMapping
-    public ResponseResult<List<Instrument>> getAllInstruments() {
+    public ResponseResult<List<InstrumentDTO>> getAllInstruments() {
         try {
-            List<Instrument> instruments = instrumentService.getAllInstruments();
-            return instruments.isEmpty()
-                    ? ResponseResult.noContent(instruments)
-                    : ResponseResult.success(instruments);
+            List<InstrumentDTO> instrumentDTOS = instrumentService.getAllInstruments();
+            return instrumentDTOS.isEmpty()
+                    ? ResponseResult.noContent(instrumentDTOS)
+                    : ResponseResult.success(instrumentDTOS);
         } catch (Exception e) {
             logger.error("Error retrieving all instruments", e);
             return ResponseResult.fail("Failed to retrieve all instruments", e);
@@ -68,10 +66,10 @@ public class InstrumentController {
     }
 
     @Operation(summary = "Update an instrument", description = "Updates an existing instrument by ID")
-    @PutMapping("/{id}/{userId}")
-    public ResponseResult<Instrument> updateInstrument(@PathVariable Long id, @RequestBody @Valid Instrument instrument, @PathVariable Integer userId) {
+    @PutMapping("/{id}")
+    public ResponseResult<InstrumentDTO> updateInstrument(@PathVariable Long id, @RequestBody @Valid InstrumentDTO instrumentDTO) {
         try {
-            Instrument updatedInstrument = instrumentService.updateInstrument(id, instrument, userId);
+            InstrumentDTO updatedInstrument = instrumentService.updateInstrument(id, instrumentDTO);
             return ResponseResult.success(updatedInstrument);
         } catch (EntityNotFoundException e) {
             logger.error("Instrument not found with ID: {}", id, e);

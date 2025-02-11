@@ -23,7 +23,7 @@ public class SamplingLocationController {
     private static final Logger logger = LoggerFactory.getLogger(SamplingLocationController.class);
 
     @Operation(summary = "Create a new sampling location", description = "Adds a new sampling location")
-    @PostMapping()
+    @PostMapping
     public ResponseResult<SamplingLocationDTO> createSamplingLocation(@RequestBody SamplingLocationDTO samplingLocationDTO) {
         try {
             SamplingLocationDTO createdLocation = service.createSamplingLocation(samplingLocationDTO);

@@ -8,7 +8,8 @@ public enum DispatchState {
     Inactive((short) 2),
     Expired((short) 3),
     Exhausted((short) 4),
-    Paused((short) 5);
+    Paused((short) 5),
+    Error((short) 6);
 
     private final short state;
 

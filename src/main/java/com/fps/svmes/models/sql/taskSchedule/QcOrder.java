@@ -24,7 +24,7 @@ public class QcOrder extends Common {
     private String name;
 
     @Column(name = "state")
-    private Short state = 1;
+    private Short state = QcOrderState.Active.getState();
 
     @Column(name = "description")
     private String description;

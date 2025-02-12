@@ -17,12 +17,14 @@ import com.fps.svmes.services.DispatchService;
 import com.fps.svmes.services.QcOrderService;
 import jakarta.persistence.EntityNotFoundException;
 import org.modelmapper.ModelMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -41,102 +43,99 @@ public class QcOrderServiceImpl implements QcOrderService {
     @Autowired private MaintenanceWorkOrderRepository maintenanceWorkOrderRepository;
     @Autowired private DispatchService dispatchService;
     @Autowired private ModelMapper modelMapper;
+    private static final Logger logger = LoggerFactory.getLogger(QcOrderServiceImpl.class);
 
-    //  **Create QC Order**
+
     @Transactional
     public QcOrderDTO createQcOrder(QcOrderDTO request) {
         QcOrder qcOrder = modelMapper.map(request, QcOrder.class);
         Integer userId = request.getCreatedBy();
 
-        // **Create Dispatches & Map Associations**
+        // Create Dispatches & Map Associations
         List<Dispatch> dispatches = request.getDispatches().stream()
-                .map(dispatchRequest -> {
-                    return dispatchService.createDispatch(dispatchRequest);
-//                    createDispatchWithAssociations(dispatchRequest, userId);
-                })
+                .map(dispatchRequest -> dispatchService.createDispatch(dispatchRequest))
                 .collect(Collectors.toList());
 
-        // **Map to QC Order Dispatch**
+        // Map to QC Order Dispatch
         qcOrder.setQcOrderDispatches(mapQcOrderDispatch(qcOrder, dispatches, userId, "CREATE"));
 
-        // **Save QC Order**
+        // Set work order state
+        qcOrder.setState(determineWorkOrderState(dispatches));
+
+        // Save QC Order
         QcOrder savedQcOrder = qcOrderRepo.save(qcOrder);
 
         return mapQcOrderToDTO(savedQcOrder);
     }
 
-    // ✅ **Update QC Order**
     @Transactional
     public QcOrderDTO updateQcOrder(Long id, QcOrderDTO request) {
         Optional<QcOrder> optionalQcOrder = qcOrderRepo.findById(id);
         Integer userId = request.getUpdatedBy();
-        if (optionalQcOrder.isPresent()) {
-            QcOrder existingQcOrder = optionalQcOrder.get();
 
-            if (request.getName() != null) {
-                existingQcOrder.setName(request.getName());
-            }
-            if (request.getDescription() != null) {
-                existingQcOrder.setDescription(request.getDescription());
-            }
-            // Handle Dispatches
-            if (request.getDispatches() != null) {
-                // List of to be updated dispatch from request
-                List<Long> incomingDispatchIds = request.getDispatches().stream()
-                        .filter(d -> d.getId() != null)
-                        .map(DispatchDTO::getId)
-                        .toList();
-
-                // Soft delete dispatches no longer in the request
-                existingQcOrder.getQcOrderDispatches()
-                        .stream()
-                        .filter(qcOrderDispatch -> !incomingDispatchIds.contains(qcOrderDispatch.getDispatch().getId()))
-                        .forEach(qcOrderDispatch -> {
-                            Dispatch dispatch = qcOrderDispatch.getDispatch();
-                            dispatch.setStatus(0); // Soft delete by setting status to 0
-                            dispatch.setUpdatedBy(userId);
-                            dispatch.setUpdatedAt(OffsetDateTime.now());
-                            dispatchRepo.save(dispatch); // Save updated dispatch
-                        });
-
-                // Process to be updated dispatches
-                List<Dispatch> updatedOrCreatedDispatches = request.getDispatches()
-                        .stream()
-                        .map(dispatchDTO -> {
-                            if (dispatchDTO.getId() != null) {
-                                // Update existing dispatch
-                                Dispatch existingDispatch = dispatchRepo.findById(dispatchDTO.getId())
-                                        .orElseThrow(() -> new RuntimeException("Dispatch not found: " + dispatchDTO.getId()));
-                                return dispatchService.updateDispatch(existingDispatch.getId(), dispatchDTO);
-                            } else {
-
-//                                // Associate new dispatch with the QcOrder
-//                                QcOrderDispatch qcOrderDispatch = new QcOrderDispatch();
-//                                qcOrderDispatch.setQcOrder(existingQcOrder);
-//                                qcOrderDispatch.setDispatch(savedDispatch);
-//                                qcOrderDispatchRepo.save(qcOrderDispatch);
-
-                                return dispatchService.createDispatch(dispatchDTO);
-
-                            }
-                        })
-                        .toList();
-
-                // Update QcOrder's dispatches with updated or newly created ones
-                existingQcOrder.setQcOrderDispatches(mapQcOrderDispatch(existingQcOrder, updatedOrCreatedDispatches, userId, "UPDATE"));
-
-            }
-
-            return mapQcOrderToDTO(qcOrderRepo.save(existingQcOrder));
-        } else {
+        if (optionalQcOrder.isEmpty()) {
             throw new RuntimeException("Order with ID " + id + " not found");
         }
+
+        QcOrder existingQcOrder = optionalQcOrder.get();
+
+        if (request.getName() != null) {
+            existingQcOrder.setName(request.getName());
+        }
+        if (request.getDescription() != null) {
+            existingQcOrder.setDescription(request.getDescription());
+        }
+
+        if (request.getDispatches() != null) {
+            // Extract IDs from Request
+            List<Long> incomingDispatchIds = request.getDispatches().stream()
+                    .map(DispatchDTO::getId)
+                    .filter(Objects::nonNull)
+                    .toList();
+
+            // Soft Delete Missing Dispatches by soft delete junction row and soft delete dispatch since dispatch is designed to belong to qc order
+            List<QcOrderDispatch> toBeDeleted = existingQcOrder.getQcOrderDispatches().stream()
+                    .filter(qcOrderDispatch -> !incomingDispatchIds.contains(qcOrderDispatch.getDispatch().getId()))
+                    .peek(qcOrderDispatch -> {
+                        qcOrderDispatch.setUpdateDetails(userId, 0); // Mark as soft deleted
+                        dispatchService.deleteDispatch(qcOrderDispatch.getDispatch().getId(), userId);
+                    })
+                    .toList();
+
+            // Persist soft deletes
+            qcOrderDispatchRepo.saveAll(toBeDeleted);
+
+            // Remove the soft-deleted ones from the list
+            existingQcOrder.getQcOrderDispatches().removeAll(toBeDeleted);
+
+            // Process Incoming Dispatches (Update or Create)
+            List<Dispatch> updatedOrCreatedDispatches = request.getDispatches().stream()
+                    .map(dispatchDTO -> (dispatchDTO.getId() != null) ?
+                            dispatchService.updateDispatch(dispatchDTO.getId(), dispatchDTO) :
+                            dispatchService.createDispatch(dispatchDTO))
+                    .toList();
+
+            // Merge New Dispatches with Retained Ones
+            updatedOrCreatedDispatches.forEach(dispatch -> {
+                boolean exists = existingQcOrder.getQcOrderDispatches().stream()
+                        .anyMatch(qcOrderDispatch -> qcOrderDispatch.getDispatch().getId().equals(dispatch.getId()));
+
+                if (!exists) {
+                    QcOrderDispatch newQcOrderDispatch = new QcOrderDispatch(existingQcOrder, dispatch);
+                    newQcOrderDispatch.setUpdateDetails(userId, 1);
+                    existingQcOrder.getQcOrderDispatches().add(newQcOrderDispatch);
+                }
+            });
+
+            existingQcOrder.setState(determineWorkOrderState(updatedOrCreatedDispatches));
+        }
+
+        return mapQcOrderToDTO(qcOrderRepo.save(existingQcOrder));
     }
 
-    // ✅ **Get QC Order by ID**
     @Transactional(readOnly = true)
     public QcOrderDTO getQcOrderById(Long id) {
-        Optional<QcOrder> qcOrder = qcOrderRepo.findByIdAndStatus(id, (short)1);
+        Optional<QcOrder> qcOrder = qcOrderRepo.findByIdAndStatus(id, (short) 1);
         if (qcOrder.isPresent()){
             return mapQcOrderToDTO(qcOrder.get());
         } else {
@@ -144,7 +143,6 @@ public class QcOrderServiceImpl implements QcOrderService {
         }
     }
 
-    // ✅ **Get All QC Orders**
     @Transactional(readOnly = true)
     public List<QcOrderDTO> getAllQcOrders() {
         return qcOrderRepo.findAll()
@@ -153,13 +151,12 @@ public class QcOrderServiceImpl implements QcOrderService {
                 .map(this::mapQcOrderToDTO).collect(Collectors.toList());
     }
 
-    // ✅ **Delete QC Order**
     @Transactional
     public void deleteQcOrder(Long orderId, Integer userId) {
         QcOrder qcOrder = qcOrderRepo.findById(orderId)
                 .orElseThrow(() -> new EntityNotFoundException("QC Order not found"));
 
-        // ** Soft-delete order & associated dispatches**
+        // Soft-delete order & associated dispatches
         qcOrder.setStatus(0);
         qcOrder.getQcOrderDispatches().forEach(qcOrderDispatch -> {
             dispatchService.deleteDispatch(qcOrderDispatch.getDispatch().getId(), userId);
@@ -169,37 +166,76 @@ public class QcOrderServiceImpl implements QcOrderService {
         qcOrderRepo.save(qcOrder);
     }
 
-    // ✅ **Helper: Map QC Order to Dispatches**
+    // Helper: Map QC Order to Dispatches
     private List<QcOrderDispatch> mapQcOrderDispatch(QcOrder qcOrder, List<Dispatch> dispatches, Integer userId, String action) {
-        if (action.equals("CREATE")) {
-            return dispatches.stream()
-                    .map(dispatch -> {
-                        QcOrderDispatch qcOrderDispatch = new QcOrderDispatch(qcOrder, dispatch);
+        return dispatches.stream()
+                .map(dispatch -> {
+                    QcOrderDispatch qcOrderDispatch = new QcOrderDispatch(qcOrder, dispatch);
+                    if ("CREATE".equals(action)) {
                         qcOrderDispatch.setCreationDetails(userId, 1);
-                        return qcOrderDispatch;
-                    })
-                    .toList();
-        } else {
-            return dispatches.stream()
-                    .map(dispatch -> {
-                        QcOrderDispatch qcOrderDispatch = new QcOrderDispatch(qcOrder, dispatch);
+                    } else {
                         qcOrderDispatch.setUpdateDetails(userId, 1);
-                        return qcOrderDispatch;
-                    })
-                    .toList();
-        }
+                    }
+                    return qcOrderDispatch;
+                })
+                .toList();
     }
 
-    // ✅ **Helper: Convert QcOrder to QcOrderDTO**
+    // Helper: Convert QcOrder to QcOrderDTO
     private QcOrderDTO mapQcOrderToDTO(QcOrder qcOrder) {
         QcOrderDTO qcOrderDTO = modelMapper.map(qcOrder, QcOrderDTO.class);
 
         List<DispatchDTO> dispatchDTOs = qcOrder.getQcOrderDispatches().stream()
-                .map(qcOrderDispatch ->
-                        dispatchService.convertToDispatchDTO(qcOrderDispatch.getDispatch()))
+                .map(qcOrderDispatch -> {
+                    if (qcOrderDispatch.getDispatch().getStatus() == 1) {
+                        return dispatchService.convertToDispatchDTO(qcOrderDispatch.getDispatch());
+                    } else {
+                        return null;
+                    }
+                })
+                .filter(Objects::nonNull)
                 .toList();
 
         qcOrderDTO.setDispatches(dispatchDTOs);
         return qcOrderDTO;
     }
+
+    @Scheduled(fixedRate = 600000) // Runs every 10 minutes
+    @Transactional
+    public void updateQcOrderStates() {
+        logger.info("Running periodic qc order states update...");
+        List<QcOrder> qcOrders = qcOrderRepo.findAll();
+        qcOrders.forEach(qcOrder -> {
+            List<Dispatch> dispatches = qcOrder.getQcOrderDispatches().stream()
+                    .map(QcOrderDispatch::getDispatch)
+                    .toList();
+
+            Short newState = determineWorkOrderState(dispatches);
+            if (!qcOrder.getState().equals(newState)) {
+                qcOrder.setState(newState);
+                qcOrderRepo.save(qcOrder);
+            }
+        });
+    }
+
+    private Short determineWorkOrderState(List<Dispatch> dispatches) {
+        if (dispatches == null || dispatches.isEmpty()) {
+            return QcOrderState.Inactive.getState();
+        }
+
+        boolean hasActive = dispatches.stream().anyMatch(d -> DispatchState.fromValue(d.getState()) == DispatchState.Active);
+        boolean hasInvalid = dispatches.stream().anyMatch(d -> DispatchState.fromValue(d.getState()) == DispatchState.Invalid);
+        boolean allInactive = dispatches.stream().allMatch(d -> DispatchState.fromValue(d.getState()) == DispatchState.Inactive);
+        boolean allExpired = dispatches.stream().allMatch(d -> DispatchState.fromValue(d.getState()) == DispatchState.Expired);
+        boolean allExhausted = dispatches.stream().allMatch(d -> DispatchState.fromValue(d.getState()) == DispatchState.Exhausted);
+        boolean allPaused = dispatches.stream().allMatch(d -> DispatchState.fromValue(d.getState()) == DispatchState.Paused);
+
+        if (hasInvalid) return QcOrderState.Invalid.getState();
+        if (hasActive) return QcOrderState.Active.getState();
+        if (allPaused) return QcOrderState.Paused.getState();
+        if (allExhausted) return QcOrderState.Exhausted.getState();
+        if (allExpired) return QcOrderState.Expired.getState();
+        return QcOrderState.Inactive.getState();
+    }
+
 }

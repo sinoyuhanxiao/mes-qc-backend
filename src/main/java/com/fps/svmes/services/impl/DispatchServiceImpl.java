@@ -2,11 +2,7 @@ package com.fps.svmes.services.impl;
 
 import com.fps.svmes.dto.dtos.dispatch.*;
 import com.fps.svmes.models.nosql.FormNode;
-import com.fps.svmes.models.sql.maintenance.Equipment;
-import com.fps.svmes.models.sql.maintenance.MaintenanceWorkOrder;
 import com.fps.svmes.models.sql.production.Product;
-import com.fps.svmes.models.sql.production.ProductionWorkOrder;
-import com.fps.svmes.models.sql.production.RawMaterial;
 import com.fps.svmes.models.sql.taskSchedule.*;
 import com.fps.svmes.models.sql.user.User;
 import com.fps.svmes.repositories.jpaRepo.dispatch.*;
@@ -23,24 +19,17 @@ import jakarta.validation.constraints.NotNull;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
-import org.springframework.data.jpa.repository.support.SimpleJpaRepository;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
 import org.modelmapper.ModelMapper;
-
 import java.time.ZoneOffset;
 import java.time.OffsetDateTime;
 import java.util.*;
 import java.util.function.Function;
 import java.util.function.Predicate;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import javax.swing.text.html.Option;
-
 import static java.util.stream.Collectors.toList;
 
 
@@ -504,54 +493,64 @@ public class DispatchServiceImpl implements DispatchService {
     @Transactional
     @Override
     public void executeDispatch(Long dispatchId) {
-
         Dispatch dispatch = dispatchRepo.findById(dispatchId)
-                .orElseThrow(() -> new EntityNotFoundException("Dispatch not found"));
+                .orElseThrow(() -> new EntityNotFoundException("Execute Dispatch Failed: Dispatch not found with ID: " + dispatchId));
 
-        // Load dispatchForms separately
-        Dispatch dispatchWithForms = dispatchRepo.findWithFormsById(dispatchId)
-                .orElseThrow(() -> new EntityNotFoundException("Dispatch forms not found"));
-        dispatch.setDispatchForms(dispatchWithForms.getDispatchForms());
-
-        // Load dispatchUsers separately
-        Dispatch dispatchWithUsers = dispatchRepo.findWithUsersById(dispatchId)
-                .orElseThrow(() -> new EntityNotFoundException("Dispatch users not found"));
-        dispatch.setDispatchUsers(dispatchWithUsers.getDispatchUsers());
-
-        // Ensure collections are fully initialized before processing
-        dispatch.getDispatchForms().size();
-        dispatch.getDispatchUsers().size();
-
-        // ✅ Update dispatchForms based on referenced entity status
-        dispatch.getDispatchForms().forEach(dispatchForm -> {
-            String qcFormTreeNodeId = dispatchForm.getQcFormTreeNodeId();
-            Optional<FormNode> formNode = formNodeService.getNodeByIdOrUuid(qcFormTreeNodeId);
-            dispatchForm.setStatus(formNode.isPresent() ? 1 : 0);
-        });
-
-        // ✅ Update dispatchUsers based on referenced user status
-        dispatch.getDispatchUsers().forEach(dispatchUser -> {
-            Optional<User> user = userRepository.findById(dispatchUser.getUser().getId());
-            dispatchUser.setStatus(user.isPresent() && user.get().getStatus() == 1 ? 1 : 0);
-        });
-
-        // cancel and update is active for dispatch reach limit
-        if (hasReachedDispatchLimit(dispatch)) {
-            if(taskScheduleService.isScheduled(dispatch.getId())) {
-                taskScheduleService.removeAllTasks(dispatch.getId());
-            }
-            dispatch.setState(DispatchState.Exhausted.getState());
-            dispatchRepo.save(dispatch);
-            return;
-        }
+        // active (set as default when creating/updating by hardcoded 1 in frontend, when a task is scheduled for a dispatch)
+        // inactive (cancel task or delete dispatch or default state for custom type dispatch, cancel task in task scheduler)
+        // expired (set during initialization based on now vs endtime, does not scheduled so wont trigger executeDispatch)
+        // exhausted (set in executeDispatch)
+        // paused (set when calling pause)
+        // invalid (set when executeDispatch gone wrong)
 
         try {
+            // Load dispatchForms separately
+            Dispatch dispatchWithForms = dispatchRepo.findWithFormsById(dispatchId)
+                    .orElseThrow(() -> new EntityNotFoundException("Dispatch forms not found"));
+            dispatch.setDispatchForms(dispatchWithForms.getDispatchForms());
+
+            // Load dispatchUsers separately
+            Dispatch dispatchWithUsers = dispatchRepo.findWithUsersById(dispatchId)
+                    .orElseThrow(() -> new EntityNotFoundException("Dispatch users not found"));
+            dispatch.setDispatchUsers(dispatchWithUsers.getDispatchUsers());
+
+            // Ensure collections are fully initialized before processing
+            dispatch.getDispatchForms().size();
+            dispatch.getDispatchUsers().size();
+
+            // Update dispatchForms based on referenced entity status
+            dispatch.getDispatchForms().forEach(dispatchForm -> {
+                String qcFormTreeNodeId = dispatchForm.getQcFormTreeNodeId();
+                Optional<FormNode> formNode = formNodeService.getNodeByIdOrUuid(qcFormTreeNodeId);
+                dispatchForm.setStatus(formNode.isPresent() ? 1 : 0);
+            });
+
+            // Update dispatchUsers based on referenced user status
+            dispatch.getDispatchUsers().forEach(dispatchUser -> {
+                Optional<User> user = userRepository.findById(dispatchUser.getUser().getId());
+                dispatchUser.setStatus(user.isPresent() && user.get().getStatus() == 1 ? 1 : 0);
+            });
+
+            // Check and cancel dispatch if it has a execution limit
+            if ((dispatch.getDispatchLimit() != -1) && (dispatch.getExecutedCount() >= dispatch.getDispatchLimit())) {
+                if(taskScheduleService.isScheduled(dispatch.getId())) {
+                    taskScheduleService.removeAllTasks(dispatch.getId());
+                }
+                dispatch.setState(DispatchState.Exhausted.getState());
+                dispatchRepo.save(dispatch);
+                return;
+            }
+
+
             // insert dispatched task rows and increase executed count
             processDispatch(dispatch);
             dispatch.setUpdatedAt(OffsetDateTime.now());
             dispatchRepo.save(dispatch);
         } catch (Exception e) {
-            logger.error("Error executing Dispatch ID: {}", dispatchId, e);
+            dispatch.setState(DispatchState.Invalid.getState());
+            taskScheduleService.removeAllTasks(dispatch.getId());
+            dispatchRepo.save(dispatch);
+            logger.error("Error executing Dispatch ID: {}, set dispatch to invalid", dispatchId, e);
         }
     }
 
@@ -580,7 +579,7 @@ public class DispatchServiceImpl implements DispatchService {
 
         if (taskScheduleService.removeTask(dispatchId, TaskType.CRON)) {
             // Update status after cancellation
-            dispatch.setUpdatedAt(OffsetDateTime.now());
+            dispatch.setUpdateDetails(userId, 1);
             dispatch.setState(DispatchState.Paused.getState());
             dispatchRepo.save(dispatch);
         } else {
@@ -593,7 +592,7 @@ public class DispatchServiceImpl implements DispatchService {
                 .orElseThrow(() -> new EntityNotFoundException("Dispatch not found"));
 
         taskScheduleService.setupCronTask(dispatch,() -> executeDispatch(dispatch.getId()));
-        dispatch.setUpdatedAt(OffsetDateTime.now());
+        dispatch.setUpdateDetails(userId, 1);
         dispatch.setState(DispatchState.Active.getState());
         dispatchRepo.save(dispatch);
     }

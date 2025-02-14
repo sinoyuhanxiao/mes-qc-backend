@@ -383,7 +383,7 @@ public class QcTaskSubmissionLogsServiceImpl implements QcTaskSubmissionLogsServ
 
                 // Custom key mapping
                 if ("_id".equals(key)) {
-                    key = "表单ID"; // Change "_id" to "表单ID"
+                    key = "提交单号"; // Change "_id" to "表单ID"
                 } else if ("created_at".equals(key)) {
                     key = "提交时间"; // Change "created_at" to "提交时间"
                     // Convert "created_at" value to local timezone in "YYYY-MM-DD HH:mm:ss" format

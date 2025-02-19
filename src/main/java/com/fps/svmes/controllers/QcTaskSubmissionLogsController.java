@@ -16,6 +16,7 @@ import org.bson.Document;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Optional;
 
 @RestController
 @Slf4j
@@ -59,9 +60,11 @@ public class QcTaskSubmissionLogsController {
     public ResponseEntity<?> getDocument(
             @RequestParam String submissionId,
             @RequestParam Long qcFormTemplateId,
-            @RequestParam Integer createdBy) {
+            @RequestParam Integer createdBy,
+            @RequestParam Optional<String> inputCollectionName
+            ) {
         try {
-            Document document = qcTaskSubmissionLogsService.getDocumentBySubmissionId(submissionId, qcFormTemplateId, createdBy);
+            Document document = qcTaskSubmissionLogsService.getDocumentBySubmissionId(submissionId, qcFormTemplateId, createdBy, inputCollectionName);
             if (document == null) {
                 return ResponseEntity.status(404).body("Document not found for submissionId: " + submissionId);
             }
@@ -110,9 +113,12 @@ public class QcTaskSubmissionLogsController {
     public ResponseEntity<?> getDocumentPdf(
             @RequestParam String submissionId,
             @RequestParam Long qcFormTemplateId,
-            @RequestParam Integer createdBy) {
+            @RequestParam Integer createdBy,
+            @RequestParam Optional<String> inputCollectionName
+
+    ) {
         try {
-            Document document = qcTaskSubmissionLogsService.getDocumentBySubmissionId(submissionId, qcFormTemplateId, createdBy);
+            Document document = qcTaskSubmissionLogsService.getDocumentBySubmissionId(submissionId, qcFormTemplateId, createdBy, inputCollectionName);
             if (document == null) {
                 return ResponseEntity.status(404).body("Document not found for submissionId: " + submissionId);
             }

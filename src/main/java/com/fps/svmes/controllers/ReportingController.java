@@ -2,6 +2,7 @@ package com.fps.svmes.controllers;
 
 import com.fps.svmes.dto.dtos.reporting.WidgetDataDTO;
 import com.fps.svmes.services.ReportingService;
+import org.bson.Document;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -26,6 +27,20 @@ public class ReportingController {
     @PostMapping("/extract-with-counts")
     public List<WidgetDataDTO> extractWidgetDataWithCounts(@RequestParam Long formTemplateId) {
         return reportingService.extractWidgetDataWithCounts(formTemplateId);
+    }
+
+    /**
+     * Fetch QC records within a given date range, with pagination.
+     */
+    @GetMapping("/qc-records")
+    public List<Document> getQcRecords(
+            @RequestParam Long formTemplateId,
+            @RequestParam String startDateTime,
+            @RequestParam String endDateTime,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+
+        return reportingService.fetchQcRecords(formTemplateId, startDateTime, endDateTime, page, size);
     }
 
 }

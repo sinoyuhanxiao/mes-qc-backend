@@ -12,6 +12,7 @@ import com.itextpdf.text.pdf.BaseFont;
 import com.itextpdf.text.pdf.PdfPCell;
 import com.itextpdf.text.pdf.PdfPTable;
 import com.itextpdf.text.pdf.PdfWriter;
+import jakarta.validation.constraints.Null;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
@@ -35,6 +36,7 @@ import java.io.ByteArrayOutputStream;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 import static com.fps.svmes.controllers.UserController.logger;
@@ -81,7 +83,7 @@ public class QcTaskSubmissionLogsServiceImpl implements QcTaskSubmissionLogsServ
     }
 
     @Override
-    public Document getDocumentBySubmissionId(String submissionId, Long formId, Integer createdBy) {
+    public Document getDocumentBySubmissionId(String submissionId, Long formId, Integer createdBy, Optional<String> inputCollectionName) {
         try {
             // Log input parameters for debugging
             logger.info("Fetching document with submissionId: {}, formId: {}, createdBy: {}", submissionId, formId, createdBy);
@@ -92,9 +94,12 @@ public class QcTaskSubmissionLogsServiceImpl implements QcTaskSubmissionLogsServ
                 throw new IllegalArgumentException("Invalid submissionId format");
             }
 
-            // Generate the collection name dynamically
-            String yearMonth = OffsetDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMM"));
-            String collectionName = "form_template_" + formId + "_" + yearMonth;
+            // Determine collection name
+            String collectionName = inputCollectionName.orElseGet(() -> {
+                String yearMonth = OffsetDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMM"));
+                return "form_template_" + formId + "_" + yearMonth;
+            });
+
             logger.info("Looking in collection: {}", collectionName);
 
             // Check if collection exists
@@ -125,6 +130,7 @@ public class QcTaskSubmissionLogsServiceImpl implements QcTaskSubmissionLogsServ
             throw new RuntimeException("Error retrieving document from MongoDB: " + e.getMessage(), e);
         }
     }
+
 
     public HashMap<String, String> getFormTemplateKeyValueMapping(Long formId) {
         String formTemplateJson = qcFormTemplateRepository.findFormTemplateJsonById(formId); // get only that single result for now

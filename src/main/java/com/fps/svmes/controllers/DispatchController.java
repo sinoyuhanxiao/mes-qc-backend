@@ -106,21 +106,6 @@ public class DispatchController {
         }
     }
 
-    @Operation(summary = "Get all dispatched tests", description = "Retrieves a list of all dispatched tests")
-    @GetMapping("/dispatched-tasks")
-    public ResponseResult<List<DispatchedTaskDTO>> getAllDispatchedTask() {
-        try {
-            List<DispatchedTaskDTO> tasks = dispatchService.getAllDispatchedTasks();
-            return tasks.isEmpty()
-                    ? ResponseResult.noContent(tasks)
-                    : ResponseResult.success(tasks);
-        } catch (Exception e) {
-            logger.error("Error retrieving all dispatched tasks");
-            return ResponseResult.fail("Failed to retrieve all dispatched tasks", e);
-        }
-    }
-
-
     /**
      * Endpoint to schedule a dispatch task.
      *

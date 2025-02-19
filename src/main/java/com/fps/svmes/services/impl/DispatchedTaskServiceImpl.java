@@ -3,10 +3,18 @@ package com.fps.svmes.services.impl;
 import com.fps.svmes.dto.dtos.dispatch.DispatchedTaskDTO;
 import com.fps.svmes.models.sql.taskSchedule.DispatchedTask;
 import com.fps.svmes.models.sql.user.User;
+import com.fps.svmes.models.nosql.FormNode;
 import com.fps.svmes.repositories.jpaRepo.dispatch.DispatchedTaskRepository;
 import com.fps.svmes.services.DispatchedTaskService;
+import com.fps.svmes.services.FormNodeService;
+import com.fps.svmes.repositories.specifications.DispatchedTaskSpecification;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import com.fps.svmes.repositories.jpaRepo.user.UserRepository;
 
@@ -15,12 +23,12 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
-import java.net.ProtocolException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.time.OffsetDateTime;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -32,6 +40,9 @@ public class DispatchedTaskServiceImpl implements DispatchedTaskService {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private FormNodeService formNodeService;
 
     @Autowired
     private ModelMapper modelMapper;
@@ -121,7 +132,6 @@ public class DispatchedTaskServiceImpl implements DispatchedTaskService {
         }
     }
 
-
     @Override
     public void updateDispatchedTask(Long id, DispatchedTaskDTO dispatchedTaskDTO) {
         // Fetch the existing task or throw an exception if not found
@@ -169,4 +179,66 @@ public class DispatchedTaskServiceImpl implements DispatchedTaskService {
         dispatchedTaskRepository.save(task);
     }
 
+    @Override
+    public Page<DispatchedTaskDTO> getAllDispatchedTasks(int page, int size, String sort, String search) {
+        String mappedSortField = mapDtoToEntityField(sort.split(",")[0]);
+        String sortDirection = sort.split(",")[1];
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.fromString(sortDirection), mappedSortField));
+
+        Specification<DispatchedTask> spec = Specification.where(null);
+
+        if (search != null && !search.trim().isEmpty()) {
+            // Find matching QC Form Nodes in MongoDB
+            List<String> matchingFormIds;
+
+            matchingFormIds = formNodeService.getNodesWithLabelContaining(search).stream().map(FormNode::getId).toList();
+            spec = spec.and(DispatchedTaskSpecification.searchByKeyword(search, matchingFormIds));
+        }
+
+        Page<DispatchedTask> dispatchedTaskPage = dispatchedTaskRepository.findAll(spec, pageable);
+
+        return dispatchedTaskPage.map(task -> modelMapper.map(task, DispatchedTaskDTO.class));
+    }
+
+    @Override
+    public Page<DispatchedTaskDTO> getDispatchedTasksByDispatchId(Long dispatchId, int page, int size, String sort, String search) {
+        String mappedSortField = mapDtoToEntityField(sort.split(",")[0]);
+        String sortDirection = sort.split(",")[1];
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.fromString(sortDirection), mappedSortField));
+
+        // Build Specification for SQL query
+        Specification<DispatchedTask> spec = Specification.where(DispatchedTaskSpecification.byDispatchId(dispatchId));
+
+        if (search != null && !search.trim().isEmpty()) {
+            // Find matching QC Form Nodes in MongoDB
+            List<String> matchingFormIds;
+
+            matchingFormIds = formNodeService.getNodesWithLabelContaining(search).stream().map(FormNode::getId).toList();
+            spec = spec.and(DispatchedTaskSpecification.searchByKeyword(search, matchingFormIds));
+        }
+
+        Page<DispatchedTask> dispatchedTaskPage = dispatchedTaskRepository.findAll(spec, pageable);
+
+        return dispatchedTaskPage.map(task -> modelMapper.map(task, DispatchedTaskDTO.class));
+    }
+
+    // Mapping DTO field names to Entity field names (Including Common Fields)
+    private String mapDtoToEntityField(String dtoField) {
+        return switch (dtoField) {
+            // DispatchedTask-specific fields
+            case "dispatch_time" -> "dispatchTime";
+            case "due_date" -> "dueDate";
+            case "finished_at" -> "finishedAt";
+            case "dispatched_task_state_id" -> "stateId";
+            case "dispatch_id" -> "dispatch.id";
+
+            // Common fields
+            case "created_at" -> "createdAt";
+            case "created_by" -> "createdBy";
+            case "updated_at" -> "updatedAt";
+            case "updated_by" -> "updatedBy";
+
+            default -> dtoField; // Default to original name if no mapping is needed
+        };
+    }
 }

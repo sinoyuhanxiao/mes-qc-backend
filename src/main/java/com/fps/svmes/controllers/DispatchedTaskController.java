@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Page;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -17,7 +18,7 @@ import java.util.List;
 @RequestMapping("/dispatched-tasks")
 @Slf4j
 @RequiredArgsConstructor
-@Tag(name = "Dispatched Task Test API", description = "API for managing dispatched tasks")
+@Tag(name = "Dispatched Task API", description = "API for managing dispatched tasks")
 public class DispatchedTaskController {
 
     private final DispatchedTaskService dispatchedTaskService;
@@ -125,6 +126,41 @@ public class DispatchedTaskController {
         } catch (Exception e) {
             logger.error("Error deleting dispatched task with ID: {}", id, e);
             return ResponseResult.fail("Failed to delete dispatched task", e);
+        }
+    }
+
+    @GetMapping
+    @Operation(summary = "Get all dispatched tasks", description = "Retrieves a list of all dispatched tests")
+    public ResponseResult<Page<DispatchedTaskDTO>> getAllDispatchedTask(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "50") int size,
+            @RequestParam(defaultValue = "dispatch_time,desc") String sort,
+            @RequestParam(required = false) String search) {
+        try {
+            Page<DispatchedTaskDTO> tasks = dispatchedTaskService.getAllDispatchedTasks(page, size, sort, search);
+            return tasks.isEmpty()
+                    ? ResponseResult.noContent(tasks)
+                    : ResponseResult.success(tasks);
+        } catch (Exception e) {
+            logger.error("Error retrieving all dispatched tasks");
+            return ResponseResult.fail("Failed to retrieve all dispatched tasks", e);
+        }
+    }
+
+    @GetMapping("/by-dispatch")
+    public ResponseResult<Page<DispatchedTaskDTO>> getDispatchedTasksByDispatchId(
+            @RequestParam Long dispatchId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "50") int size,
+            @RequestParam(defaultValue = "dispatch_time,desc") String sort,
+            @RequestParam(required = false) String search) {
+
+        try {
+            Page<DispatchedTaskDTO> dispatchedTasks = dispatchedTaskService.getDispatchedTasksByDispatchId(dispatchId, page, size, sort, search);
+            return ResponseResult.success(dispatchedTasks);
+        } catch (Exception e) {
+            logger.error("Error retrieving dispatched tasks by dispatch ID", e);
+            return ResponseResult.fail("Failed to retrieve dispatched tasks by dispatch ID", e);
         }
     }
 }

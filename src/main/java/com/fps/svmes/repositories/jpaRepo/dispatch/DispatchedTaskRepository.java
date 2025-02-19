@@ -1,11 +1,14 @@
 package com.fps.svmes.repositories.jpaRepo.dispatch;
 
 import com.fps.svmes.models.sql.taskSchedule.DispatchedTask;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
 import java.util.List;
 
-public interface DispatchedTaskRepository extends JpaRepository<DispatchedTask, Long> {
+public interface DispatchedTaskRepository extends JpaRepository<DispatchedTask, Long>, JpaSpecificationExecutor<DispatchedTask> {
 
     // Find tasks for the current day
     List<DispatchedTask> findByUserIdAndDueDateBetweenAndStatus(
@@ -22,4 +25,7 @@ public interface DispatchedTaskRepository extends JpaRepository<DispatchedTask, 
 
     // Find tasks with dispatch id that are in pending
     List<DispatchedTask> findByDispatchIdAndStateIdAndStatus(Long dispatchId, Integer stateId, Integer status);
+
+    Page<DispatchedTask> findAll(Pageable pageable);
+
 }

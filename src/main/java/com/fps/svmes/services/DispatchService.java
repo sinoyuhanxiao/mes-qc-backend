@@ -17,7 +17,6 @@ public interface DispatchService {
     Dispatch updateDispatch(Long id, @Valid DispatchDTO request);
     DispatchDTO getDispatch(Long id);
     List<DispatchDTO> getAllDispatches();
-    List<DispatchedTaskDTO> getAllDispatchedTasks();
     void pauseDispatch(Long dispatchId, Integer userId);
     void resumeDispatch(Long dispatchId, Integer userId);
     void deleteDispatch(Long id, Integer userId);

@@ -179,21 +179,13 @@ public class DispatchServiceImpl implements DispatchService {
         dispatch.setDispatchTestSubjects(mutableDispatchTestSubjects);
 
 
-        if (dispatch.getType().equals("custom")) {
-            // since manual dispatch only execute once, will default isActive to false
-            dispatch.setState(DispatchState.Inactive.getState());
-            dispatch.setExecutedCount(dispatch.getExecutedCount() + 1); // Increment executed count
-        }
-
         Dispatch savedDispatch = dispatchRepo.save(dispatch);
 
         // Insert rows to dispatched task table
         try {
-            if (dispatch.getType().equals("custom")) {
-                createTasksForDispatch(savedDispatch);
-            } else {
-                this.initializeDispatch(savedDispatch.getId(), () -> executeDispatch(savedDispatch.getId()));
-            }
+
+            this.initializeDispatch(savedDispatch.getId(), () -> executeDispatch(savedDispatch.getId()));
+
         } catch (IllegalStateException e) {
             logger.warn("Dispatch created but not immediately scheduled: {}", e.getMessage());
         }
@@ -278,23 +270,12 @@ public class DispatchServiceImpl implements DispatchService {
         updateDispatchInstruments(dispatch, request.getInstrumentIds());
         updateDispatchTestSubjects(dispatch, request.getTestSubjectIds());
 
-        if (dispatch.getType().equals("custom")) {
-            // since manual dispatch only execute once, will default isActive to false
-            dispatch.setState(DispatchState.Inactive.getState());
-            dispatch.setExecutedCount(dispatch.getExecutedCount() + 1); // Increment executed count
-        }
 
         Dispatch updatedDispatch = dispatchRepo.save(dispatch);
 
         if (updatedDispatch.getStatus() == 1) {
-            if ("regular".equals(request.getType())) {
-                // reset its scheduled task
-                taskScheduleService.removeAllTasks(dispatch.getId());
-                initializeDispatch(id, () -> executeDispatch(updatedDispatch.getId()));
-            } else {
-                // custom dispatch will just create and insert row to dispatched task table
-                createTasksForDispatch(updatedDispatch);
-            }
+            taskScheduleService.removeAllTasks(dispatch.getId());
+            initializeDispatch(id, () -> executeDispatch(updatedDispatch.getId()));
         }
         return updatedDispatch;
     }
@@ -376,33 +357,6 @@ public class DispatchServiceImpl implements DispatchService {
                 .stream()
                 .filter(dispatch -> dispatch.getStatus() == 1)
                 .map(this::convertToDispatchDTO)
-                .collect(toList());
-    }
-
-    @Transactional(readOnly = true)
-    public List<DispatchedTaskDTO> getAllDispatchedTasks() {
-        // Fetch all dispatched tasks from the repository
-        List<DispatchedTask> dispatchedTasks = dispatchedTaskRepo.findAll();
-
-        return dispatchedTasks.stream()
-                .map(dispatchedTask -> {
-                    try {
-                        // Skip if dispatch or user is missing
-                        if (dispatchedTask.getDispatch() == null || dispatchedTask.getUser() == null) {
-                            return null; // Skip this entry
-                        }
-
-                        DispatchedTaskDTO dto = modelMapper.map(dispatchedTask, DispatchedTaskDTO.class);
-                        dto.setDispatchId(dispatchedTask.getDispatch().getId());
-                        dto.setUserId(Long.valueOf(dispatchedTask.getUser().getId()));
-
-                        return dto;
-                    } catch (EntityNotFoundException e) {
-                        // Log and skip the entry
-                        return null;
-                    }
-                })
-                .filter(Objects::nonNull) // Remove skipped entries
                 .collect(toList());
     }
 
@@ -532,7 +486,7 @@ public class DispatchServiceImpl implements DispatchService {
             });
 
             // Check and cancel dispatch if it has a execution limit
-            if ((dispatch.getDispatchLimit() != -1) && (dispatch.getExecutedCount() >= dispatch.getDispatchLimit())) {
+            if ((Objects.equals(dispatch.getType(), "regular")) && (dispatch.getDispatchLimit() != -1) && (dispatch.getExecutedCount() >= dispatch.getDispatchLimit())) {
                 if(taskScheduleService.isScheduled(dispatch.getId())) {
                     taskScheduleService.removeAllTasks(dispatch.getId());
                 }
@@ -553,7 +507,6 @@ public class DispatchServiceImpl implements DispatchService {
             logger.error("Error executing Dispatch ID: {}, set dispatch to invalid", dispatchId, e);
         }
     }
-
 
     // This function cancels all tasks of a dispatch
     @Override

@@ -200,7 +200,7 @@ public class QcOrderServiceImpl implements QcOrderService {
         return qcOrderDTO;
     }
 
-    @Scheduled(fixedRate = 600000) // Runs every 10 minutes
+    @Scheduled(fixedRate = 60000) // Runs every 10 minutes
     @Transactional
     public void updateQcOrderStates() {
         logger.info("Running periodic qc order states update...");

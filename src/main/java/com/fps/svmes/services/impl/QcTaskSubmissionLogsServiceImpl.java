@@ -442,6 +442,29 @@ public class QcTaskSubmissionLogsServiceImpl implements QcTaskSubmissionLogsServ
         }
     }
 
+    @Override
+    public void deleteSubmissionLog(String submissionId, String collectionName) {
+        // Check if collection exists
+        if (!mongoTemplate.collectionExists(collectionName)) {
+            throw new RuntimeException("Collection not found: " + collectionName);
+        }
+
+        // Construct the MongoDB query
+        Query query = new Query();
+        query.addCriteria(Criteria.where("_id").is(submissionId));
+
+        // Execute the query and fetch the documents
+        List<Document> documents = mongoTemplate.find(query, Document.class, collectionName);
+
+        // Check if the document exists
+        if (documents.isEmpty()) {
+            throw new RuntimeException("Document not found: " + submissionId);
+        }
+
+        // Delete the document
+        mongoTemplate.remove(query, collectionName);
+    }
+
     private String convertToLocalTime(String utcTime) {
         try {
             // Parse the ISO-8601 UTC timestamp into an Instant

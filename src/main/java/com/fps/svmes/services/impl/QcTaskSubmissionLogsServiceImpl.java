@@ -338,7 +338,9 @@ public class QcTaskSubmissionLogsServiceImpl implements QcTaskSubmissionLogsServ
                 cellNum = 0;
                 for (Object value : document.values()) {
                     Cell cell = row.createCell(cellNum++);
-                    if (value instanceof List) {
+                    if (value == null) {
+                        cell.setCellValue(""); // 如果 value 是 null，则填充空字符串
+                    } else if (value instanceof List) {
                         cell.setCellValue(String.join(", ", (List<String>) value));
                     } else {
                         cell.setCellValue(value.toString());

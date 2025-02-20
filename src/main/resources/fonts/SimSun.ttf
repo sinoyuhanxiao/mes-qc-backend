@@ -1,5 +1,0 @@
-BaseFont baseFont = BaseFont.createFont(
-    getClass().getClassLoader().getResource("fonts/SimSun.ttf").toString(),
-    BaseFont.IDENTITY_H,
-    BaseFont.EMBEDDED
-);

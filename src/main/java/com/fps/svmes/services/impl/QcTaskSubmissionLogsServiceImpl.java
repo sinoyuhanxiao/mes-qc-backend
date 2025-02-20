@@ -27,6 +27,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.data.mongodb.core.query.Query;
 import com.itextpdf.text.*;
 
+import java.io.InputStream;
 import java.time.*;
 import java.util.Map;
 
@@ -369,9 +370,16 @@ public class QcTaskSubmissionLogsServiceImpl implements QcTaskSubmissionLogsServ
             // Open the PDF document
             pdfDocument.open();
 
-            // Load the SimSun font
-            String fontPath = "C:/Windows/Fonts/simsun.ttc";
-            BaseFont baseFont = BaseFont.createFont(fontPath + ",0", BaseFont.IDENTITY_H, BaseFont.EMBEDDED);
+            // Load the font from resources instead of system path
+            BaseFont baseFont;
+            try (InputStream fontStream = getClass().getClassLoader().getResourceAsStream("fonts/simsun.ttc")) {
+                if (fontStream == null) {
+                    throw new RuntimeException("Font file not found in resources!");
+                }
+                byte[] fontBytes = fontStream.readAllBytes();
+                baseFont = BaseFont.createFont("fonts/simsun.ttc,0", BaseFont.IDENTITY_H, BaseFont.EMBEDDED);
+            }
+
             Font chineseFont = new Font(baseFont, 12, Font.NORMAL);
 
             // Add the title "提交记录"
@@ -379,28 +387,25 @@ public class QcTaskSubmissionLogsServiceImpl implements QcTaskSubmissionLogsServ
             pdfDocument.add(Chunk.NEWLINE); // Add a blank line for spacing
 
             // Create a table to dynamically display the key-value pairs
-            PdfPTable table = new PdfPTable(2); // Two columns: one for the key and one for the value
-            table.setWidthPercentage(100); // Table spans the full width
+            PdfPTable table = new PdfPTable(2);
+            table.setWidthPercentage(100);
             table.setSpacingBefore(10f);
-            table.setWidths(new float[]{2f, 5f}); // Adjust column widths
+            table.setWidths(new float[]{2f, 5f});
 
             // Dynamically iterate over the MongoDB document and handle specific keys
             for (Map.Entry<String, Object> entry : mongoDocument.entrySet()) {
                 String key = entry.getKey();
                 Object value = entry.getValue();
 
-                // Custom key mapping
                 if ("_id".equals(key)) {
-                    key = "提交单号"; // Change "_id" to "表单ID"
+                    key = "提交单号";
                 } else if ("created_at".equals(key)) {
-                    key = "提交时间"; // Change "created_at" to "提交时间"
-                    // Convert "created_at" value to local timezone in "YYYY-MM-DD HH:mm:ss" format
+                    key = "提交时间";
                     value = convertToLocalTime(value.toString());
                 } else if ("created_by".equals(key)) {
-                    key = "提交人ID"; // Change "created_by" to "提交人ID"
+                    key = "提交人ID";
                 }
 
-                // Add key and value to the table
                 PdfPCell keyCell = new PdfPCell(new Phrase(key, chineseFont));
                 keyCell.setBorder(Rectangle.NO_BORDER);
                 keyCell.setPadding(5);
@@ -413,17 +418,17 @@ public class QcTaskSubmissionLogsServiceImpl implements QcTaskSubmissionLogsServ
                 table.addCell(valueCell);
             }
 
-            // Add the table to the PDF document
             pdfDocument.add(table);
 
             // Add the closing "提交时间" at the end
             pdfDocument.add(Chunk.NEWLINE);
-            String createdAt = mongoDocument.getString("created_at"); // Retrieve "created_at" value dynamically
+            String createdAt = mongoDocument.getString("created_at");
             pdfDocument.add(new Paragraph(
                     "提交时间: " + (createdAt != null ? convertToLocalTime(createdAt) : "N/A"),
                     chineseFont
             ));
-            // find the person name using the userservice
+
+            // Find the person name using the UserService
             String personName = userService.getUserById(
                             Integer.parseInt(String.valueOf(mongoDocument.get("created_by"))))
                     .getName();
@@ -435,7 +440,6 @@ public class QcTaskSubmissionLogsServiceImpl implements QcTaskSubmissionLogsServ
             // Close the PDF document
             pdfDocument.close();
 
-            // Return the generated PDF as a byte array
             return outputStream.toByteArray();
         } catch (Exception e) {
             throw new RuntimeException("Error exporting document to PDF: " + e.getMessage(), e);

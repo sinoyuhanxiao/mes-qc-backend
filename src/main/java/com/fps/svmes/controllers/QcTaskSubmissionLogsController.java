@@ -13,7 +13,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.bson.Document;
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Optional;
 
 @RestController
 @Slf4j
@@ -57,15 +60,94 @@ public class QcTaskSubmissionLogsController {
     public ResponseEntity<?> getDocument(
             @RequestParam String submissionId,
             @RequestParam Long qcFormTemplateId,
-            @RequestParam Integer createdBy) {
+            @RequestParam Integer createdBy,
+            @RequestParam Optional<String> inputCollectionName
+            ) {
         try {
-            Document document = qcTaskSubmissionLogsService.getDocumentBySubmissionId(submissionId, qcFormTemplateId, createdBy);
+            Document document = qcTaskSubmissionLogsService.getDocumentBySubmissionId(submissionId, qcFormTemplateId, createdBy, inputCollectionName);
             if (document == null) {
                 return ResponseEntity.status(404).body("Document not found for submissionId: " + submissionId);
             }
             return ResponseEntity.ok(document);
         } catch (Exception e) {
             return ResponseEntity.status(500).body("Error retrieving document: " + e.getMessage());
+        }
+    }
+
+    // documents for user that accept the qcFormTemplateId and createdBy and return all the documents that match the criteria
+    @GetMapping("/documents_for_user")
+    @Operation(summary = "Get all documents by qcFormTemplateId and createdBy")
+    public ResponseEntity<?> getDocuments(
+            @RequestParam Long qcFormTemplateId,
+            @RequestParam Integer createdBy) {
+        try {
+            List<Document> documents = qcTaskSubmissionLogsService.getDocumentsByQcFormTemplateIdAndCreatedBy(qcFormTemplateId, createdBy);
+            return ResponseEntity.ok(documents);
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body("Error retrieving documents: " + e.getMessage());
+        }
+    }
+
+    // write a controller called excel_documents_for_user to export all the list of documents to excel
+    @GetMapping("/excel_documents_for_user")
+    @Operation(summary = "Export all documents by qcFormTemplateId and createdBy to Excel")
+    public ResponseEntity<?> exportDocumentsToExcel(
+            @RequestParam Long qcFormTemplateId,
+            @RequestParam Integer createdBy) {
+        try {
+            List<Document> documents = qcTaskSubmissionLogsService.getDocumentsByQcFormTemplateIdAndCreatedBy(qcFormTemplateId, createdBy);
+            byte[] excelBytes = qcTaskSubmissionLogsService.exportDocumentsToExcel(documents);
+            // the filename should be the current datetime
+            String fileName = "documents_" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss")) + ".xlsx";
+            return ResponseEntity.ok()
+                    .header("Content-Disposition", "attachment; filename=" + fileName)
+                    .body(excelBytes);
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body("Error exporting documents to Excel: " + e.getMessage());
+        }
+    }
+
+    // use itext to export result to pdf according to the /document endpoint and make that /document_pdf
+    @GetMapping("/document_pdf")
+    @Operation(summary = "Export Mongo document to PDF")
+    public ResponseEntity<?> getDocumentPdf(
+            @RequestParam String submissionId,
+            @RequestParam Long qcFormTemplateId,
+            @RequestParam Integer createdBy,
+            @RequestParam Optional<String> inputCollectionName
+
+    ) {
+        try {
+            Document document = qcTaskSubmissionLogsService.getDocumentBySubmissionId(submissionId, qcFormTemplateId, createdBy, inputCollectionName);
+            if (document == null) {
+                return ResponseEntity.status(404).body("Document not found for submissionId: " + submissionId);
+            }
+            // export the document to pdf
+            byte[] pdfBytes = qcTaskSubmissionLogsService.exportDocumentToPdf(document);
+            // the filename should be the current datetime
+            String fileName = "document_" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss")) + ".pdf";
+            return ResponseEntity.ok()
+                    .header("Content-Disposition", "attachment; filename=" + fileName)
+                    .body(pdfBytes);
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body("Error exporting document to PDF: " + e.getMessage());
+        }
+    }
+
+    // Delete the submission log by submissionId and createdAt
+    @DeleteMapping("/{submissionId}")
+    @Operation(summary = "Delete a submission log by submissionId and createdAt")
+    public ResponseEntity<?> deleteSubmissionLog(
+            @PathVariable String submissionId,
+            @RequestParam Long qcFormTemplateId,
+            @RequestParam String createdAt) {
+        try {
+            // determine the form_template_{id}_{YYYYMM} collection to look for according to createdAt example createdAt string 2025-02-05 19:31:58
+            String collectionName = "form_template_" + qcFormTemplateId + "_" + createdAt.substring(0, 7).replace("-", "");
+            qcTaskSubmissionLogsService.deleteSubmissionLog(submissionId, collectionName);
+            return ResponseEntity.ok("Submission log deleted successfully");
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body("Error deleting submission log: " + e.getMessage());
         }
     }
 

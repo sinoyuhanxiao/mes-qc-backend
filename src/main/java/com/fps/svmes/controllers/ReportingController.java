@@ -25,8 +25,12 @@ public class ReportingController {
     }
 
     @PostMapping("/extract-with-counts")
-    public List<WidgetDataDTO> extractWidgetDataWithCounts(@RequestParam Long formTemplateId) {
-        return reportingService.extractWidgetDataWithCounts(formTemplateId);
+    public List<WidgetDataDTO> extractWidgetDataWithCounts(
+            @RequestParam Long formTemplateId,
+            @RequestParam(required = false) String startDateTime,
+            @RequestParam(required = false) String endDateTime
+    ) {
+        return reportingService.extractWidgetDataWithCounts(formTemplateId, startDateTime, endDateTime);
     }
 
     /**

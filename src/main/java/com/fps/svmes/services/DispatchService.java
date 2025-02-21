@@ -23,4 +23,5 @@ public interface DispatchService {
     void initializeDispatch(Long dispatchId, Runnable task);
     void cancelDispatchTask(Long dispatchId);
     DispatchDTO convertToDispatchDTO(Dispatch dispatch);
+    String parseSpringCronToChinese(String cronExpression);
 }

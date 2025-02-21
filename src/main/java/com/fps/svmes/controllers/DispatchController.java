@@ -255,6 +255,17 @@ public class DispatchController {
         }
     }
 
+    @Operation(summary = "Convert spring CRON expression to Chinese", description = "Parses a Spring CRON expression and returns a human-readable description in Chinese")
+    @GetMapping("/parse-cron")
+    public ResponseResult<String> parseCronToChinese(@RequestParam String cronExpression) {
+        try {
+            String result = dispatchService.parseSpringCronToChinese(cronExpression);
+            return ResponseResult.success(result);
+        } catch (Exception e) {
+            logger.error("Error parsing cron expression: {}", cronExpression, e);
+            return ResponseResult.fail("Failed to parse cron expression", e);
+        }
+    }
 }
 
 

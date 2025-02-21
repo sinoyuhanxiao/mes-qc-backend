@@ -1,5 +1,9 @@
 package com.fps.svmes.services.impl;
 
+import com.cronutils.descriptor.CronDescriptor;
+import com.cronutils.model.Cron;
+import com.cronutils.model.CronType;
+import com.cronutils.model.definition.CronDefinitionBuilder;
 import com.fps.svmes.dto.dtos.dispatch.*;
 import com.fps.svmes.models.nosql.FormNode;
 import com.fps.svmes.models.sql.production.Product;
@@ -31,7 +35,7 @@ import java.util.function.Predicate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import static java.util.stream.Collectors.toList;
-
+import com.cronutils.parser.CronParser;
 
 /**
  * Implementation of the DispatchService interface.
@@ -937,7 +941,6 @@ public class DispatchServiceImpl implements DispatchService {
         });
     }
 
-
     private void updateDispatchRawMaterials(Dispatch dispatch, List<Integer> rawMaterialIds) {
         if (rawMaterialIds == null) return;
 
@@ -965,7 +968,6 @@ public class DispatchServiceImpl implements DispatchService {
             }
         });
     }
-
 
     private void updateDispatchProductionWorkOrders(Dispatch dispatch, List<Integer> productionWorkOrderIds) {
         if (productionWorkOrderIds == null) return;
@@ -1022,8 +1024,6 @@ public class DispatchServiceImpl implements DispatchService {
             }
         });
     }
-
-
 
     private void updateDispatchMaintenanceWorkOrders(Dispatch dispatch, List<Integer> maintenanceWorkOrderIds) {
         if (maintenanceWorkOrderIds == null) return;
@@ -1138,5 +1138,14 @@ public class DispatchServiceImpl implements DispatchService {
                 dispatch.getDispatchTestSubjects().add(dt);
             }
         });
+    }
+
+    public String parseSpringCronToChinese(String cronExpression) {
+
+//        return CronToChineseConverter.convertToChinese(cronExpression);
+        CronParser parser = new CronParser(CronDefinitionBuilder.instanceDefinitionFor(CronType.SPRING53));
+        Cron cron = parser.parse(cronExpression);
+        CronDescriptor descriptor = CronDescriptor.instance(Locale.ENGLISH);
+        return descriptor.describe(cron);
     }
 }

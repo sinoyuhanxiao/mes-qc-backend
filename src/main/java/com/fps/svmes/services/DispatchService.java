@@ -1,7 +1,6 @@
 package com.fps.svmes.services;
 
 import com.fps.svmes.dto.dtos.dispatch.DispatchDTO;
-import com.fps.svmes.dto.dtos.dispatch.DispatchedTaskDTO;
 import com.fps.svmes.models.sql.taskSchedule.Dispatch;
 import jakarta.validation.Valid;
 

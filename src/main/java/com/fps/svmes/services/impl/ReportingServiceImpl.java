@@ -57,7 +57,7 @@ public class ReportingServiceImpl implements ReportingService {
 
     @Override
     public List<WidgetDataDTO> extractWidgetDataWithCounts(Long formTemplateId, String startDateTime, String endDateTime) {
-        // ✅ Set default start and end timestamps
+        // Set default start and end timestamps
         Timestamp defaultStart = Timestamp.valueOf(startDateTime);
         Timestamp defaultEnd = Timestamp.valueOf(endDateTime);
 
@@ -65,13 +65,13 @@ public class ReportingServiceImpl implements ReportingService {
         List<WidgetDataDTO> widgetDataList = extractWidgetData(jsonInput);
         MongoDatabase database = mongoClient.getDatabase("dev-mes-qc");
 
-        // ✅ Use updated generateCollectionNames with default timestamps
+        // Use updated generateCollectionNames with default timestamps
         List<String> collectionNames = generateCollectionNames(formTemplateId, defaultStart, defaultEnd);
 
-        // ✅ Apply updates step by step
+        // Apply updates step by step
         for (String collectionName : collectionNames) {
             List<WidgetDataDTO> newData = processCollection(database, collectionName, widgetDataList, defaultStart, defaultEnd);
-            mergeWidgetDataLists(widgetDataList, newData); // ✅ Merge instead of overwriting
+            mergeWidgetDataLists(widgetDataList, newData); // Merge instead of overwriting
         }
 
         return widgetDataList;
@@ -86,7 +86,6 @@ public class ReportingServiceImpl implements ReportingService {
 
             if (existingWidget != null) {
                 if (newWidget.getType().equals("number")) {
-                    // ✅ Merge time-series data (handled correctly before)
                     if (existingWidget.getChartData() == null) {
                         existingWidget.setChartData(new ArrayList<>());
                     }
@@ -107,7 +106,6 @@ public class ReportingServiceImpl implements ReportingService {
                     existingWidget.setChartData(sortedEntries.stream().map(Map.Entry::getValue).collect(Collectors.toList()));
 
                 } else {
-                    // ✅ Fix option-based widgets (Pie Charts)
                     if (existingWidget.getOptionItems() == null) {
                         existingWidget.setOptionItems(new ArrayList<>());
                     }
@@ -115,23 +113,21 @@ public class ReportingServiceImpl implements ReportingService {
                         newWidget.setOptionItems(new ArrayList<>());
                     }
 
-                    // **Create a mapping of value → label from existing optionItems**
-                    Map<Integer, String> valueToLabelMap = existingWidget.getOptionItems().stream()
-                            .collect(Collectors.toMap(OptionItemDTO::getValue, OptionItemDTO::getLabel, (a, b) -> a));
+                    // ✅ Corrected: Sum up counts across multiple collections properly
+                    Map<Integer, Integer> countMap = new HashMap<>();
+                    Map<Integer, String> valueToLabelMap = new HashMap<>();
 
-                    Map<Integer, Integer> countMap = existingWidget.getOptionItems().stream()
-                            .collect(Collectors.toMap(OptionItemDTO::getValue, OptionItemDTO::getCount, Integer::sum));
-
-                    for (OptionItemDTO newItem : newWidget.getOptionItems()) {
-                        countMap.put(newItem.getValue(), countMap.getOrDefault(newItem.getValue(), 0) + newItem.getCount());
-
-                        // Ensure label is not null
-                        if (!valueToLabelMap.containsKey(newItem.getValue()) || valueToLabelMap.get(newItem.getValue()) == null) {
-                            valueToLabelMap.put(newItem.getValue(), newItem.getLabel());
-                        }
+                    for (OptionItemDTO item : existingWidget.getOptionItems()) {
+                        countMap.put(item.getValue(), item.getCount());
+                        valueToLabelMap.put(item.getValue(), item.getLabel());
                     }
 
-                    // ✅ Merge results back, ensuring labels are properly set
+                    for (OptionItemDTO item : newWidget.getOptionItems()) {
+                        countMap.put(item.getValue(), countMap.getOrDefault(item.getValue(), 0) + item.getCount());
+                        valueToLabelMap.putIfAbsent(item.getValue(), item.getLabel());
+                    }
+
+                    // ✅ Ensuring counts are correctly accumulated across months
                     List<OptionItemDTO> updatedOptions = countMap.entrySet().stream()
                             .map(e -> new OptionItemDTO(valueToLabelMap.get(e.getKey()), e.getKey(), e.getValue()))
                             .collect(Collectors.toList());
@@ -139,7 +135,7 @@ public class ReportingServiceImpl implements ReportingService {
                     existingWidget.setOptionItems(updatedOptions);
                 }
             } else {
-                originalList.add(newWidget); // ✅ If widget is new, add it directly
+                originalList.add(newWidget);
             }
         }
     }
@@ -199,20 +195,20 @@ public class ReportingServiceImpl implements ReportingService {
         List<String> collectionNames = new ArrayList<>();
         MongoDatabase database = mongoClient.getDatabase("dev-mes-qc");
 
-        // ✅ Convert timestamps to YYYYMM format
+        // Convert timestamps to YYYYMM format
         SimpleDateFormat yearMonthFormat = new SimpleDateFormat("yyyyMM");
         int startYearMonth = Integer.parseInt(yearMonthFormat.format(utcStartDateTime));
         int endYearMonth = Integer.parseInt(yearMonthFormat.format(utcEndDateTime));
 
         for (String collectionName : database.listCollectionNames()) {
-            // ✅ Extract YYYYMM from collection name
+            // Extract YYYYMM from collection name
             String pattern = "form_template_" + formTemplateId + "_(\\d{6})";
             java.util.regex.Matcher matcher = java.util.regex.Pattern.compile(pattern).matcher(collectionName);
 
             if (matcher.matches()) {
                 int collectionYearMonth = Integer.parseInt(matcher.group(1));
 
-                // ✅ Check if collection is within the time range
+                // Check if collection is within the time range
                 if (collectionYearMonth >= startYearMonth && collectionYearMonth <= endYearMonth) {
                     collectionNames.add(collectionName);
                 }
@@ -232,7 +228,7 @@ public class ReportingServiceImpl implements ReportingService {
         MongoCollection<Document> collection = database.getCollection(collectionName);
         List<WidgetDataDTO> updatedWidgets = new ArrayList<>();
 
-        // ✅ Update formatter to support nanoseconds (9-digit precision)
+        // Update formatter to support nanoseconds (9-digit precision)
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSSSSSSS");
 
         for (WidgetDataDTO widget : widgetDataList) {
@@ -262,13 +258,13 @@ public class ReportingServiceImpl implements ReportingService {
                         String rawTimestamp = doc.getString("created_at");
 
                         try {
-                            // ✅ Correctly parse as LocalDateTime (ignoring timezone)
+                            // Correctly parse as LocalDateTime (ignoring timezone)
                             LocalDateTime dateTime = LocalDateTime.parse(rawTimestamp, formatter);
 
-                            // ✅ Convert to UTC if necessary (optional)
+                            // Convert to UTC if necessary (optional)
                             ZonedDateTime utcDateTime = dateTime.atZone(ZoneId.systemDefault()).withZoneSameInstant(ZoneId.of("UTC"));
 
-                            // ✅ Format it correctly without nanoseconds
+                            // Format it correctly without nanoseconds
                             String formattedDate = utcDateTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
                             xaxisData.add(formattedDate);
                         } catch (Exception e) {
@@ -279,6 +275,22 @@ public class ReportingServiceImpl implements ReportingService {
 
                 updatedWidgets.add(new WidgetDataDTO(widget.getName(), widget.getLabel(), widget.getType(),
                         new ArrayList<>(), chartData, xaxisData));
+            }
+
+            // If the widget has optionItems (for select fields), count occurrences in MongoDB
+            if (!widget.getOptionItems().isEmpty()) {
+                Map<Integer, Integer> optionCounts = countOptionOccurrences(collection, widget.getName(), widget.getOptionItems(), startDateTime, endDateTime);
+
+                // ✅ Instead of modifying `widget.getOptionItems()`, create a NEW WidgetDataDTO and store it in `updatedWidgets`
+                List<OptionItemDTO> updatedOptions = widget.getOptionItems().stream()
+                        .map(option -> new OptionItemDTO(
+                                option.getLabel(),
+                                option.getValue(),
+                                optionCounts.getOrDefault(option.getValue(), 0)))  // Correctly apply new count values
+                        .collect(Collectors.toList());
+
+                updatedWidgets.add(new WidgetDataDTO(widget.getName(), widget.getLabel(), widget.getType(),
+                        updatedOptions, null, null));  // Store it correctly
             }
         }
 
@@ -361,28 +373,28 @@ public class ReportingServiceImpl implements ReportingService {
     public List<Document> fetchQcRecords(Long formTemplateId, String startDateTime, String endDateTime, Integer page, Integer size) {
         MongoDatabase database = mongoClient.getDatabase("dev-mes-qc");
 
-        // ✅ Convert time range to UTC before querying
+        // Convert time range to UTC before querying
         String startUtc = convertToUtcString(startDateTime);
         String endUtc = convertToUtcString(endDateTime);
 
-        // ✅ Get label mappings for formTemplateId
+        // Get label mappings for formTemplateId
         HashMap<String, Object> optionItemsKeyValueMap = QcFormTemplateOptionItemsKeyValueMapping(formTemplateId);
         HashMap<String, String> keyValueMap = getFormTemplateKeyValueMapping(formTemplateId);
 
-        // ✅ Get target collections based on the UTC date range
+        // Get target collections based on the UTC date range
         List<String> collectionNames = getRelevantCollections(database, formTemplateId, startUtc, endUtc);
 
         List<Document> records = new ArrayList<>();
         for (String collectionName : collectionNames) {
             MongoCollection<Document> collection = database.getCollection(collectionName);
 
-            // ✅ Query using UTC timestamps
+            // Query using UTC timestamps
             List<Document> collectionRecords = queryRecords(collection, startUtc, endUtc, page, size);
 
             records.addAll(collectionRecords);
         }
 
-        // ✅ Convert keys and values before returning
+        // Convert keys and values before returning
         return records.stream()
                 .map(doc -> formattedResult(doc, optionItemsKeyValueMap, keyValueMap))
                 .collect(Collectors.toList());
@@ -402,7 +414,7 @@ public class ReportingServiceImpl implements ReportingService {
             List<Document> widgetList = (List<Document>) formTemplate.get("widgetList");
 
             if (widgetList != null) {
-                extractKeyValuePairs(widgetList, keyValueMap); // ✅ Extract key-label mappings
+                extractKeyValuePairs(widgetList, keyValueMap); // Extract key-label mappings
             }
         } catch (Exception e) {
             throw new RuntimeException("Error parsing form template JSON", e);
@@ -413,7 +425,7 @@ public class ReportingServiceImpl implements ReportingService {
 
     private void extractKeyValuePairs(List<Document> widgetList, HashMap<String, String> keyValueMap) {
         for (Document widget : widgetList) {
-            // ✅ Extract options and add name-label pairs to the map
+            // Extract options and add name-label pairs to the map
             Document options = (Document) widget.get("options");
             if (options != null) {
                 String name = options.getString("name");
@@ -423,13 +435,13 @@ public class ReportingServiceImpl implements ReportingService {
                 }
             }
 
-            // ✅ Recursively process nested widgetList
+            // Recursively process nested widgetList
             List<Document> nestedWidgetList = (List<Document>) widget.get("widgetList");
             if (nestedWidgetList != null) {
                 extractKeyValuePairs(nestedWidgetList, keyValueMap);
             }
 
-            // ✅ Check for widget lists inside grid columns
+            // Check for widget lists inside grid columns
             List<Document> cols = (List<Document>) widget.get("cols");
             if (cols != null) {
                 for (Document col : cols) {
@@ -449,16 +461,16 @@ public class ReportingServiceImpl implements ReportingService {
         for (String key : document.keySet()) {
             Object value = document.get(key);
 
-            // ✅ 确保 `_id` 仍然是 ObjectId 而不是 timestamp + date 结构
+            // 确保 `_id` 仍然是 ObjectId 而不是 timestamp + date 结构
             if ("_id".equals(key) && value instanceof ObjectId) {
                 formattedDocument.put("_id", value.toString()); // 转换成字符串
                 continue;
             }
 
-            // ✅ 替换字段名
+            // 替换字段名
             String formattedKey = keyValueMap.getOrDefault(key, key);
 
-            // ✅ 如果 value 是选项列表，则转换成对应的 label
+            // 如果 value 是选项列表，则转换成对应的 label
             if (optionItemsKeyValueMap.containsKey(key) && value instanceof List) {
                 List<?> valueList = (List<?>) value;
                 HashMap<String, String> valueToLabelMap = (HashMap<String, String>) optionItemsKeyValueMap.get(key);
@@ -468,7 +480,7 @@ public class ReportingServiceImpl implements ReportingService {
                         .collect(Collectors.toList());
                 formattedDocument.put(formattedKey, resolvedLabels);
             }
-            // ✅ 如果 value 是单个数值并且有 label 映射，则转换
+            // 如果 value 是单个数值并且有 label 映射，则转换
             else if (optionItemsKeyValueMap.containsKey(key) && (value instanceof Integer || value instanceof String)) {
                 HashMap<String, String> valueToLabelMap = (HashMap<String, String>) optionItemsKeyValueMap.get(key);
                 formattedDocument.put(formattedKey, valueToLabelMap.getOrDefault(value.toString(), value.toString()));
@@ -476,7 +488,7 @@ public class ReportingServiceImpl implements ReportingService {
                 formattedDocument.put(formattedKey, value);
             }
 
-            // ✅ 获取 `created_by` 并添加 `created_by_name`
+            // 获取 `created_by` 并添加 `created_by_name`
             if (document.containsKey("created_by") && document.get("created_by") instanceof Long) {
                 Long createdById = document.getLong("created_by"); // ✅ 直接获取 Long 类型
                 try {

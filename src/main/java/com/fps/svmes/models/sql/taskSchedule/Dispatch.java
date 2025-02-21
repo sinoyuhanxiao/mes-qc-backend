@@ -14,7 +14,7 @@ import java.util.List;
 @NoArgsConstructor
 @EqualsAndHashCode(callSuper = true)
 @Entity
-@Table(name = "dispatch_temp", schema = "quality_management")
+@Table(name = "dispatch", schema = "quality_management")
 public class Dispatch extends Common {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

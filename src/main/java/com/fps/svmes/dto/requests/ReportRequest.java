@@ -11,8 +11,8 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class ReportRequest {
+    private String qcFormName;
     private String startDateTime;
     private String endDateTime;
     private List<ChartDataDTO> charts;
 }
-

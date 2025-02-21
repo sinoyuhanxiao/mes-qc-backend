@@ -13,7 +13,7 @@
     </style>
 </head>
 <body>
-<h1>质量控制报告</h1>
+<h1 th:text="${qcFormName} + '报告'"></h1>
 
 <p class="bold">检测时间范围：<span class="highlight" th:text="${startDateTime}"></span> 至 <span class="highlight" th:text="${endDateTime}"></span></p>
 

@@ -165,6 +165,7 @@ public class PdfController {
 
             // 2️⃣ Render HTML using Thymeleaf
             Context context = new Context();
+            context.setVariable("qcFormName", request.getQcFormName());
             context.setVariable("startDateTime", request.getStartDateTime());
             context.setVariable("endDateTime", request.getEndDateTime());
             context.setVariable("charts", request.getCharts());

@@ -1,6 +1,7 @@
 package com.fps.svmes.services;
 
 import com.fps.svmes.dto.dtos.dispatch.DispatchedTaskDTO;
+import org.springframework.data.domain.Page;
 
 import java.util.List;
 
@@ -13,4 +14,7 @@ public interface DispatchedTaskService {
     void updateDispatchedTask(Long id, DispatchedTaskDTO dispatchedTaskDTO);
     DispatchedTaskDTO getDispatchedTaskById(Long id);
     void deleteDispatchedTask(Long id);
+    Page<DispatchedTaskDTO> getAllDispatchedTasks(int page, int size, String sort, String search);
+    Page<DispatchedTaskDTO> getDispatchedTasksByDispatchId(Long dispatchId, int page, int size, String sort, String search);
+
 }

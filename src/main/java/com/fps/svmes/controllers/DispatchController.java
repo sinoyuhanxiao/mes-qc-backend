@@ -2,8 +2,6 @@ package com.fps.svmes.controllers;
 
 
 import com.fps.svmes.dto.dtos.dispatch.DispatchDTO;
-import com.fps.svmes.dto.dtos.dispatch.DispatchedTaskDTO;
-import com.fps.svmes.dto.requests.DispatchRequest;
 import com.fps.svmes.dto.responses.ResponseResult;
 import com.fps.svmes.models.sql.taskSchedule.Dispatch;
 import com.fps.svmes.models.sql.taskSchedule.TaskType;
@@ -12,6 +10,7 @@ import com.fps.svmes.services.DispatchService;
 import com.fps.svmes.services.TaskScheduleService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,6 +21,7 @@ import java.time.OffsetDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * REST Controller for managing dispatch configurations.
@@ -44,9 +44,9 @@ public class DispatchController {
 
     @Operation(summary = "Create a new dispatch", description = "Creates a dispatch in the QC System")
     @PostMapping
-    public ResponseResult<DispatchDTO> createDispatch(@RequestBody DispatchRequest request) {
+    public ResponseResult<DispatchDTO> createDispatch(@RequestBody DispatchDTO request) {
         try {
-            DispatchDTO dispatchDTO = dispatchService.createDispatch(request);
+            DispatchDTO dispatchDTO = dispatchService.convertToDispatchDTO(dispatchService.createDispatch(request));
             return ResponseResult.success(dispatchDTO);
         } catch (Exception e) {
             logger.error("Error creating dispatch", e);
@@ -54,23 +54,11 @@ public class DispatchController {
         }
     }
 
-    @Operation(summary = "Create a manual dispatch", description = "Create a manual dispatch that dispatches right away")
-    @PostMapping("/manual")
-    public ResponseResult<DispatchDTO> createManualDispatch(@RequestBody DispatchRequest request) {
-        try {
-            DispatchDTO dispatchDTO = dispatchService.createManualDispatch(request);
-            return ResponseResult.success(dispatchDTO);
-        } catch (Exception e) {
-            logger.error("Error creating manual dispatch", e);
-            return ResponseResult.fail("Failed to create a manual dispatch", e);
-        }
-    }
-
     @Operation(summary = "Update an existing dispatch", description = "Updates a dispatch given an ID")
     @PutMapping("/{id}")
-    public ResponseResult<DispatchDTO> updateDispatch(@PathVariable Long id, @RequestBody @Valid DispatchRequest request) {
+    public ResponseResult<DispatchDTO> updateDispatch(@PathVariable Long id, @RequestBody @Valid DispatchDTO request) {
         try {
-            DispatchDTO dispatchDTO = dispatchService.updateDispatch(id, request);
+            DispatchDTO dispatchDTO = dispatchService.convertToDispatchDTO(dispatchService.updateDispatch(id, request));
             return ResponseResult.success(dispatchDTO);
         } catch (Exception e) {
             logger.error("Error updating dispatch with ID: {}",  id);
@@ -79,10 +67,10 @@ public class DispatchController {
     }
 
     @Operation(summary = "Delete a dispatch", description = "Deletes a dispatch given its ID")
-    @DeleteMapping("/{id}")
-    public ResponseResult<String> deleteDispatch(@PathVariable Long id) {
+    @DeleteMapping("/{id}/{userId}")
+    public ResponseResult<String> deleteDispatch(@PathVariable Long id, @PathVariable Integer userId) {
         try {
-            dispatchService.deleteDispatch(id);
+            dispatchService.deleteDispatch(id, userId);
             return ResponseResult.success("Dispatch with ID " + id + " deleted successfully.");
         } catch (Exception e) {
             logger.error("Error deleting a dispatch with ID: {}", id );
@@ -117,22 +105,6 @@ public class DispatchController {
         }
     }
 
-    @Operation(summary = "Get all dispatched tests", description = "Retrieves a list of all dispatched tests")
-    @GetMapping("/dispatched-tasks")
-    public ResponseResult<List<DispatchedTaskDTO>> getAllDispatchedTask() {
-        try {
-            List<DispatchedTaskDTO> tasks = dispatchService.getAllDispatchedTasks();
-            return tasks.isEmpty()
-                    ? ResponseResult.noContent(tasks)
-                    : ResponseResult.success(tasks);
-        } catch (Exception e) {
-            logger.error("Error retrieving all dispatched tasks");
-            return ResponseResult.fail("Failed to retrieve all dispatched tasks", e);
-        }
-    }
-
-
-
     /**
      * Endpoint to schedule a dispatch task.
      *
@@ -143,12 +115,47 @@ public class DispatchController {
     @PostMapping("/schedule/{id}")
     public ResponseResult<String> scheduleTask(@PathVariable Long id) {
         try {
-            Dispatch dispatch = dispatchRepository.findByIdAndStatus(id, 1);
-            dispatchService.initializeDispatch(dispatch.getId(), () -> dispatchService.executeDispatch(dispatch.getId()));
-            return ResponseResult.success("Task scheduled successfully for Dispatch ID: " + id);
+            Optional<Dispatch> dispatch = dispatchRepository.findByIdAndStatus(id, 1);
+            if (dispatch.isPresent()){
+                Long dispatch_id = dispatch.get().getId();
+                dispatchService.initializeDispatch(dispatch_id, () -> dispatchService.executeDispatch(dispatch_id));
+                return ResponseResult.success("Task scheduled successfully for Dispatch ID: " + id);
+            } else {
+                return ResponseResult.fail("Failed to schedule a dispatch's task, dispatch not found with ID: " + id);
+            }
         } catch (Exception e) {
             logger.error("Error scheduling a dispatch with ID: {}", id);
             return ResponseResult.fail("Failed to schedule a dispatch", e);
+        }
+    }
+
+    @Operation(summary = "Pause a dispatch", description = "Pauses the specified dispatch and cancels its tasks.")
+    @PutMapping("/pause/{id}/{userId}")
+    public ResponseResult<String> pauseDispatch(@PathVariable Long id, @PathVariable Integer userId) {
+        try {
+            dispatchService.pauseDispatch(id, userId);
+            return ResponseResult.success("Dispatch with ID " + id + " has been paused.");
+        } catch (EntityNotFoundException e) {
+            logger.error("Error pausing dispatch with ID: {}", id, e);
+            return ResponseResult.fail("Dispatch not found for ID: " + id, e);
+        } catch (Exception e) {
+            logger.error("Error pausing dispatch with ID: {}", id, e);
+            return ResponseResult.fail("Failed to pause dispatch with ID: " + id, e);
+        }
+    }
+
+    @Operation(summary = "Resume a paused dispatch", description = "Resumes the specified dispatch and re-enables its tasks.")
+    @PutMapping("/resume/{id}/{userId}")
+    public ResponseResult<String> resumeDispatch(@PathVariable Long id, @PathVariable Integer userId) {
+        try {
+            dispatchService.resumeDispatch(id, userId);
+            return ResponseResult.success("Dispatch with ID " + id + " has been resumed.");
+        } catch (EntityNotFoundException e) {
+            logger.error("Error resuming dispatch with ID: {}", id, e);
+            return ResponseResult.fail("Dispatch not found for ID: " + id, e);
+        } catch (Exception e) {
+            logger.error("Error resuming dispatch with ID: {}", id, e);
+            return ResponseResult.fail("Failed to resume dispatch with ID: " + id, e);
         }
     }
 
@@ -247,6 +254,17 @@ public class DispatchController {
         }
     }
 
+    @Operation(summary = "Convert spring CRON expression to Chinese", description = "Parses a Spring CRON expression and returns a human-readable description in Chinese")
+    @GetMapping("/parse-cron")
+    public ResponseResult<String> parseCronToChinese(@RequestParam String cronExpression) {
+        try {
+            String result = dispatchService.parseSpringCronToChinese(cronExpression);
+            return ResponseResult.success(result);
+        } catch (Exception e) {
+            logger.error("Error parsing cron expression: {}", cronExpression, e);
+            return ResponseResult.fail("Failed to parse cron expression", e);
+        }
+    }
 }
 
 

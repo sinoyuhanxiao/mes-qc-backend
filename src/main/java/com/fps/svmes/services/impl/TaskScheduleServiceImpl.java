@@ -1,5 +1,6 @@
 package com.fps.svmes.services.impl;
 
+import com.fps.svmes.models.sql.taskSchedule.DispatchState;
 import com.fps.svmes.models.sql.taskSchedule.TaskType;
 
 import com.fps.svmes.models.sql.taskSchedule.Dispatch;
@@ -12,6 +13,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.TaskScheduler;
 import org.springframework.scheduling.support.CronTrigger;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -21,6 +23,7 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 @Service
+@Transactional
 public class TaskScheduleServiceImpl implements TaskScheduleService {
 
     @Autowired
@@ -43,6 +46,16 @@ public class TaskScheduleServiceImpl implements TaskScheduleService {
     public void scheduleDispatch(Dispatch dispatch, Runnable task) {
 
         // 1. schedule a cron periodic task for this dispatch
+        setupCronTask(dispatch, task);
+        setupCancelTask(dispatch);
+
+        // set as is active since it has cron task scheduled.
+        dispatch.setState(DispatchState.Active.getState());
+        logger.info("Set dispatch with ID: {} as active", dispatch.getId());
+        dispatchRepo.save(dispatch);
+    }
+
+    public void setupCronTask(Dispatch dispatch, Runnable task){
         CronTrigger ct = new CronTrigger(dispatch.getCronExpression());
         ScheduledFuture<?> cronFuture = taskScheduler.schedule(task, ct);
 
@@ -52,7 +65,9 @@ public class TaskScheduleServiceImpl implements TaskScheduleService {
         } else {
             throw new IllegalStateException("Failed to schedule cron periodic task for Dispatch ID: " + dispatch.getId());
         }
+    }
 
+    public void setupCancelTask(Dispatch dispatch){
         Runnable cancelRunnable = ()->{
             removeTask(dispatch.getId(), TaskType.CRON);
             removeTask(dispatch.getId(), TaskType.CANCEL);
@@ -60,7 +75,7 @@ public class TaskScheduleServiceImpl implements TaskScheduleService {
             // set the dispatch is active to false since all tasks is canceled
             Dispatch d = dispatchRepo.findById(dispatch.getId())
                     .orElseThrow(() -> new EntityNotFoundException("Dispatch not found"));
-            d.setIsActive(false);
+            d.setState(DispatchState.Inactive.getState());
             d.setUpdatedAt(OffsetDateTime.now());
             dispatchRepo.save(d);
         };
@@ -70,11 +85,6 @@ public class TaskScheduleServiceImpl implements TaskScheduleService {
 
         // track this cancel runnable in tasks map
         addTask(dispatch.getId(), TaskType.CANCEL, cancelFuture);
-
-        // set as is active since it has cron task scheduled.
-        dispatch.setIsActive(true);
-        logger.info("Set dispatch with ID: {} as active", dispatch.getId());
-        dispatchRepo.save(dispatch);
     }
 
     /**
@@ -107,7 +117,7 @@ public class TaskScheduleServiceImpl implements TaskScheduleService {
                     // set the dispatch is active to false since all tasks is canceled
                     Dispatch d = dispatchRepo.findById(dispatch.getId())
                             .orElseThrow(() -> new EntityNotFoundException("Dispatch not found"));
-                    d.setIsActive(false);
+                    d.setState(DispatchState.Inactive.getState());
                     d.setUpdatedAt(OffsetDateTime.now());
                     dispatchRepo.save(d);
                 }, dispatch.getEndTime().plusSeconds(30).toInstant());
@@ -115,7 +125,7 @@ public class TaskScheduleServiceImpl implements TaskScheduleService {
                 addTask(dispatch.getId(), TaskType.CANCEL, cancelFuture);
                 removeTask(dispatch.getId(), TaskType.FUTURE);
                 // set as is active since it has cron task scheduled.
-                dispatch.setIsActive(true);
+                dispatch.setState(DispatchState.Active.getState());
                 logger.info("Set dispatch with ID: {} as active", dispatch.getId());
                 dispatchRepo.save(dispatch);
             };
@@ -126,6 +136,42 @@ public class TaskScheduleServiceImpl implements TaskScheduleService {
         } else {
             logger.warn("Dispatch ID {} is already scheduled for future execution.", dispatch.getId());
         }
+    }
+
+    public void scheduleCustomDispatch(Dispatch dispatch, Runnable task) {
+        if (dispatch.getCustomTime().isBefore(OffsetDateTime.now())) {
+            task.run();
+
+            dispatch.setState(DispatchState.Inactive.getState());
+            dispatchRepo.save(dispatch);
+            return;
+        }
+
+        // custom time is in the future
+        ScheduledFuture<?> sf = taskScheduler.schedule(()->
+        {
+            // Insert rows to dispatched task table
+            task.run();
+
+            Dispatch d = dispatchRepo.findById(dispatch.getId())
+                    .orElseThrow(() -> new EntityNotFoundException("Dispatch not found"));
+
+            // Set dispatch as inactive as custom dispatch only execute once.
+            d.setState(DispatchState.Inactive.getState());
+
+            d.setUpdatedAt(OffsetDateTime.now());
+            dispatchRepo.save(d);
+
+            // Remove task from audit map since it is completed
+            removeTask(dispatch.getId(), TaskType.CUSTOM);
+        }, dispatch.getCustomTime().toInstant());
+
+        addTask(dispatch.getId(), TaskType.CUSTOM, sf);
+
+        // Set dispatch as active now that custom dispatch is scheduled
+        dispatch.setState(DispatchState.Active.getState());
+        logger.info("Set dispatch with ID: {} as active", dispatch.getId());
+        dispatchRepo.save(dispatch);
     }
 
     /**

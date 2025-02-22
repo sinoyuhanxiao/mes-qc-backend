@@ -57,7 +57,6 @@ public class ProductionController {
             logger.error("Error retrieving work order");
             return ResponseResult.fail("Failed to retrieve work order", e);
         }
-
     }
 
     // Products

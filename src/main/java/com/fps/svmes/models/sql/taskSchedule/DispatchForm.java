@@ -1,6 +1,7 @@
 package com.fps.svmes.models.sql.taskSchedule;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
+import com.fps.svmes.models.sql.Common;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -9,7 +10,7 @@ import lombok.NoArgsConstructor;
 @Table(name = "dispatch_form", schema = "quality_management")
 @Data
 @NoArgsConstructor
-public class DispatchForm {
+public class DispatchForm extends Common {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -21,9 +22,6 @@ public class DispatchForm {
 
     @Column(name = "qc_form_tree_node_id", nullable = false)
     private String qcFormTreeNodeId;
-
-    @Column(name = "status", nullable = false, columnDefinition = "SMALLINT DEFAULT 1")
-    private Integer status = 1; // Active by default
 
     public DispatchForm(Dispatch dispatch, String formTreeNodeId) {
         this.setQcFormTreeNodeId(formTreeNodeId);

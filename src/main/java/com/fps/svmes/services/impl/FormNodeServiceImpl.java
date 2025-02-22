@@ -174,5 +174,29 @@ public class FormNodeServiceImpl implements FormNodeService {
         return Optional.empty(); // Node not found in this subtree
     }
 
+    @Override
+    public List<FormNode> getNodesWithLabelContaining(String keyword) {
+        List<FormNode> allNodes = repository.findAll();
+        List<FormNode> matchingNodes = new ArrayList<>();
+
+        for (FormNode node : allNodes) {
+            findMatchingNodesRecursively(node, keyword.toLowerCase(), matchingNodes);
+        }
+
+        return matchingNodes;
+    }
+
+    // ✅ Recursive helper method to search within child nodes
+    private void findMatchingNodesRecursively(FormNode currentNode, String keyword, List<FormNode> matchingNodes) {
+        if (currentNode.getLabel().toLowerCase().contains(keyword)) {
+            matchingNodes.add(currentNode);
+        }
+        if (currentNode.getChildren() != null) {
+            for (FormNode child : currentNode.getChildren()) {
+                findMatchingNodesRecursively(child, keyword, matchingNodes);
+            }
+        }
+    }
+
 
 }

@@ -5,7 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
 
-public interface EquipmentRepository extends JpaRepository<Equipment, Integer>  {
+public interface EquipmentRepository extends JpaRepository<Equipment, Short>  {
     List<Equipment> findByStatus(int status);
     Equipment findByIdAndStatus(Integer id, int status);
 }

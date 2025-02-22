@@ -2,11 +2,14 @@ package com.fps.svmes.dto.dtos.dispatch;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fps.svmes.dto.dtos.CommonDTO;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 
+@EqualsAndHashCode(callSuper = true)
 @Data
 @JsonInclude(JsonInclude.Include.NON_NULL)
-public class DispatchRawMaterialDTO {
+public class DispatchRawMaterialDTO extends CommonDTO {
 
     @JsonProperty("id")
     private Integer id;
@@ -16,9 +19,6 @@ public class DispatchRawMaterialDTO {
 
     @JsonProperty("raw_material_id")
     private Integer rawMaterialId;
-
-    @JsonProperty("status")
-    private Short status;
 }
 
 

@@ -16,7 +16,6 @@ import java.util.List;
 @Entity
 @Table(name = "dispatch", schema = "quality_management")
 public class Dispatch extends Common {
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id")
@@ -25,32 +24,35 @@ public class Dispatch extends Common {
     @Column(name = "type", nullable = false)
     private String type;
 
-    @Column(name = "name", nullable = false)
+    @Column(name = "name")
     private String name;
 
-    @Column(name = "remark")
-    private String remark;
+    @Column(name = "description")
+    private String description;
 
-    @Column(name = "cron_expression")
-    private String cronExpression;
+    @Column(name = "state", nullable = false)
+    private Short state = 1;
 
     @Column(name = "start_time", nullable = false)
-    private OffsetDateTime startTime;
+    private OffsetDateTime startTime; // For regular type dispatch only
 
-    @Column(name = "end_time", nullable = false)
-    private OffsetDateTime endTime;
+    @Column(name = "end_time")
+    private OffsetDateTime endTime; // For regular type dispatch only
+
+    @Column(name = "cron_expression")
+    private String cronExpression; // For regular type dispatch only
 
     @Column(name = "dispatch_limit")
-    private Integer dispatchLimit;
+    private Integer dispatchLimit; // For regular type dispatch only
 
-    @Column(name = "executed_count", nullable = false)
+    @Column(name = "custom_time")
+    private OffsetDateTime customTime; // For custom type dispatch only
+
+    @Column(name = "executed_count")
     private Integer executedCount = 0;
 
-    @Column(name = "due_date_offset_minute", nullable = false)
-    private Integer dueDateOffsetMinute = 60; // Total offset in minutes, default to 1 hour
-
-    @Column(name = "is_active", nullable = false)
-    private Boolean isActive = false;  // indicates whether the dispatch scheduled to assign forms for users
+    @Column(name = "due_date_offset_minute")
+    private Integer dueDateOffsetMinute; // Total offset in minutes, default to 1 hour
 
     @OneToMany(mappedBy = "dispatch", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonManagedReference
@@ -80,5 +82,16 @@ public class Dispatch extends Common {
     @JsonManagedReference
     private List<DispatchMaintenanceWorkOrder> dispatchMaintenanceWorkOrders;
 
+    @OneToMany(mappedBy = "dispatch", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonManagedReference
+    private List<DispatchSamplingLocation> dispatchSamplingLocations;
+
+    @OneToMany(mappedBy = "dispatch", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonManagedReference
+    private List<DispatchInstrument> dispatchInstruments;
+
+    @OneToMany(mappedBy = "dispatch", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonManagedReference
+    private List<DispatchTestSubject> dispatchTestSubjects;
 
 }

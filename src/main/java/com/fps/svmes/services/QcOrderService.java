@@ -11,4 +11,5 @@ public interface QcOrderService {
     QcOrderDTO getQcOrderById(Long id);
     List<QcOrderDTO> getAllQcOrders();
     void deleteQcOrder(Long id, Integer userId);
+    void updateQcOrderStates();
 }

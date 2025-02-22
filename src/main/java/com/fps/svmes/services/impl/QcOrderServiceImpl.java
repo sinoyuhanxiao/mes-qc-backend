@@ -203,7 +203,7 @@ public class QcOrderServiceImpl implements QcOrderService {
     @Scheduled(fixedRate = 60000) // Runs every 10 minutes
     @Transactional
     public void updateQcOrderStates() {
-        logger.info("Running periodic qc order states update...");
+        logger.info("Updating qc order states ...");
         List<QcOrder> qcOrders = qcOrderRepo.findAll();
         qcOrders.forEach(qcOrder -> {
             List<Dispatch> dispatches = qcOrder.getQcOrderDispatches().stream()

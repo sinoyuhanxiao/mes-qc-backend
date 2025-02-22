@@ -11,6 +11,7 @@ import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -115,6 +116,12 @@ public class QcOrderController {
             logger.error("Error deleting QC Order with ID: {}", id, e);
             return ResponseResult.fail("Failed to delete QC Order", e);
         }
+    }
+
+    @PostMapping("/update-qc-order-states")
+    public ResponseEntity<String> updateQcOrderStates() {
+        qcOrderService.updateQcOrderStates();
+        return ResponseEntity.ok("QC Order states updated successfully.");
     }
 
 

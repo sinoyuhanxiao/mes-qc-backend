@@ -1,5 +1,6 @@
 package com.fps.svmes.controllers;
 
+import com.fps.svmes.dto.dtos.task.QuarterlyTaskStatisticsDTO;
 import com.fps.svmes.dto.dtos.task.TaskStatisticsDTO;
 import com.fps.svmes.dto.dtos.task.TaskCountDTO;
 import com.fps.svmes.dto.responses.ResponseResult;
@@ -28,7 +29,7 @@ public class TaskStatisticsController {
             int historicalTasks = dispatchedTaskService.getHistoricalTasks(userId).size();
             int overdueTasks = dispatchedTaskService.getOverdueTasks(userId).size();
 
-            // Hardcoded percentage changes
+            // TODO: Modify this Hardcoded percentage changes
             TaskStatisticsDTO taskStatistics = new TaskStatisticsDTO(
                     userId,
                     new TaskCountDTO(todayTasks, 24),
@@ -42,6 +43,19 @@ public class TaskStatisticsController {
         } catch (Exception e) {
             log.error("Error retrieving task statistics for userId: {}", userId, e);
             return ResponseResult.fail("Failed to retrieve task statistics", e);
+        }
+    }
+
+    @GetMapping("/quarterly-stats")
+    @Operation(summary = "Get quarterly task statistics", description = "Fetch quarterly task statistics for a user")
+    public ResponseResult<QuarterlyTaskStatisticsDTO> getQuarterlyTaskStatistics(@RequestParam Long userId) {
+        try {
+            QuarterlyTaskStatisticsDTO quarterlyStatistics = dispatchedTaskService.getQuarterlyTaskStatistics(userId);
+            log.info("Quarterly task statistics retrieved for userId: {}", userId);
+            return ResponseResult.success(quarterlyStatistics);
+        } catch (Exception e) {
+            log.error("Error retrieving quarterly task statistics for userId: {}", userId, e);
+            return ResponseResult.fail("Failed to retrieve quarterly task statistics", e);
         }
     }
 }

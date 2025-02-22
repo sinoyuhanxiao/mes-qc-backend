@@ -1,6 +1,7 @@
 package com.fps.svmes.services.impl;
 
 import com.fps.svmes.dto.dtos.dispatch.DispatchedTaskDTO;
+import com.fps.svmes.dto.dtos.task.QuarterlyTaskStatisticsDTO;
 import com.fps.svmes.models.sql.taskSchedule.DispatchedTask;
 import com.fps.svmes.models.sql.user.User;
 import com.fps.svmes.models.nosql.FormNode;
@@ -29,7 +30,9 @@ import java.time.OffsetDateTime;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -220,6 +223,17 @@ public class DispatchedTaskServiceImpl implements DispatchedTaskService {
         Page<DispatchedTask> dispatchedTaskPage = dispatchedTaskRepository.findAll(spec, pageable);
 
         return dispatchedTaskPage.map(task -> modelMapper.map(task, DispatchedTaskDTO.class));
+    }
+
+    @Override
+    public QuarterlyTaskStatisticsDTO getQuarterlyTaskStatistics(Long userId) {
+        Map<String, Integer> quarterlyTasks = new HashMap<>();
+        quarterlyTasks.put("Q1", dispatchedTaskRepository.countTasksByQuarter(userId, 1));
+        quarterlyTasks.put("Q2", dispatchedTaskRepository.countTasksByQuarter(userId, 2));
+        quarterlyTasks.put("Q3", dispatchedTaskRepository.countTasksByQuarter(userId, 3));
+        quarterlyTasks.put("Q4", dispatchedTaskRepository.countTasksByQuarter(userId, 4));
+
+        return new QuarterlyTaskStatisticsDTO(userId, quarterlyTasks);
     }
 
     // Mapping DTO field names to Entity field names (Including Common Fields)

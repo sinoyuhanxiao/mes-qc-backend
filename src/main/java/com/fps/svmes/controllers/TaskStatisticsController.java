@@ -1,6 +1,7 @@
 package com.fps.svmes.controllers;
 
 import com.fps.svmes.dto.dtos.task.QuarterlyTaskStatisticsDTO;
+import com.fps.svmes.dto.dtos.task.TaskStateStatisticsDTO;
 import com.fps.svmes.dto.dtos.task.TaskStatisticsDTO;
 import com.fps.svmes.dto.dtos.task.TaskCountDTO;
 import com.fps.svmes.dto.responses.ResponseResult;
@@ -56,6 +57,19 @@ public class TaskStatisticsController {
         } catch (Exception e) {
             log.error("Error retrieving quarterly task statistics for userId: {}", userId, e);
             return ResponseResult.fail("Failed to retrieve quarterly task statistics", e);
+        }
+    }
+
+    @GetMapping("/state-stats")
+    @Operation(summary = "Get task state statistics", description = "Fetch task state statistics for a user")
+    public ResponseResult<TaskStateStatisticsDTO> getTaskStateStatistics(@RequestParam Long userId) {
+        try {
+            TaskStateStatisticsDTO statistics = dispatchedTaskService.getTaskStateStatistics(userId);
+            log.info("Task state statistics retrieved for userId: {}", userId);
+            return ResponseResult.success(statistics);
+        } catch (Exception e) {
+            log.error("Error retrieving task state statistics for userId: {}", userId, e);
+            return ResponseResult.fail("Failed to retrieve task state statistics", e);
         }
     }
 }

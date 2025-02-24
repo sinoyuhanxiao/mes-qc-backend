@@ -30,11 +30,18 @@ public interface DispatchedTaskRepository extends JpaRepository<DispatchedTask, 
     Page<DispatchedTask> findAll(Pageable pageable);
 
     @Query(value = """
-    SELECT COUNT(*) FROM quality_management.dispatched_task
-    WHERE user_id = :userId
-    AND EXTRACT(QUARTER FROM due_date) = :quarter
-    """, nativeQuery = true)
+            SELECT COUNT(*) FROM quality_management.dispatched_task
+            WHERE user_id = :userId
+            AND EXTRACT(QUARTER FROM due_date) = :quarter
+            """, nativeQuery = true)
     int countTasksByQuarter(Long userId, int quarter);
+
+    @Query(value = """
+                SELECT COUNT(*) FROM quality_management.dispatched_task
+                WHERE user_id = :userId AND dispatched_task_state_id = :stateId
+            """, nativeQuery = true)
+    int countTasksByState(Long userId, int stateId);
+
 
 
 }

@@ -2,6 +2,7 @@ package com.fps.svmes.services.impl;
 
 import com.fps.svmes.dto.dtos.dispatch.DispatchedTaskDTO;
 import com.fps.svmes.dto.dtos.task.QuarterlyTaskStatisticsDTO;
+import com.fps.svmes.dto.dtos.task.TaskStateStatisticsDTO;
 import com.fps.svmes.models.sql.taskSchedule.DispatchedTask;
 import com.fps.svmes.models.sql.user.User;
 import com.fps.svmes.models.nosql.FormNode;
@@ -234,6 +235,15 @@ public class DispatchedTaskServiceImpl implements DispatchedTaskService {
         quarterlyTasks.put("Q4", dispatchedTaskRepository.countTasksByQuarter(userId, 4));
 
         return new QuarterlyTaskStatisticsDTO(userId, quarterlyTasks);
+    }
+
+    @Override
+    public TaskStateStatisticsDTO getTaskStateStatistics(Long userId) {
+        int pendingCount = dispatchedTaskRepository.countTasksByState(userId, 1);
+        int inProgressCount = dispatchedTaskRepository.countTasksByState(userId, 2);
+        int completedCount = dispatchedTaskRepository.countTasksByState(userId, 3);
+
+        return new TaskStateStatisticsDTO(userId, pendingCount, inProgressCount, completedCount);
     }
 
     // Mapping DTO field names to Entity field names (Including Common Fields)

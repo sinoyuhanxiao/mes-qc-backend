@@ -150,8 +150,9 @@ public class PdfController {
                         Files.write(tempFile, decodedBytes);
 
                         // ✅ Store absolute file path instead of base64 string
-                        String absolutePath = tempFile.toAbsolutePath().toString();
-                        chart.setChartImage(absolutePath);
+                        String absolutePath = tempFile.toAbsolutePath().toString().replace("\\", "/");
+                        String imageUrl = "file:///" + absolutePath; // 注意是三个斜杠 file:///
+                        chart.setChartImage(imageUrl);
 
                         // ✅ Store file paths for cleanup
                         imagePaths.add(absolutePath);

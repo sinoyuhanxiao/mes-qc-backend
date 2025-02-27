@@ -5,6 +5,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Query;
 
 import java.util.List;
 
@@ -27,5 +28,20 @@ public interface DispatchedTaskRepository extends JpaRepository<DispatchedTask, 
     List<DispatchedTask> findByDispatchIdAndStateIdAndStatus(Long dispatchId, Integer stateId, Integer status);
 
     Page<DispatchedTask> findAll(Pageable pageable);
+
+    @Query(value = """
+            SELECT COUNT(*) FROM quality_management.dispatched_task
+            WHERE user_id = :userId
+            AND EXTRACT(QUARTER FROM due_date) = :quarter
+            """, nativeQuery = true)
+    int countTasksByQuarter(Long userId, int quarter);
+
+    @Query(value = """
+                SELECT COUNT(*) FROM quality_management.dispatched_task
+                WHERE user_id = :userId AND dispatched_task_state_id = :stateId
+            """, nativeQuery = true)
+    int countTasksByState(Long userId, int stateId);
+
+
 
 }

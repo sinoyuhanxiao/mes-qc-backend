@@ -105,6 +105,21 @@ public class DispatchController {
         }
     }
 
+    @Operation(summary = "Get dispatch by dispatched task ID", description = "Retrieves a dispatch using the dispatched task's ID")
+    @GetMapping("/dispatched-task/{dispatchedTaskId}")
+    public ResponseResult<DispatchDTO> getDispatchByDispatchedTaskId(@PathVariable Long dispatchedTaskId) {
+        try {
+            DispatchDTO dispatchDTO = dispatchService.getDispatchByDispatchedTaskId(dispatchedTaskId);
+            return ResponseResult.success(dispatchDTO);
+        } catch (Exception e) {
+            logger.error("Error retrieving dispatch for dispatched task ID: {}", dispatchedTaskId, e);
+            return ResponseResult.fail("Failed to retrieve dispatch for dispatched task ID: " + dispatchedTaskId, e);
+        }
+    }
+
+
+
+
     /**
      * Endpoint to schedule a dispatch task.
      *

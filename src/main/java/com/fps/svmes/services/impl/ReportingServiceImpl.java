@@ -262,10 +262,10 @@ public class ReportingServiceImpl implements ReportingService {
                             LocalDateTime dateTime = LocalDateTime.parse(rawTimestamp, formatter);
 
                             // Convert to UTC if necessary (optional)
-                            ZonedDateTime utcDateTime = dateTime.atZone(ZoneId.systemDefault()).withZoneSameInstant(ZoneId.of("UTC"));
+                            // ZonedDateTime utcDateTime = dateTime.atZone(ZoneId.systemDefault()).withZoneSameInstant(ZoneId.of("UTC"));
 
                             // Format it correctly without nanoseconds
-                            String formattedDate = utcDateTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+                            String formattedDate = dateTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
                             xaxisData.add(formattedDate);
                         } catch (Exception e) {
                             System.out.println("Error parsing created_at: " + rawTimestamp + " - " + e.getMessage());
@@ -339,6 +339,10 @@ public class ReportingServiceImpl implements ReportingService {
             Timestamp endDateTime
     ) {
         Map<Integer, Integer> countMap = new HashMap<>();
+
+        // should first convert the two timestamp to shanghai time
+        startDateTime = Timestamp.valueOf(startDateTime.toLocalDateTime().atZone(ZoneId.systemDefault()).withZoneSameInstant(ZoneId.of("Asia/Shanghai")).toLocalDateTime());
+        endDateTime = Timestamp.valueOf(endDateTime.toLocalDateTime().atZone(ZoneId.systemDefault()).withZoneSameInstant(ZoneId.of("Asia/Shanghai")).toLocalDateTime());
 
         List<Bson> pipeline = Arrays.asList(
                 match(and(
@@ -606,8 +610,10 @@ public class ReportingServiceImpl implements ReportingService {
     private String convertToUtcString(String localDateTimeString) {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
         ZonedDateTime localDateTime = ZonedDateTime.of(LocalDateTime.parse(localDateTimeString, formatter), ZoneId.systemDefault());
-        ZonedDateTime utcDateTime = localDateTime.withZoneSameInstant(ZoneId.of("UTC"));
-        return utcDateTime.format(formatter);
+        // ZonedDateTime utcDateTime = localDateTime.withZoneSameInstant(ZoneId.of("UTC"));
+        // convert to shanghai datetime
+        ZonedDateTime shangHaiDateTime = localDateTime.withZoneSameInstant(ZoneId.of("Asia/Shanghai"));
+        return shangHaiDateTime.format(formatter);
     }
 
 }

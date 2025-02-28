@@ -29,6 +29,8 @@ import com.itextpdf.text.*;
 
 import java.io.InputStream;
 import java.time.*;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.Map;
 
 import org.bson.Document;
@@ -65,8 +67,10 @@ public class QcTaskSubmissionLogsServiceImpl implements QcTaskSubmissionLogsServ
         // Map the DTO to the entity
         QcTaskSubmissionLogs log = modelMapper.map(dto, QcTaskSubmissionLogs.class);
 
-        // Set timestamps
-        log.setCreatedAt(OffsetDateTime.now());
+        // Set timestamps to shanghai time
+        ZoneId shanghaiZone = ZoneId.of("Asia/Shanghai");
+        OffsetDateTime now = OffsetDateTime.now(shanghaiZone);
+        log.setCreatedAt(now);
 
         // Save the entity
         QcTaskSubmissionLogs savedLog = repository.save(log);

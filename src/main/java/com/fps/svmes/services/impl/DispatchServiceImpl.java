@@ -364,6 +364,22 @@ public class DispatchServiceImpl implements DispatchService {
                 .collect(toList());
     }
 
+    @Transactional
+    public DispatchDTO getDispatchByDispatchedTaskId(Long dispatchedTaskId) {
+        // Fetch the dispatched task using its repository (ensure you have injected DispatchedTaskRepository)
+        DispatchedTask dispatchedTask = dispatchedTaskRepo.findById(dispatchedTaskId)
+                .orElseThrow(() -> new EntityNotFoundException("Dispatched Task not found with ID: " + dispatchedTaskId));
+
+        // Ensure the dispatched task has an associated dispatch
+        if (dispatchedTask.getDispatch() == null) {
+            throw new EntityNotFoundException("No dispatch found for dispatched task ID: " + dispatchedTaskId);
+        }
+
+        // Use your existing conversion method to create a DTO for the Dispatch
+        return convertToDispatchDTO(dispatchedTask.getDispatch());
+    }
+
+
     // ------------- SCHEDULING LOGIC -----------------------------------------------------------------------
 
     // Runs on server start up

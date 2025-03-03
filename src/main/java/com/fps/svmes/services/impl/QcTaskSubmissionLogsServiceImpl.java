@@ -122,6 +122,9 @@ public class QcTaskSubmissionLogsServiceImpl implements QcTaskSubmissionLogsServ
             // Execute the query and fetch the document
             Document document = mongoTemplate.findOne(query, Document.class, collectionName);
 
+            // adjust the document to categorize the results according to the form template
+
+
             if (document == null) {
                 logger.warn("No document found for submissionId: {}", submissionId);
                 return null;
@@ -255,37 +258,98 @@ public class QcTaskSubmissionLogsServiceImpl implements QcTaskSubmissionLogsServ
         }
     }
 
-
     public Document formattedResult(Document document, Long formId) {
+        // 获取表单的字段映射（字段 name -> label）
         HashMap<String, String> keyValueMap = getFormTemplateKeyValueMapping(formId);
         HashMap<String, Object> optionItemsKeyValueMap = QcFormTemplateOptionItemsKeyValueMapping(formId);
 
+        // 解析表单模板，构建 divider 层级映射
+        HashMap<String, String> fieldToDividerMap = new HashMap<>();
+        List<Document> widgetList = getWidgetListFromTemplate(formId);
+
+        // **Step 1: 解析表单模板，构建字段归属的 `divider`**
+        String currentDivider = "未分类"; // 默认归类
+        for (Document widget : widgetList) {
+            String type = widget.getString("type");
+            Document options = (Document) widget.get("options");
+
+            if ("divider".equals(type) && options != null) {
+                // **遇到新的 `divider`，更新当前分组名称**
+                currentDivider = options.getString("label");
+            } else if ("grid".equals(type)) {
+                // **如果当前 `divider` 下的第一个元素是 `grid`，那么 `grid` 内部的 `cols` 也归属于该 `divider`**
+                List<Document> cols = (List<Document>) widget.get("cols");
+                if (cols != null) {
+                    for (Document col : cols) {
+                        List<Document> colWidgetList = (List<Document>) col.get("widgetList");
+                        if (colWidgetList != null) {
+                            for (Document colWidget : colWidgetList) {
+                                Document colOptions = (Document) colWidget.get("options");
+                                if (colOptions != null && colOptions.containsKey("name")) {
+                                    fieldToDividerMap.put(colOptions.getString("name"), currentDivider);
+                                }
+                            }
+                        }
+                    }
+                }
+            } else if (options != null && options.containsKey("name")) {
+                // **记录字段属于哪个分组**
+                fieldToDividerMap.put(options.getString("name"), currentDivider);
+            }
+        }
+
+        // **Step 2: 重新格式化 MongoDB 取出的数据**
         Document formattedDocument = new Document();
+        Document groupedData = new Document();
+
         for (String key : document.keySet()) {
             Object value = document.get(key);
 
-            // Replace key with its corresponding label or retain original key
+            // **获取格式化后的字段名**
             String formattedKey = keyValueMap.getOrDefault(key, key);
+            String dividerLabel = fieldToDividerMap.get(key); // 获取字段归属的 `divider`
 
-            // If the value is a list and matches an optionItems mapping
+            // **如果字段不属于任何 `divider`，默认归类到 `"未分类"`**
+            if (dividerLabel == null) {
+                dividerLabel = "未分类";
+            }
+
+            // **处理 optionItems 转换**
             if (optionItemsKeyValueMap.containsKey(formattedKey) && value instanceof List) {
                 List<?> valueList = (List<?>) value;
                 HashMap<String, String> valueToLabelMap = (HashMap<String, String>) optionItemsKeyValueMap.get(formattedKey);
-
                 List<String> resolvedLabels = valueList.stream()
                         .map(val -> valueToLabelMap.getOrDefault(val.toString(), val.toString()))
                         .collect(Collectors.toList());
-                formattedDocument.put(formattedKey, resolvedLabels);
-            }
-            // Single value with a matching optionItems mapping
-            else if (optionItemsKeyValueMap.containsKey(formattedKey) && (value instanceof String || value instanceof Integer)) {
+                value = resolvedLabels;
+            } else if (optionItemsKeyValueMap.containsKey(formattedKey) && (value instanceof String || value instanceof Integer)) {
                 HashMap<String, String> valueToLabelMap = (HashMap<String, String>) optionItemsKeyValueMap.get(formattedKey);
-                formattedDocument.put(formattedKey, valueToLabelMap.getOrDefault(value.toString(), value.toString()));
-            } else {
+                value = valueToLabelMap.getOrDefault(value.toString(), value.toString());
+            }
+
+            // **保留 `_id`, `created_at`, `created_by` 在根层级**
+            if (List.of("_id", "created_at", "created_by").contains(key)) {
                 formattedDocument.put(formattedKey, value);
+            } else {
+                // **正确归类到 `divider`**
+                groupedData.computeIfAbsent(dividerLabel, k -> new Document());
+                ((Document) groupedData.get(dividerLabel)).put(formattedKey, value);
             }
         }
+
+        // **合并分组数据到最终 JSON**
+        formattedDocument.putAll(groupedData);
         return formattedDocument;
+    }
+
+    // **解析 widgetList**
+    private List<Document> getWidgetListFromTemplate(Long formId) {
+        String formTemplateJson = qcFormTemplateRepository.findFormTemplateJsonById(formId);
+        if (formTemplateJson == null || formTemplateJson.isEmpty()) {
+            throw new RuntimeException("Form template JSON not found for formId: " + formId);
+        }
+        Document formTemplate = Document.parse(formTemplateJson);
+        return (List<Document>) formTemplate.get("widgetList");
     }
 
     @Override

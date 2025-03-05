@@ -68,9 +68,7 @@ public class QcTaskSubmissionLogsServiceImpl implements QcTaskSubmissionLogsServ
         QcTaskSubmissionLogs log = modelMapper.map(dto, QcTaskSubmissionLogs.class);
 
         // Set timestamps to shanghai time
-        ZoneId shanghaiZone = ZoneId.of("Asia/Shanghai");
-        OffsetDateTime now = OffsetDateTime.now(shanghaiZone);
-        log.setCreatedAt(now);
+        log.setCreatedAt(OffsetDateTime.now());
 
         // Save the entity
         QcTaskSubmissionLogs savedLog = repository.save(log);

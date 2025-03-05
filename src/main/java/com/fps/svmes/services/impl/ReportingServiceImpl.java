@@ -10,6 +10,9 @@ import com.fps.svmes.services.UserService;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
+import com.mongodb.client.model.Field;
+import com.mongodb.client.model.Filters;
+import org.bson.BsonDateTime;
 import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
@@ -36,6 +39,7 @@ public class ReportingServiceImpl implements ReportingService {
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final MongoClient mongoClient;
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+    private static final DateTimeFormatter MONGO_DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSSSSSSS");
 
     @Autowired
     QcFormTemplateRepository qcFormTemplateRepository;
@@ -340,7 +344,7 @@ public class ReportingServiceImpl implements ReportingService {
     ) {
         Map<Integer, Integer> countMap = new HashMap<>();
 
-        // should first convert the two timestamp to shanghai time
+        // TODO: what should be the correct counting for this part
         startDateTime = Timestamp.valueOf(startDateTime.toLocalDateTime().atZone(ZoneId.systemDefault()).withZoneSameInstant(ZoneId.of("Asia/Shanghai")).toLocalDateTime());
         endDateTime = Timestamp.valueOf(endDateTime.toLocalDateTime().atZone(ZoneId.systemDefault()).withZoneSameInstant(ZoneId.of("Asia/Shanghai")).toLocalDateTime());
 
@@ -378,22 +382,22 @@ public class ReportingServiceImpl implements ReportingService {
         MongoDatabase database = mongoClient.getDatabase("dev-mes-qc");
 
         // Convert time range to UTC before querying
-        String startUtc = convertToUtcString(startDateTime);
-        String endUtc = convertToUtcString(endDateTime);
+//        String startUtc = convertToUtcString(startDateTime);
+//        String endUtc = convertToUtcString(endDateTime);
 
         // Get label mappings for formTemplateId
         HashMap<String, Object> optionItemsKeyValueMap = QcFormTemplateOptionItemsKeyValueMapping(formTemplateId);
         HashMap<String, String> keyValueMap = getFormTemplateKeyValueMapping(formTemplateId);
 
         // Get target collections based on the UTC date range
-        List<String> collectionNames = getRelevantCollections(database, formTemplateId, startUtc, endUtc);
+        List<String> collectionNames = getRelevantCollections(database, formTemplateId, startDateTime, endDateTime);
 
         List<Document> records = new ArrayList<>();
         for (String collectionName : collectionNames) {
             MongoCollection<Document> collection = database.getCollection(collectionName);
 
             // Query using UTC timestamps
-            List<Document> collectionRecords = queryRecords(collection, startUtc, endUtc, page, size);
+            List<Document> collectionRecords = queryRecords(collection, startDateTime, endDateTime, page, size);
 
             records.addAll(collectionRecords);
         }
@@ -592,19 +596,33 @@ public class ReportingServiceImpl implements ReportingService {
         return targetCollections;
     }
 
-    /**
-     * Query MongoDB collection for records within the time range and apply pagination.
-     */
     private List<Document> queryRecords(MongoCollection<Document> collection, String startDateTime, String endDateTime, int page, int size) {
+        // ✅ Convert input string dates to the correct MongoDB format: "2025-01-22T21:55:14.982746326"
+        String formattedStartDateTime = convertToMongoDateTimeFormat(startDateTime);
+        String formattedEndDateTime = convertToMongoDateTimeFormat(endDateTime);
+
+        System.out.println("Querying records with range: " + formattedStartDateTime + " to " + formattedEndDateTime);
+
         List<Bson> filters = Arrays.asList(
-                gte("created_at", startDateTime),
-                lte("created_at", endDateTime)
+                gte("created_at", formattedStartDateTime),
+                lte("created_at", formattedEndDateTime)
         );
 
         return collection.find(and(filters))
                 .skip(page * size)  // Pagination: skip past (page * size) records
                 .limit(size)        // Limit results to `size` per page
                 .into(new ArrayList<>());
+    }
+
+    /**
+     * ✅ Converts "yyyy-MM-dd HH:mm:ss" to MongoDB's "yyyy-MM-dd'T'HH:mm:ss.SSSSSSSSS" format.
+     */
+    private String convertToMongoDateTimeFormat(String dateTime) {
+        DateTimeFormatter inputFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+        DateTimeFormatter outputFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSSSSSSS");
+
+        LocalDateTime localDateTime = LocalDateTime.parse(dateTime, inputFormatter);
+        return localDateTime.atZone(ZoneId.systemDefault()).format(outputFormatter);
     }
 
     private String convertToUtcString(String localDateTimeString) {
@@ -615,5 +633,83 @@ public class ReportingServiceImpl implements ReportingService {
         ZonedDateTime shangHaiDateTime = localDateTime.withZoneSameInstant(ZoneId.of("Asia/Shanghai"));
         return shangHaiDateTime.format(formatter);
     }
+
+//    // with time conversion
+//    private List<Document> queryRecords(MongoCollection<Document> collection, String startDateTime, String endDateTime, int page, int size) {
+//        // ✅ Step 1: Convert "yyyy-MM-dd HH:mm:ss" to `Instant`
+//        Instant startInstant = convertStringToInstant(startDateTime);
+//        Instant endInstant = convertStringToInstant(endDateTime);
+//
+//        System.out.println("Querying records with range: " + startInstant + " to " + endInstant);
+//
+//        // ✅ Step 2: Retrieve all documents from the collection
+//        List<Document> allRecords = collection.find().into(new ArrayList<>());
+//
+//        // ✅ Step 3: Convert `created_at` field from String to `Instant` and add a new field `created_at_time`
+//        List<Document> enrichedRecords = new ArrayList<>();
+//        for (Document doc : allRecords) {
+//            if (doc.containsKey("created_at") && doc.get("created_at") instanceof String) {
+//                try {
+//                    Instant createdAtInstant = convertMongoCreatedAtStringToInstant(doc.getString("created_at"));
+//                    doc.put("created_at_time", createdAtInstant); // Add a new Instant field
+//                    enrichedRecords.add(doc);
+//                } catch (Exception e) {
+//                    System.out.println("Error converting created_at: " + doc.get("created_at") + " - " + e.getMessage());
+//                }
+//            }
+//        }
+//
+//        // ✅ Step 4: Filter records based on `created_at_time`
+//        return enrichedRecords.stream()
+//                .filter(doc -> {
+//                    Instant createdAt = doc.get("created_at_time", Instant.class);
+//                    return createdAt != null && !createdAt.isBefore(startInstant) && !createdAt.isAfter(endInstant);
+//                })
+//                .skip(page * size) // Apply pagination
+//                .limit(size)
+//                .collect(Collectors.toList());
+//    }
+//
+//    /**
+//     * ✅ Converts "yyyy-MM-dd HH:mm:ss" to `Instant`
+//     */
+//    private Instant convertStringToInstant(String dateTime) {
+//        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+//        LocalDateTime localDateTime = LocalDateTime.parse(dateTime, formatter);
+//
+//        // Convert to UTC Instant
+//        return localDateTime.atZone(ZoneId.systemDefault()).toInstant();
+//    }
+//
+//    /**
+//     * ✅ Converts MongoDB's `created_at` format ("2025-01-22T19:34:02.966394038") to `Instant`
+//     */
+//    private Instant convertMongoCreatedAtStringToInstant(String mongoDateTime) {
+//        try {
+//            // Handle timestamps with 6 or 9 decimal places dynamically
+//            DateTimeFormatter formatter;
+//            if (mongoDateTime.length() == 29) { // 9 decimal places (e.g., 2025-01-22T19:34:02.966394038)
+//                formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSSSSSSS");
+//            } else if (mongoDateTime.length() == 26) { // 6 decimal places (e.g., 2025-02-28T13:49:31.535097)
+//                formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSSSS");
+//            } else {
+//                throw new IllegalArgumentException("Unexpected created_at format: " + mongoDateTime);
+//            }
+//
+//            return LocalDateTime.parse(mongoDateTime, formatter).atZone(ZoneId.systemDefault()).toInstant();
+//        } catch (Exception e) {
+//            System.out.println("Error parsing MongoDB created_at: " + mongoDateTime + " - " + e.getMessage());
+//            return null;
+//        }
+//    }
+//
+//    private String convertToUtcString(String localDateTimeString) {
+//        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+//        ZonedDateTime localDateTime = ZonedDateTime.of(LocalDateTime.parse(localDateTimeString, formatter), ZoneId.systemDefault());
+//        ZonedDateTime utcDateTime = localDateTime.withZoneSameInstant(ZoneId.of("UTC"));
+//        // convert to shanghai datetime
+////        ZonedDateTime shangHaiDateTime = localDateTime.withZoneSameInstant(ZoneId.of("Asia/Shanghai"));
+//        return utcDateTime.format(formatter);
+//    }
 
 }

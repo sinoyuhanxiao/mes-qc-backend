@@ -28,6 +28,6 @@ feign:
   client:
     config:
       s3-adapter-service:
-        url: http://10.10.12.12:8083
+        url: http://s3-adapter-service:8083
         connect-timeout: 5000
         read-timeout: 5000

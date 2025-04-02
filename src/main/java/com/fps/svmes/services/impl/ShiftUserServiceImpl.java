@@ -128,7 +128,7 @@ public class ShiftUserServiceImpl implements ShiftUserService {
         UserForShiftTableDTO dto = new UserForShiftTableDTO();
         dto.setId(user.getId());
         dto.setName(user.getName());
-        dto.setRoleId(user.getRoleId());
+        dto.setRoleId(user.getRole().getId());
         dto.setWecomId(user.getWecomId());
         dto.setUsername(user.getUsername());
         dto.setPassword(user.getPassword());

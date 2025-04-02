@@ -2,8 +2,10 @@ package com.fps.svmes.services.impl;
 
 import com.fps.svmes.dto.dtos.user.ShiftForUserTableDTO;
 import com.fps.svmes.dto.dtos.user.UserDTO;
+import com.fps.svmes.models.sql.user.Role;
 import com.fps.svmes.models.sql.user.ShiftUser;
 import com.fps.svmes.models.sql.user.User;
+import com.fps.svmes.repositories.jpaRepo.user.RoleRepository;
 import com.fps.svmes.repositories.jpaRepo.user.ShiftRepository;
 import com.fps.svmes.repositories.jpaRepo.user.ShiftUserRepository;
 import com.fps.svmes.repositories.jpaRepo.user.UserRepository;
@@ -27,6 +29,9 @@ public class UserServiceImpl implements UserService {
 
     @Autowired
     private ShiftUserRepository shiftUserRepository;
+
+    @Autowired
+    private RoleRepository roleRepository;
 
     @Autowired
     private ModelMapper modelMapper;
@@ -79,8 +84,15 @@ public class UserServiceImpl implements UserService {
             if (userDTO.getName() != null) {
                 existingUser.setName(userDTO.getName());
             }
-            if (userDTO.getRoleId() != null) {
-                existingUser.setRoleId(userDTO.getRoleId());
+            if (userDTO.getRole() != null && userDTO.getRole().getId() != null) {
+                // Fetch the Role object from the RoleRepository using the ID
+                Optional<Role> roleOptional = roleRepository.findById(userDTO.getRole().getId());
+
+                if (roleOptional.isPresent()) {
+                    existingUser.setRole(roleOptional.get());  // Set the fetched Role object
+                } else {
+                    throw new RuntimeException("Role with ID " + userDTO.getRole().getId() + " not found");
+                }
             }
             if (userDTO.getWecomId() != null) {
                 existingUser.setWecomId(userDTO.getWecomId());

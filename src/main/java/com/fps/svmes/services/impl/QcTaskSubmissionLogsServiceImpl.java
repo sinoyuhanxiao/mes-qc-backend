@@ -31,15 +31,13 @@ import java.io.InputStream;
 import java.time.*;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
-import java.util.Map;
+import java.util.*;
 
 import org.bson.Document;
 
 import java.io.ByteArrayOutputStream;
 import java.time.format.DateTimeFormatter;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 import static com.fps.svmes.controllers.UserController.logger;

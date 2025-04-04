@@ -19,8 +19,8 @@ public class UserDTO extends CommonDTO {
     @JsonProperty("name")
     private String name;
 
-    @JsonProperty("role_id")
-    private Short roleId;
+    @JsonProperty("role")
+    private RoleDTO role;
 
     @JsonProperty("wecom_id")
     private String wecomId;

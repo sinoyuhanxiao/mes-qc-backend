@@ -6,8 +6,6 @@ import jakarta.persistence.*;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
-import java.util.Collection;
-
 @Entity
 @Table(name = "user", schema = "quality_management")
 @Data
@@ -23,9 +21,10 @@ public class User extends Common {
     @Column(name = "name")
     private String name;
 
-    @JsonProperty("role_id")
-    @Column(name = "role_id")
-    private Short roleId;
+    @OneToOne
+    @JoinColumn(name = "role_id", referencedColumnName = "id")
+    @JsonProperty("role")
+    private Role role;
 
     @JsonProperty("wecom_id")
     @Column(name = "wecom_id")

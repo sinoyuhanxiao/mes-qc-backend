@@ -1,5 +1,6 @@
 package com.fps.svmes.services.impl;
 
+import com.fps.svmes.dto.dtos.user.RoleDTO;
 import com.fps.svmes.dto.dtos.user.ShiftUserDTO;
 import com.fps.svmes.dto.dtos.user.UserForShiftTableDTO;
 import com.fps.svmes.models.sql.user.ShiftUser;
@@ -128,12 +129,21 @@ public class ShiftUserServiceImpl implements ShiftUserService {
         UserForShiftTableDTO dto = new UserForShiftTableDTO();
         dto.setId(user.getId());
         dto.setName(user.getName());
-        dto.setRoleId(user.getRoleId());
+
+        // Map Role to RoleDTO
+        RoleDTO roleDTO = new RoleDTO();
+        roleDTO.setId(user.getRole().getId());
+        roleDTO.setName(user.getRole().getName());
+        roleDTO.setDescription(user.getRole().getDescription());
+        roleDTO.setElTagType(user.getRole().getElTagType());
+
+        dto.setRole(roleDTO);  // Setting the roleDTO here
+
         dto.setWecomId(user.getWecomId());
         dto.setUsername(user.getUsername());
-        dto.setPassword(user.getPassword());
         dto.setEmail(user.getEmail());
         dto.setPhoneNumber(user.getPhoneNumber());
+
         return dto;
     }
 

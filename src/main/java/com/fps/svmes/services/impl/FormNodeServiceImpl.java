@@ -1,10 +1,14 @@
 package com.fps.svmes.services.impl;
 
 import com.fps.svmes.models.nosql.FormNode;
+import com.fps.svmes.repositories.jpaRepo.user.ShiftFormRepository;
 import com.fps.svmes.repositories.mongoRepo.FormNodeRepository;
 import com.fps.svmes.services.FormNodeService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import jakarta.transaction.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -16,6 +20,11 @@ public class FormNodeServiceImpl implements FormNodeService {
 
     @Autowired
     private FormNodeRepository repository;
+
+    @Autowired
+    private ShiftFormRepository shiftFormRepository;
+
+    public static final Logger logger = LoggerFactory.getLogger(FormNodeServiceImpl.class);
 
     // Save a top-level node (new document)
     @Override
@@ -58,6 +67,7 @@ public class FormNodeServiceImpl implements FormNodeService {
 
     // Delete a node by ID or UUID (traverse if necessary)
     @Override
+    @Transactional
     public boolean deleteNodeByIdOrUuid(String id) {
         // Fetch all top-level nodes
         List<FormNode> nodes = repository.findAll();
@@ -66,6 +76,11 @@ public class FormNodeServiceImpl implements FormNodeService {
         for (int i = 0; i < nodes.size(); i++) {
             // Check if the root node's ID matches the given ID
             if (nodes.get(i).getId().equals(id)) {
+                // Clean shift-form association for deleted form node
+                List<String> formNodeArr = new ArrayList<>();
+                collectFormIdsRecursively(nodes.get(i), formNodeArr);
+                shiftFormRepository.deleteAllByFormIds(formNodeArr);
+
                 nodes.remove(i); // Remove the root node
                 repository.deleteById(id); // Persist the deletion
                 return true; // Successfully deleted
@@ -101,13 +116,20 @@ public class FormNodeServiceImpl implements FormNodeService {
     private boolean deleteNodeByIdOrUuid(FormNode currentNode, String id) {
         if (currentNode.getChildren() != null) {
             for (int i = 0; i < currentNode.getChildren().size(); i++) {
-                if (currentNode.getChildren().get(i).getId().equals(id)) {
+                FormNode child = currentNode.getChildren().get(i);
+                if (child.getId().equals(id)) {
+                    // Clean shift-form association for deleted form node
+                    List<String> formNodeArr = new ArrayList<>();
+                    collectFormIdsRecursively(child, formNodeArr);
+                    shiftFormRepository.deleteAllByFormIds(formNodeArr);
+
                     currentNode.getChildren().remove(i); // Remove the matching child node
+
                     return true; // Successfully deleted
                 }
 
                 // Recursively search deeper
-                if (deleteNodeByIdOrUuid(currentNode.getChildren().get(i), id)) {
+                if (deleteNodeByIdOrUuid(child, id)) {
                     return true;
                 }
             }
@@ -186,7 +208,7 @@ public class FormNodeServiceImpl implements FormNodeService {
         return matchingNodes;
     }
 
-    // ✅ Recursive helper method to search within child nodes
+    // Recursive helper method to search within child nodes
     private void findMatchingNodesRecursively(FormNode currentNode, String keyword, List<FormNode> matchingNodes) {
         if (currentNode.getLabel().toLowerCase().contains(keyword)) {
             matchingNodes.add(currentNode);
@@ -198,5 +220,16 @@ public class FormNodeServiceImpl implements FormNodeService {
         }
     }
 
+    // Grab all document type node ids for a target node.
+    private void collectFormIdsRecursively(FormNode node, List<String> result) {
+        if ("document".equalsIgnoreCase(node.getNodeType())) {
+            result.add(node.getId());
+        }
 
+        if (node.getChildren() != null) {
+            for (FormNode child : node.getChildren()) {
+                collectFormIdsRecursively(child, result);
+            }
+        }
+    }
 }

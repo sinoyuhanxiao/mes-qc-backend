@@ -95,7 +95,6 @@ public class DispatchServiceImpl implements DispatchService {
     @Autowired
     private ModelMapper modelMapper;
 
-
     private static final Logger logger = LoggerFactory.getLogger(DispatchServiceImpl.class);
 
     // ------------- Dispatch CRUD -----------------------------------------------------------------------
@@ -182,12 +181,10 @@ public class DispatchServiceImpl implements DispatchService {
         dispatch.setDispatchSamplingLocations(mutableDispatchSamplingLocations);
         dispatch.setDispatchTestSubjects(mutableDispatchTestSubjects);
 
-
         Dispatch savedDispatch = dispatchRepo.save(dispatch);
 
         // Insert rows to dispatched task table
         try {
-
             this.initializeDispatch(savedDispatch.getId(), () -> executeDispatch(savedDispatch.getId()));
 
         } catch (IllegalStateException e) {
@@ -274,13 +271,13 @@ public class DispatchServiceImpl implements DispatchService {
         updateDispatchInstruments(dispatch, request.getInstrumentIds());
         updateDispatchTestSubjects(dispatch, request.getTestSubjectIds());
 
-
         Dispatch updatedDispatch = dispatchRepo.save(dispatch);
 
         if (updatedDispatch.getStatus() == 1) {
             taskScheduleService.removeAllTasks(dispatch.getId());
             initializeDispatch(id, () -> executeDispatch(updatedDispatch.getId()));
         }
+
         return updatedDispatch;
     }
 
@@ -514,7 +511,6 @@ public class DispatchServiceImpl implements DispatchService {
                 dispatchRepo.save(dispatch);
                 return;
             }
-
 
             // insert dispatched task rows and increase executed count
             processDispatch(dispatch);

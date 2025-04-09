@@ -1,6 +1,7 @@
 package com.fps.svmes.controllers;
 
 import com.fps.svmes.dto.responses.ResponseResult;
+import com.fps.svmes.models.nosql.FormNode;
 import com.fps.svmes.services.ShiftFormService;
 import io.swagger.v3.oas.annotations.Operation;
 import lombok.RequiredArgsConstructor;
@@ -74,6 +75,19 @@ public class ShiftFormController {
         } catch (Exception e) {
             logger.error("Error retrieving forms for shift {}", shiftId, e);
             return ResponseResult.fail("Error retrieving forms for shift", e);
+        }
+    }
+
+    @GetMapping("/shifts/{shiftId}/form-tree")
+    @Operation(summary = "Get filtered form tree by shift", description = "Returns only the part of the form tree associated with the given shift")
+    public ResponseResult<List<FormNode>> getFormTreeByShift(@PathVariable Integer shiftId) {
+        try {
+            List<FormNode> tree = shiftFormService.getFormTreeByShiftId(shiftId);
+            logger.info("Filtered form tree for shift {} retrieved successfully", shiftId);
+            return ResponseResult.success(tree);
+        } catch (Exception e) {
+            logger.error("Error retrieving form tree for shift {}", shiftId, e);
+            return ResponseResult.fail("Error retrieving filtered form tree", e);
         }
     }
 }

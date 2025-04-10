@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Quality Control Report</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        h1 { color: #2c3e50; text-align: center; }
+        .content { margin-top: 20px; text-align: left; }
+        .highlight { color: #5470c6; font-weight: bold; }
+        .chart-container { text-align: center; margin-top: 20px; }
+        img { max-width: 95%; height: auto; margin-top: 10px; border: 1px solid #ddd; padding: 5px; }
+    </style>
+</head>
+<body>
+<h1 th:text="${qcFormName} + ' Report'"></h1>
+
+<p class="bold">Inspection Date Range: <span class="highlight" th:text="${startDateTime}"></span> to <span class="highlight" th:text="${endDateTime}"></span></p>
+
+<h2>Inspection Data</h2>
+
+<div class="content">
+    <th:block th:each="chart : ${charts}">
+        <div class="chart-container">
+            <img th:src="@{${chart.chartImage}}" alt="Inspection Chart">
+
+            <th:block th:if="${chart.chartType == 'line'}">
+                <p>In this inspection, the maximum value was <span class="highlight" th:text="${chart.max}"></span>, and the minimum value was <span class="highlight" th:text="${chart.min}"></span>.
+                    After calculation, the average value was <span class="highlight" th:text="${chart.average}"></span>, with a total of <span class="highlight" th:text="${chart.total}"></span> data points.
+                </p>
+            </th:block>
+
+            <th:block th:if="${chart.chartType == 'pie'}">
+                <p>This inspection covered multiple categories. The statistical summary of each category is as follows:</p>
+                <p>
+                    <th:block th:each="item : ${chart.info}">
+                        <span th:text="${item.label}"></span> appeared <span class="highlight" th:text="${item.count}"></span> times, accounting for <span class="highlight" th:text="${item.percentage}"></span>% of the total.
+                    </th:block>
+                </p>
+                <p>Total data count: <span class="highlight" th:text="${chart.total}"></span></p>
+            </th:block>
+        </div>
+    </th:block>
+</div>
+
+</body>
+</html>

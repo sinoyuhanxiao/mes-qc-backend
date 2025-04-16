@@ -16,4 +16,13 @@ public interface MongoService {
      * @return true if the collection exists, false otherwise
      */
     boolean collectionExists(String collectionName);
+
+    /**
+     * Inserts one document into a MongoDB collection.
+     *
+     * @param collectionName Name of the collection
+     * @param document The document to insert
+     */
+    void insertOne(String collectionName, org.bson.Document document);
+
 }

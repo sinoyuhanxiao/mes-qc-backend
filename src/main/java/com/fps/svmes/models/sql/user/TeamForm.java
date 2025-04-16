@@ -9,13 +9,13 @@ import lombok.*;
 @Entity
 @NoArgsConstructor
 @AllArgsConstructor
-@Table(name = "shift_form", schema = "quality_management")
-public class ShiftForm {
+@Table(name = "team_form", schema = "quality_management")
+public class TeamForm {
     @EmbeddedId
-    ShiftFormId id;
+    TeamFormId id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @MapsId("shiftId")
-    @JoinColumn(name = "shift_id", referencedColumnName = "id")
-    private Shift shift;
+    @MapsId("teamId")
+    @JoinColumn(name = "team_id", referencedColumnName = "id")
+    private Team team;
 }

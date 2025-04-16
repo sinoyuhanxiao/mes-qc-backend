@@ -1,52 +1,51 @@
 package com.fps.svmes.services.impl;
 
 import com.fps.svmes.models.nosql.FormNode;
-import com.fps.svmes.models.sql.user.Shift;
-import com.fps.svmes.models.sql.user.ShiftForm;
-import com.fps.svmes.models.sql.user.ShiftFormId;
-import com.fps.svmes.repositories.jpaRepo.user.ShiftFormRepository;
-import com.fps.svmes.repositories.jpaRepo.user.ShiftRepository;
+import com.fps.svmes.models.sql.user.Team;
+import com.fps.svmes.models.sql.user.TeamForm;
+import com.fps.svmes.models.sql.user.TeamFormId;
+import com.fps.svmes.repositories.jpaRepo.user.TeamFormRepository;
+import com.fps.svmes.repositories.jpaRepo.user.TeamRepository;
 import com.fps.svmes.repositories.mongoRepo.FormNodeRepository;
-import com.fps.svmes.services.ShiftFormService;
+import com.fps.svmes.services.TeamFormService;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.List;
 
 @Service
 @RequiredArgsConstructor
-public class ShiftFormServiceImpl implements ShiftFormService {
-    private final ShiftFormRepository shiftFormRepository;
-    private final ShiftRepository shiftRepository;
+public class TeamFormServiceImpl implements TeamFormService {
+    private final TeamFormRepository teamFormRepository;
+    private final TeamRepository teamRepository;
     private final FormNodeRepository formNodeRepository;
 
     @Transactional
     @Override
-    public void assignFormToShift(Integer shiftId, String formId) {
-        Shift shift = shiftRepository.findById(shiftId)
-                .orElseThrow(() -> new EntityNotFoundException("Shift not found"));
+    public void assignFormToTeam(Integer teamId, String formId) {
+        Team team = teamRepository.findById(teamId)
+                .orElseThrow(() -> new EntityNotFoundException("Team not found"));
 
-        ShiftFormId id = new ShiftFormId(shiftId, formId);
+        TeamFormId id = new TeamFormId(teamId, formId);
 
-        if (!shiftFormRepository.existsById(id)) {
-            ShiftForm shiftForm = new ShiftForm(id, shift);
-            shiftFormRepository.save(shiftForm);
+        if (!teamFormRepository.existsById(id)) {
+            TeamForm teamForm = new TeamForm(id, team);
+            teamFormRepository.save(teamForm);
         }
     }
 
     @Transactional
     @Override
-    public void removeFormFromShift(Integer shiftId, String formId) {
-        shiftFormRepository.deleteById(new ShiftFormId(shiftId, formId));
+    public void removeFormFromTeam(Integer teamId, String formId) {
+        teamFormRepository.deleteById(new TeamFormId(teamId, formId));
     }
 
     @Override
-    public List<String> getFormIdsByShift(Integer shiftId) {
-        return shiftFormRepository.findByShiftId(shiftId)
+    public List<String> getFormIdsByTeam(Integer teamId) {
+        return teamFormRepository.findByTeamId(teamId)
                 .stream()
                 .map(sf -> sf.getId().getFormId())
                 .toList();
@@ -54,13 +53,13 @@ public class ShiftFormServiceImpl implements ShiftFormService {
 
     @Transactional
     @Override
-    public void removeAllFormsFromShift(Integer shiftId) {
-        shiftFormRepository.deleteByShiftId(shiftId);
+    public void removeAllFormsFromTeam(Integer teamId) {
+        teamFormRepository.deleteByTeamId(teamId);
     }
 
     @Override
-    public List<FormNode> getFormTreeByShiftId(Integer shiftId) {
-        List<String> formIds = getFormIdsByShift(shiftId);
+    public List<FormNode> getFormTreeByTeamId(Integer teamId) {
+        List<String> formIds = getFormIdsByTeam(teamId);
         List<FormNode> fullTree = formNodeRepository.findAll();
 
         List<FormNode> filteredTree = new ArrayList<>();

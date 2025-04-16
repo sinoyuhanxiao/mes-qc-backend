@@ -9,7 +9,7 @@ import lombok.EqualsAndHashCode;
 @Data
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @EqualsAndHashCode(callSuper = true)
-public class UserForShiftTableDTO extends CommonDTO {
+public class UserForTeamTableDTO extends CommonDTO {
 
     @JsonProperty("id")
     private Integer id;

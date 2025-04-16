@@ -10,7 +10,7 @@ import java.io.Serializable;
 @NoArgsConstructor
 @AllArgsConstructor
 @Embeddable
-public class ShiftFormId implements Serializable {
-    private Integer shiftId;
+public class TeamFormId implements Serializable {
+    private Integer teamId;
     private String formId; // String to match MongoDB's FormNode._id
 }

@@ -2,30 +2,29 @@ package com.fps.svmes.models.sql.user;
 
 import jakarta.persistence.Embeddable;
 import lombok.Data;
-import lombok.NoArgsConstructor;
 
 import java.io.Serializable;
 import java.util.Objects;
 
 @Data
 @Embeddable
-public class ShiftUserId implements Serializable {
-    private Integer shiftId;
+public class TeamUserId implements Serializable {
+    private Integer teamId;
     private Integer userId;
 
-    public ShiftUserId() {}
+    public TeamUserId() {}
 
-    public ShiftUserId(Integer shiftId, Integer userId) {
-        this.shiftId = shiftId;
+    public TeamUserId(Integer teamId, Integer userId) {
+        this.teamId = teamId;
         this.userId = userId;
     }
 
-    public Integer getShiftId() {
-        return shiftId;
+    public Integer getTeamId() {
+        return teamId;
     }
 
-    public void setShiftId(Integer shiftId) {
-        this.shiftId = shiftId;
+    public void setTeamId(Integer teamId) {
+        this.teamId = teamId;
     }
 
     public Integer getUserId() {
@@ -40,12 +39,12 @@ public class ShiftUserId implements Serializable {
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        ShiftUserId that = (ShiftUserId) o;
-        return Objects.equals(shiftId, that.shiftId) && Objects.equals(userId, that.userId);
+        TeamUserId that = (TeamUserId) o;
+        return Objects.equals(teamId, that.teamId) && Objects.equals(userId, that.userId);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(shiftId, userId);
+        return Objects.hash(teamId, userId);
     }
 }

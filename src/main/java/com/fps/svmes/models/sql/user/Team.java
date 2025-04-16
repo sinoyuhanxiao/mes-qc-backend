@@ -1,33 +1,37 @@
-package com.fps.svmes.dto.dtos.user;
+package com.fps.svmes.models.sql.user;
 
-import com.fasterxml.jackson.annotation.JsonFormat;
-import com.fasterxml.jackson.annotation.JsonInclude;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fps.svmes.dto.dtos.CommonDTO;
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.persistence.Column;
+import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fps.svmes.models.sql.Common;
+import jakarta.persistence.*;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
-import java.time.OffsetDateTime;
 import java.time.OffsetTime;
 
+@Entity
+@Table(name = "team", schema = "quality_management")
 @Data
-@JsonInclude(JsonInclude.Include.NON_NULL)
 @EqualsAndHashCode(callSuper = true)
-public class ShiftDTO extends CommonDTO {
-
+public class Team extends Common {
+    @Id
     @JsonProperty("id")
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "id")
     private Integer id;
 
     @JsonProperty("name")
+    @Column(name = "name")
     private String name;
 
     @JsonProperty("type")
+    @Column(name = "type")
     private String type;
 
-    @JsonProperty("leader")
-    private UserDTO leader; // Add this for full user details.
+    @OneToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "leader_id", referencedColumnName = "id")
+    private User leader;
 
     @Schema(type = "string", pattern = "HH:mm:ssXXX", example = "14:30:00+02:00")
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "HH:mm:ssXXX")
@@ -42,5 +46,7 @@ public class ShiftDTO extends CommonDTO {
     private OffsetTime endTime;
 
     @JsonProperty("description")
+    @Column(name = "description")
     private String description;
+
 }

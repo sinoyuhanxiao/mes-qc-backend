@@ -6,16 +6,16 @@ import lombok.Data;
 
 @Data
 @JsonInclude(JsonInclude.Include.NON_NULL)
-public class ShiftUserDTO {
+public class TeamUserDTO {
 
-    @JsonProperty("shift_id")
-    private Integer shiftId;
+    @JsonProperty("team_id")
+    private Integer teamId;
 
     @JsonProperty("user_id")
     private Integer userId;
 
-    public ShiftUserDTO(Integer userId, Integer shiftId) {
+    public TeamUserDTO(Integer userId, Integer teamId) {
         this.userId = userId;
-        this.shiftId = shiftId;
+        this.teamId = teamId;
     }
 }

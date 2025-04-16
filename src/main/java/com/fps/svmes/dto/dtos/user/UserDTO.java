@@ -37,6 +37,6 @@ public class UserDTO extends CommonDTO {
     @JsonProperty("phone_number")
     private String phoneNumber;
 
-    @JsonProperty("shifts")
-    private List<ShiftForUserTableDTO> shifts;
+    @JsonProperty("teams")
+    private List<TeamForUserTableDTO> teams;
 }

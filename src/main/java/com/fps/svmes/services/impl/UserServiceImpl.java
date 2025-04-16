@@ -1,13 +1,13 @@
 package com.fps.svmes.services.impl;
 
-import com.fps.svmes.dto.dtos.user.ShiftForUserTableDTO;
+import com.fps.svmes.dto.dtos.user.TeamForUserTableDTO;
 import com.fps.svmes.dto.dtos.user.UserDTO;
 import com.fps.svmes.models.sql.user.Role;
-import com.fps.svmes.models.sql.user.ShiftUser;
+import com.fps.svmes.models.sql.user.TeamUser;
 import com.fps.svmes.models.sql.user.User;
 import com.fps.svmes.repositories.jpaRepo.user.RoleRepository;
-import com.fps.svmes.repositories.jpaRepo.user.ShiftRepository;
-import com.fps.svmes.repositories.jpaRepo.user.ShiftUserRepository;
+import com.fps.svmes.repositories.jpaRepo.user.TeamRepository;
+import com.fps.svmes.repositories.jpaRepo.user.TeamUserRepository;
 import com.fps.svmes.repositories.jpaRepo.user.UserRepository;
 import com.fps.svmes.services.UserService;
 import lombok.RequiredArgsConstructor;
@@ -28,7 +28,7 @@ public class UserServiceImpl implements UserService {
     private UserRepository userRepository;
 
     @Autowired
-    private ShiftUserRepository shiftUserRepository;
+    private TeamUserRepository teamUserRepository;
 
     @Autowired
     private RoleRepository roleRepository;
@@ -36,10 +36,10 @@ public class UserServiceImpl implements UserService {
     @Autowired
     private ModelMapper modelMapper;
     @Autowired
-    private ShiftRepository shiftRepository;
+    private TeamRepository teamRepository;
 
     // Get all users
-    // TODO: add the shifts
+    // TODO: add the teams
     @Override
     @Transactional(readOnly = true)
     public List<UserDTO> getAllUsers() {
@@ -49,11 +49,11 @@ public class UserServiceImpl implements UserService {
                     // Map the user entity to UserDTO
                     UserDTO userDTO = modelMapper.map(user, UserDTO.class);
 
-                    // Fetch shifts directly using the repository method that returns ShiftForUserTableDTO
-                    List<ShiftForUserTableDTO> shifts = shiftUserRepository.findShiftsByUserId(user.getId());
+                    // Fetch teams directly using the repository method that returns TeamForUserTableDTO
+                    List<TeamForUserTableDTO> teams = teamUserRepository.findTeamsByUserId(user.getId());
 
-                    // Assign the mapped shifts to the UserDTO
-                    userDTO.setShifts(shifts);
+                    // Assign the mapped teams to the UserDTO
+                    userDTO.setTeams(teams);
 
                     return userDTO;
                 })
@@ -71,7 +71,7 @@ public class UserServiceImpl implements UserService {
     }
 
     // Update an existing user
-    // TODO: add the shifts
+    // TODO: add the teams
     @Override
     @Transactional
     public UserDTO updateUser(Integer id, UserDTO userDTO) {

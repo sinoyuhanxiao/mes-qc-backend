@@ -14,24 +14,24 @@ import java.time.OffsetDateTime;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-public class ShiftRequest {
+public class TeamRequest {
 
     @JsonProperty("id")
-    @Schema(description = "Shift ID (only for updates)", example = "1")
+    @Schema(description = "Team ID (only for updates)", example = "1")
     private Integer id;
 
     @JsonProperty("name")
-    @NotNull(message = "Shift name cannot be null")
-    @Schema(description = "Name of the shift", example = "Morning Shift")
+    @NotNull(message = "Team name cannot be null")
+    @Schema(description = "Name of the team", example = "Morning Team")
     private String name;
 
     @JsonProperty("type")
-    @NotNull(message = "Shift type cannot be null")
-    @Schema(description = "Type of the shift", example = "Day")
+    @NotNull(message = "Team type cannot be null")
+    @Schema(description = "Type of the team", example = "Day")
     private String type;
 
     @JsonProperty("leader_id") // 与前端字段名称一致
-    @Schema(description = "User ID of the shift leader", example = "14")
+    @Schema(description = "User ID of the team leader", example = "14")
     private Integer leaderId;
 
     @Schema(type = "string", pattern = "HH:mm:ssXXX", example = "08:00:00+02:00")
@@ -45,26 +45,26 @@ public class ShiftRequest {
     private OffsetTime endTime;
 
     @JsonProperty("description")
-    @Schema(description = "Description of the shift", example = "This is a regular day shift")
+    @Schema(description = "Description of the team", example = "This is a regular day team")
     private String description;
 
     @JsonProperty("status")
-    @Schema(description = "Status of the shift", example = "1")
+    @Schema(description = "Status of the team", example = "1")
     private Integer status;
 
     @JsonProperty("created_by")
-    @Schema(description = "User ID that creates this shift", example = "14")
+    @Schema(description = "User ID that creates this team", example = "14")
     private Integer createdBy;
 
     @JsonProperty("updated_by")
-    @Schema(description = "User ID that updates this shift", example = "14")
+    @Schema(description = "User ID that updates this team", example = "14")
     private Integer updatedBy;
 
     @JsonProperty("created_at")
-    @Schema(description = "Creation timestamp of the shift", example = "12:00:00+00:00")
+    @Schema(description = "Creation timestamp of the team", example = "12:00:00+00:00")
     private OffsetDateTime createdAt;
 
     @JsonProperty("updated_at")
-    @Schema(description = "Last update timestamp of the shift", example = "12:00:00+00:00")
+    @Schema(description = "Last update timestamp of the team", example = "12:00:00+00:00")
     private OffsetDateTime updatedAt;
 }

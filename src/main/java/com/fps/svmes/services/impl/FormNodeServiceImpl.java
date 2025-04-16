@@ -1,7 +1,7 @@
 package com.fps.svmes.services.impl;
 
 import com.fps.svmes.models.nosql.FormNode;
-import com.fps.svmes.repositories.jpaRepo.user.ShiftFormRepository;
+import com.fps.svmes.repositories.jpaRepo.user.TeamFormRepository;
 import com.fps.svmes.repositories.mongoRepo.FormNodeRepository;
 import com.fps.svmes.services.FormNodeService;
 import org.slf4j.Logger;
@@ -22,7 +22,7 @@ public class FormNodeServiceImpl implements FormNodeService {
     private FormNodeRepository repository;
 
     @Autowired
-    private ShiftFormRepository shiftFormRepository;
+    private TeamFormRepository teamFormRepository;
 
     public static final Logger logger = LoggerFactory.getLogger(FormNodeServiceImpl.class);
 
@@ -76,10 +76,10 @@ public class FormNodeServiceImpl implements FormNodeService {
         for (int i = 0; i < nodes.size(); i++) {
             // Check if the root node's ID matches the given ID
             if (nodes.get(i).getId().equals(id)) {
-                // Clean shift-form association for deleted form node
+                // Clean team-form association for deleted form node
                 List<String> formNodeArr = new ArrayList<>();
                 collectFormIdsRecursively(nodes.get(i), formNodeArr);
-                shiftFormRepository.deleteAllByFormIds(formNodeArr);
+                teamFormRepository.deleteAllByFormIds(formNodeArr);
 
                 nodes.remove(i); // Remove the root node
                 repository.deleteById(id); // Persist the deletion
@@ -118,10 +118,10 @@ public class FormNodeServiceImpl implements FormNodeService {
             for (int i = 0; i < currentNode.getChildren().size(); i++) {
                 FormNode child = currentNode.getChildren().get(i);
                 if (child.getId().equals(id)) {
-                    // Clean shift-form association for deleted form node
+                    // Clean team-form association for deleted form node
                     List<String> formNodeArr = new ArrayList<>();
                     collectFormIdsRecursively(child, formNodeArr);
-                    shiftFormRepository.deleteAllByFormIds(formNodeArr);
+                    teamFormRepository.deleteAllByFormIds(formNodeArr);
 
                     currentNode.getChildren().remove(i); // Remove the matching child node
 

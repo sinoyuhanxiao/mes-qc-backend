@@ -129,5 +129,11 @@ public class TeamServiceImpl implements TeamService {
         teamRepository.save(team);
     }
 
+    @Override
+    public TeamDTO getTeamByTeamLeadId(Integer id) {
+        Team team = teamRepository.findByLeaderId(id);
+        return modelMapper.map(team, TeamDTO.class);
+    }
+
 }
 

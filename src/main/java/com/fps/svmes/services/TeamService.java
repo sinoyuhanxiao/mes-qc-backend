@@ -14,4 +14,5 @@ public interface TeamService {
     void activateTeam(Integer id, Integer updatedBy);
     void softDeleteTeam(Integer id, Integer userId);
     void hardDeleteTeam(Integer id);
+    TeamDTO getTeamByTeamLeadId(Integer id);
 }

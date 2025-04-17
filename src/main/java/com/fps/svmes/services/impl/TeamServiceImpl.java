@@ -135,5 +135,15 @@ public class TeamServiceImpl implements TeamService {
         return modelMapper.map(team, TeamDTO.class);
     }
 
+    @Override
+    public List<Integer> getCurrentLeaderIds() {
+        // Fetch all teams
+        List<Team> teams = teamRepository.findAll();
+        // Extract leader IDs from teams
+        return teams.stream()
+                .map(team -> team.getLeader().getId())
+                .collect(Collectors.toList());
+    }
+
 }
 

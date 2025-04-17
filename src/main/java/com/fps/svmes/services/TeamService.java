@@ -15,4 +15,5 @@ public interface TeamService {
     void softDeleteTeam(Integer id, Integer userId);
     void hardDeleteTeam(Integer id);
     TeamDTO getTeamByTeamLeadId(Integer id);
+    List<Integer> getCurrentLeaderIds();
 }

@@ -163,4 +163,30 @@ public class TeamController {
             return ResponseResult.fail("Failed to hard delete team", e);
         }
     }
+
+    // get the team id by the team lead id
+    @GetMapping("/lead/{id}")
+    @Operation(summary = "Get team by team lead id", description = "Fetch a team by its team lead id")
+    public ResponseResult<TeamDTO> getTeamByTeamLeadId(@PathVariable Integer id) {
+        try {
+            TeamDTO team = teamService.getTeamByTeamLeadId(id);
+            return ResponseResult.success(team);
+        } catch (Exception e) {
+            logger.error("Error retrieving team by team lead id", e);
+            return ResponseResult.fail("Failed to retrieve team", e);
+        }
+    }
+
+    // get the list of current leader ids existing in the Team
+    @GetMapping("/leaders")
+    @Operation(summary = "Get current leader ids", description = "Fetch a list of current leader ids")
+    public ResponseResult<List<Integer>> getCurrentLeaderIds() {
+        try {
+            List<Integer> leaderIds = teamService.getCurrentLeaderIds();
+            return ResponseResult.success(leaderIds);
+        } catch (Exception e) {
+            logger.error("Error retrieving current leader ids", e);
+            return ResponseResult.fail("Failed to retrieve current leader ids", e);
+        }
+    }
 }

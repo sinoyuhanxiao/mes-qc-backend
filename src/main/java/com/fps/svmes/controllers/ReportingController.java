@@ -47,4 +47,19 @@ public class ReportingController {
         return reportingService.fetchQcRecords(formTemplateId, startDateTime, endDateTime, page, size);
     }
 
+    /**
+     * Fetch QC records filtered by created_by ID, with pagination.
+     */
+    @GetMapping("/qc-records/by-user")
+    public List<Document> getQcRecordsByUser(
+            @RequestParam Long formTemplateId,
+            @RequestParam String startDateTime,
+            @RequestParam String endDateTime,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam Integer createdBy) {
+
+        return reportingService.fetchQcRecordsFilteredByCreator(formTemplateId, startDateTime, endDateTime, page, size, createdBy);
+    }
+
 }

@@ -407,8 +407,6 @@ public class DispatchServiceImpl implements DispatchService {
     // Runs every 10 minutes (600000 ms)
     @Scheduled(fixedRate = 600000)
     public void periodicCleanupExpiredTasks() {
-        logger.info("Running cleanup of expired tasks...");
-
         dispatchRepo.findByStatus(1).stream()
                 .filter(dispatch -> "regular".equals(dispatch.getType()) &&
                         dispatch.getState().equals(DispatchState.Active.getState()))

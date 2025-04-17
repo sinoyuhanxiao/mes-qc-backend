@@ -10,9 +10,6 @@ import com.fps.svmes.services.UserService;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
-import com.mongodb.client.model.Field;
-import com.mongodb.client.model.Filters;
-import org.bson.BsonDateTime;
 import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
@@ -407,6 +404,29 @@ public class ReportingServiceImpl implements ReportingService {
                 .map(doc -> formattedResult(doc, optionItemsKeyValueMap, keyValueMap))
                 .collect(Collectors.toList());
     }
+
+    // another function use above fetchQcRecords but filtered by createdBy integer
+    @Override
+    public List<Document> fetchQcRecordsFilteredByCreator(Long formTemplateId, String startDateTime, String endDateTime, Integer page, Integer size, Integer createdBy) {
+        // 先获取全部记录（分页限制会在这里执行）
+        List<Document> allRecords = fetchQcRecords(formTemplateId, startDateTime, endDateTime, page, size);
+
+        // 然后再根据 created_by 进行过滤
+        return allRecords.stream()
+                .filter(doc -> {
+                    Object creator = doc.get("created_by");
+                    if (creator instanceof Integer) {
+                        return creator.equals(createdBy);
+                    } else if (creator instanceof Long) {
+                        return ((Long) creator).intValue() == createdBy;
+                    } else {
+                        return false;
+                    }
+                })
+                .collect(Collectors.toList());
+    }
+
+
 
     public HashMap<String, String> getFormTemplateKeyValueMapping(Long formId) {
         String formTemplateJson = qcFormTemplateRepository.findFormTemplateJsonById(formId);

@@ -65,7 +65,7 @@ public class QcTaskSubmissionLogsServiceImpl implements QcTaskSubmissionLogsServ
         // Map the DTO to the entity
         QcTaskSubmissionLogs log = modelMapper.map(dto, QcTaskSubmissionLogs.class);
 
-        // Set timestamps to shanghai time
+        // Set timestamps to current time
         log.setCreatedAt(OffsetDateTime.now());
 
         // Save the entity

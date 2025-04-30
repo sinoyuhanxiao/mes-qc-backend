@@ -27,7 +27,6 @@ public class QcOrderController {
     @Autowired
     private QcOrderService qcOrderService;
 
-
     @Autowired
     DispatchService dispatchService;
     private static final Logger logger = LoggerFactory.getLogger(QcOrderController.class);
@@ -123,6 +122,4 @@ public class QcOrderController {
         qcOrderService.updateQcOrderStates();
         return ResponseEntity.ok("QC Order states updated successfully.");
     }
-
-
 }

@@ -376,7 +376,6 @@ public class DispatchServiceImpl implements DispatchService {
         return convertToDispatchDTO(dispatchedTask.getDispatch());
     }
 
-
     // ------------- SCHEDULING LOGIC -----------------------------------------------------------------------
 
     // Runs on server start up
@@ -418,7 +417,7 @@ public class DispatchServiceImpl implements DispatchService {
                 });
     }
 
-    // called by create dispatch, update dispatch, initialization upon server restart , schedule by id
+    // Called by create dispatch, update dispatch, initialization upon server restart , schedule by id
     // This function setup task(CRON, FUTURE, CANCEL) based on the start/end time of dispatch
     public void initializeDispatch(Long dispatchId, Runnable task) {
         Dispatch dispatch = dispatchRepo.findById(dispatchId)

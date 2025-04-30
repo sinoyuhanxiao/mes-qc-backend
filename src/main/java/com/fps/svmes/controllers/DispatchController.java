@@ -1,6 +1,5 @@
 package com.fps.svmes.controllers;
 
-
 import com.fps.svmes.dto.dtos.dispatch.DispatchDTO;
 import com.fps.svmes.dto.responses.ResponseResult;
 import com.fps.svmes.models.sql.taskSchedule.Dispatch;
@@ -16,7 +15,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
-
 import java.time.OffsetDateTime;
 import java.util.HashMap;
 import java.util.List;
@@ -90,7 +88,6 @@ public class DispatchController {
         }
     }
 
-
     @Operation(summary = "Get all dispatches", description = "Retrieves a list of all dispatches")
     @GetMapping
     public ResponseResult<List<DispatchDTO>> getAllDispatches() {
@@ -116,9 +113,6 @@ public class DispatchController {
             return ResponseResult.fail("Failed to retrieve dispatch for dispatched task ID: " + dispatchedTaskId, e);
         }
     }
-
-
-
 
     /**
      * Endpoint to schedule a dispatch task.
@@ -183,7 +177,6 @@ public class DispatchController {
     @Operation(summary = "Cancel dispatch task for specified dispatch", description = "Schedule dispatch task for the specified dispatch")
     @DeleteMapping("/cancel/{id}")
     public ResponseResult<String> cancelTask(@PathVariable Long id) {
-
         try {
             dispatchService.cancelDispatchTask(id);
             return ResponseResult.success("Task cancelled successfully for Dispatch ID: " + id);
@@ -203,7 +196,6 @@ public class DispatchController {
     @Operation(summary = "Check if a dispatch has any task scheduled", description = "Retrieves true or false on whether a dispatch has task scheduled")
     @GetMapping("/is-scheduled/{id}")
     public ResponseResult<Boolean> isTaskScheduled(@PathVariable Long id) {
-
         try {
             boolean isScheduled = taskScheduleService.isScheduled(id);
             return ResponseResult.success(isScheduled);
@@ -212,7 +204,6 @@ public class DispatchController {
             return ResponseResult.fail("Fail to check is scheduled for a dispatch with ID", e);
         }
     }
-
 
     /**
      * Endpoint to get the next execution time of a scheduled task.

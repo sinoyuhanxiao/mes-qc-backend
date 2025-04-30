@@ -45,7 +45,6 @@ public class QcOrderServiceImpl implements QcOrderService {
     @Autowired private ModelMapper modelMapper;
     private static final Logger logger = LoggerFactory.getLogger(QcOrderServiceImpl.class);
 
-
     @Transactional
     public QcOrderDTO createQcOrder(QcOrderDTO request) {
         QcOrder qcOrder = modelMapper.map(request, QcOrder.class);

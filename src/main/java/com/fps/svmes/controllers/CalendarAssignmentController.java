@@ -53,7 +53,7 @@ public class CalendarAssignmentController {
 
     @DeleteMapping("/{id}")
     @Operation(summary = "Delete (soft delete) a calendar assignment", description = "Soft delete a calendar assignment by setting its status to 0.")
-    public ResponseResult<String> delete(@PathVariable Long id, @PathVariable Integer userId) {
+    public ResponseResult<String> delete(@PathVariable Long id, @RequestParam Integer userId) {
         try {
             service.deleteAssignment(id, userId);
             logger.info("Soft deleted Calendar Assignment with ID: {}", id);

@@ -39,8 +39,15 @@ public class CalendarAssignmentServiceImpl implements CalendarAssignmentService 
             assignment.setForms(forms);
         }
 
-        assignment.setCreationDetails(dto.getCreatedBy(), dto.getStatus());
+        assignment.setCreationDetails(dto.getCreatedBy(), 1);
         assignment = assignmentRepo.save(assignment);
+
+        // Setup groupId if it's a recurring assignment and groupId was not provided
+        if ((assignment.getDaysOfWeek() != null && assignment.getDaysOfWeek().length > 0)) {
+            assignment.setGroupId(Math.toIntExact(assignment.getId()));
+            assignment = assignmentRepo.save(assignment);
+        }
+
         return modelMapper.map(assignment, CalendarAssignmentDTO.class);
     }
 
@@ -66,7 +73,7 @@ public class CalendarAssignmentServiceImpl implements CalendarAssignmentService 
             assignment.getForms().addAll(forms);
         }
 
-        assignment.setUpdateDetails(dto.getUpdatedBy(), dto.getStatus());
+        assignment.setUpdateDetails(dto.getUpdatedBy(),1);
         assignment = assignmentRepo.save(assignment);
         return modelMapper.map(assignment, CalendarAssignmentDTO.class);
     }
@@ -85,7 +92,7 @@ public class CalendarAssignmentServiceImpl implements CalendarAssignmentService 
     public List<CalendarAssignmentDTO> getAllAssignments() {
         return assignmentRepo.findAll().stream()
                 .filter(assignment -> assignment.getStatus() != null && assignment.getStatus() == 1)
-                .map(assignment -> modelMapper.map(assignment, CalendarAssignmentDTO.class))
+                .map(this::convertToDTO)
                 .collect(Collectors.toList());
     }
 
@@ -95,6 +102,20 @@ public class CalendarAssignmentServiceImpl implements CalendarAssignmentService 
         CalendarAssignment assignment = assignmentRepo.findById(id)
                 .filter(a -> a.getStatus() != null && a.getStatus() == 1)
                 .orElseThrow(() -> new IllegalArgumentException("Assignment not found"));
-        return modelMapper.map(assignment, CalendarAssignmentDTO.class);
+        return convertToDTO(assignment);
+    }
+
+    private CalendarAssignmentDTO convertToDTO(CalendarAssignment calendarAssignment) {
+        CalendarAssignmentDTO dto = modelMapper.map(calendarAssignment, CalendarAssignmentDTO.class);
+
+        if (calendarAssignment.getForms() != null){
+            List<String> formNodeIds = calendarAssignment.getForms()
+                    .stream()
+                    .map(CalendarAssignmentForm::getFormTreeNodeId)
+                    .collect(Collectors.toList());
+            dto.setFormTreeNodeIds(formNodeIds);
+        }
+
+        return dto;
     }
 }

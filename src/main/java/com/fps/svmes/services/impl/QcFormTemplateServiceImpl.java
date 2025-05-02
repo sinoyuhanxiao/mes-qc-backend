@@ -127,4 +127,44 @@ public class QcFormTemplateServiceImpl implements QcFormTemplateService {
         }
     }
 
+    @Override
+    public String resolveLabelFromTemplateByKey(Long templateId, String fieldKey) {
+        QcFormTemplate template = repository.findById(templateId)
+                .orElseThrow(() -> new RuntimeException("Template not found"));
+
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+            JsonNode root = mapper.readTree(template.getFormTemplateJson());
+            JsonNode widgetList = root.get("widgetList");
+            return findLabelInWidgetList(widgetList, fieldKey);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to resolve label from form template", e);
+        }
+    }
+
+    private String findLabelInWidgetList(JsonNode widgetList, String fieldKey) {
+        if (widgetList == null || !widgetList.isArray()) return null;
+
+        for (JsonNode widget : widgetList) {
+            String type = widget.get("type").asText();
+
+            if ("grid".equals(type)) {
+                for (JsonNode col : widget.get("cols")) {
+                    String label = findLabelInWidgetList(col.get("widgetList"), fieldKey);
+                    if (label != null) return label;
+                }
+            } else if ("number".equals(type)) {
+                JsonNode options = widget.get("options");
+                if (options != null && options.has("name") && options.has("label")) {
+                    if (fieldKey.equals(options.get("name").asText())) {
+                        return options.get("label").asText();
+                    }
+                }
+            }
+        }
+
+        return null; // not found
+    }
+
+
 }

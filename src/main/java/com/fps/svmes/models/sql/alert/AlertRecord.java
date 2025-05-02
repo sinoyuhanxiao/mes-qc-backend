@@ -8,6 +8,8 @@ import lombok.EqualsAndHashCode;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "qc_alert_record", schema = "quality_management")
@@ -29,21 +31,17 @@ public class AlertRecord extends Common {
     @JsonProperty("alert_time")
     private OffsetDateTime alertTime;
 
-    @Column(name = "product_id")
-    @JsonProperty("product_id")
-    private Integer productId;
-
-    @Column(name = "batch_id")
-    @JsonProperty("batch_id")
-    private Integer batchId;
-
     @Column(name = "qc_form_template_id")
     @JsonProperty("qc_form_template_id")
     private Long qcFormTemplateId;
 
     @Column(name = "inspection_item_key")
     @JsonProperty("inspection_item_key")
-    private Long inspectionItemKey;
+    private String inspectionItemKey;
+
+    @Column(name = "inspection_item_label")
+    @JsonProperty("inspection_item_label")
+    private String inspectionItemLabel;
 
     @Column(name = "inspection_value")
     @JsonProperty("inspection_value")
@@ -65,15 +63,20 @@ public class AlertRecord extends Common {
     @JsonProperty("risk_level_id")
     private Integer riskLevelId;
 
-    @Column(name = "inspector_id")
-    @JsonProperty("inspector_id")
-    private Long inspectorId;
-
-    @Column(name = "reviewer_id")
-    @JsonProperty("reviewer_id")
-    private Long reviewerId;
-
     @Column(name = "alert_status")
     @JsonProperty("alert_status")
     private Integer alertStatus;
+
+    @OneToMany(mappedBy = "alert", fetch = FetchType.EAGER, cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<AlertProduct> alertProducts = new ArrayList<>();
+
+    @OneToMany(mappedBy = "alert", fetch = FetchType.EAGER, cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<AlertBatch> alertBatches = new ArrayList<>();
+
+    @OneToMany(mappedBy = "alert", fetch = FetchType.EAGER, cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<AlertInspector> alertInspectors = new ArrayList<>();
+
+    @OneToMany(mappedBy = "alert", fetch = FetchType.EAGER, cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<AlertReviewer> alertReviewers = new ArrayList<>();
+
 }

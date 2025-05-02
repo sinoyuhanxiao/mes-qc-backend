@@ -1,10 +1,12 @@
 package com.fps.svmes.controllers;
 
 import com.fps.svmes.dto.dtos.alert.AlertRecordDTO;
+import com.fps.svmes.dto.dtos.alert.DetailedAlertRecordDTO;
 import com.fps.svmes.dto.requests.alert.UpdateAlertRecordRequest;
 import com.fps.svmes.services.AlertRecordService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -54,5 +56,22 @@ public class AlertRecordController {
             return ResponseEntity.status(500).body("delete failed: " + e.getMessage());
         }
     }
+
+    /**
+     * Retrieves a paginated list of detailed alert records.
+     *
+     * @param page The page number (zero-based)
+     * @param size The page size
+     * @return A Page of DetailedAlertRecordDTO
+     */
+    @GetMapping
+    public ResponseEntity<?> getAllAlertRecords(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size
+    ) {
+        Page<DetailedAlertRecordDTO> result = alertRecordService.getDetailedList(page, size);
+        return ResponseEntity.ok(result);
+    }
+
 
 }

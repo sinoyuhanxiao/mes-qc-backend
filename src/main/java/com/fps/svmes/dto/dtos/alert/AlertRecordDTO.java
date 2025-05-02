@@ -8,6 +8,7 @@ import lombok.EqualsAndHashCode;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
+import java.util.List;
 
 @Data
 @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -23,17 +24,14 @@ public class AlertRecordDTO extends CommonDTO {
     @JsonProperty("alert_time")
     private OffsetDateTime alertTime;
 
-    @JsonProperty("product_id")
-    private Integer productId;
-
-    @JsonProperty("batch_id")
-    private Integer batchId;
-
     @JsonProperty("qc_form_template_id")
     private Long qcFormTemplateId;
 
     @JsonProperty("inspection_item_key")
-    private Long inspectionItemKey;
+    private String inspectionItemKey;
+
+    @JsonProperty("inspection_item_label")
+    private String inspectionItemLabel;
 
     @JsonProperty("inspection_value")
     private BigDecimal inspectionValue;
@@ -50,11 +48,17 @@ public class AlertRecordDTO extends CommonDTO {
     @JsonProperty("risk_level_id")
     private Integer riskLevelId;
 
-    @JsonProperty("inspector_id")
-    private Long inspectorId;
+    @JsonProperty("product_ids")
+    private List<Long> productIds;
 
-    @JsonProperty("reviewer_id")
-    private Long reviewerId;
+    @JsonProperty("batch_ids")
+    private List<Long> batchIds;
+
+    @JsonProperty("inspector_ids")
+    private List<Long> inspectorIds;
+
+    @JsonProperty("reviewer_ids")
+    private List<Long> reviewerIds;
 
     @JsonProperty("alert_status")
     private Integer alertStatus;

@@ -6,6 +6,7 @@ import com.fps.svmes.dto.dtos.production.SuggestedProductDTO;
 import com.fps.svmes.dto.dtos.qcForm.QcFormTemplateDTO;
 import com.fps.svmes.dto.dtos.user.UserDTO;
 import com.fps.svmes.models.sql.alert.*;
+import com.fps.svmes.models.sql.production.SuggestedProduct;
 import com.fps.svmes.models.sql.qcForm.QcFormTemplate;
 import com.fps.svmes.repositories.jpaRepo.alert.AlertRecordLogRepository;
 import com.fps.svmes.repositories.jpaRepo.alert.AlertRecordRepository;
@@ -194,6 +195,8 @@ public class AlertRecordServiceImpl implements AlertRecordService {
             dto.setRpn(alert.getRpn());
             dto.setCreatedAt(alert.getCreatedAt());
             dto.setStatus(alert.getStatus());
+            dto.setUpperControlLimit(alert.getUpperControlLimit());
+            dto.setLowerControlLimit(alert.getLowerControlLimit());
 
             if (alert.getLowerControlLimit() != null && alert.getUpperControlLimit() != null) {
                 dto.setControlRange(alert.getLowerControlLimit() + " - " + alert.getUpperControlLimit());
@@ -323,6 +326,87 @@ public class AlertRecordServiceImpl implements AlertRecordService {
 
         return modelMapper.map(entity, AlertRecordDTO.class);
     }
+
+    @Override
+    public AlertSummaryDTO getAlertSummary() {
+        List<AlertRecord> allRecords = alertRecordRepository.findAll();
+
+        // 1. 告警状态统计（按 alertStatus 外键聚合，展示名称）
+        Map<Integer, Long> alertStatusRaw = allRecords.stream()
+                .filter(r -> r.getAlertStatus() != null)
+                .collect(Collectors.groupingBy(AlertRecord::getAlertStatus, Collectors.counting()));
+
+        // 加载 ID 对应的 AlertStatus 实体
+        Map<Integer, AlertStatus> alertStatusMap = alertStatusRepository.findAllById(alertStatusRaw.keySet())
+                .stream()
+                .collect(Collectors.toMap(AlertStatus::getId, a -> a));
+
+        // 映射为 <name, count>
+        Map<String, Long> alertStatusCounts = alertStatusRaw.entrySet().stream()
+                .collect(Collectors.toMap(
+                        e -> Optional.ofNullable(alertStatusMap.get(e.getKey()))
+                                .map(AlertStatus::getName)
+                                .orElse("未知"),
+                        Map.Entry::getValue
+                ));
+
+        // 2. 风险等级统计（用 id 聚合，显示 label）
+        Map<Integer, Long> riskRaw = allRecords.stream()
+                .filter(r -> r.getRiskLevelId() != null)
+                .collect(Collectors.groupingBy(AlertRecord::getRiskLevelId, Collectors.counting()));
+
+        Map<Integer, RiskLevel> riskMap = riskLevelRepository.findAllById(riskRaw.keySet()).stream()
+                .collect(Collectors.toMap(RiskLevel::getId, r -> r));
+
+        Map<String, Long> riskLevelCounts = riskRaw.entrySet().stream()
+                .collect(Collectors.toMap(
+                        e -> Optional.ofNullable(riskMap.get(e.getKey()))
+                                .map(RiskLevel::getName)
+                                .orElse("未知"),
+                        Map.Entry::getValue
+                ));
+
+        // 3. 产品统计（用 productId 聚合，显示名称）
+        Map<Long, Long> productRaw = allRecords.stream()
+                .flatMap(r -> r.getAlertProducts().stream())
+                .collect(Collectors.groupingBy(AlertProduct::getProductId, Collectors.counting()));
+
+        Map<Long, SuggestedProduct> productMap = suggestedProductRepository.findAllById(productRaw.keySet()).stream()
+                .collect(Collectors.toMap(SuggestedProduct::getId, p -> p));
+
+        Map<String, Long> productCounts = productRaw.entrySet().stream()
+                .collect(Collectors.toMap(
+                        e -> Optional.ofNullable(productMap.get(e.getKey()))
+                                .map(SuggestedProduct::getName)
+                                .orElse("未知"),
+                        Map.Entry::getValue
+                ));
+
+        // 4. 检测项统计（key 聚合，label 展示）
+        Map<String, Long> inspectionRaw = allRecords.stream()
+                .filter(r -> r.getInspectionItemKey() != null)
+                .collect(Collectors.groupingBy(AlertRecord::getInspectionItemKey, Collectors.counting()));
+
+        Map<String, String> keyToLabel = allRecords.stream()
+                .filter(r -> r.getInspectionItemKey() != null && r.getInspectionItemLabel() != null)
+                .collect(Collectors.toMap(AlertRecord::getInspectionItemKey, AlertRecord::getInspectionItemLabel, (a, b) -> a)); // 去重保留第一个
+
+        Map<String, Long> inspectionItemCounts = inspectionRaw.entrySet().stream()
+                .collect(Collectors.toMap(
+                        e -> Optional.ofNullable(keyToLabel.get(e.getKey())).orElse("[未知检测项]"),
+                        Map.Entry::getValue
+                ));
+
+        // 封装结果
+        AlertSummaryDTO summary = new AlertSummaryDTO();
+        summary.setInspectionItemCounts(inspectionItemCounts);
+        summary.setRiskLevelCounts(riskLevelCounts);
+        summary.setProductCounts(productCounts);
+        summary.setAlertStatusCounts(alertStatusCounts);
+
+        return summary;
+    }
+
 
     // original
 //    public Page<DetailedAlertRecordDTO> getDetailedList(int page, int size) {

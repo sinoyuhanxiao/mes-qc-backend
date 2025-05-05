@@ -13,7 +13,6 @@ import lombok.EqualsAndHashCode;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.List;
-import java.util.Map;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
@@ -46,6 +45,12 @@ public class DetailedAlertRecordDTO extends CommonDTO {
 
     @JsonProperty("control_range")
     private String controlRange;
+
+    @JsonProperty("upper_control_limit")
+    private BigDecimal upperControlLimit;
+
+    @JsonProperty("lower_control_limit")
+    private BigDecimal lowerControlLimit;
 
     @JsonProperty("alert_status")
     private AlertStatusDTO alertStatus;

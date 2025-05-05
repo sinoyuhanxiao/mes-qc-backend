@@ -71,6 +71,7 @@ public class ControlLimitEvaluationServiceImpl implements ControlLimitEvaluation
                     alert.setUpperControlLimit(upper == null ? null : BigDecimal.valueOf(upper));
                     alert.setLowerControlLimit(lower == null ? null : BigDecimal.valueOf(lower));
                     alert.setRpn(50); // hardcoded to 50 for now
+                    alert.setRiskLevelId(1); // default to low risk
                     alert.setAlertTime(OffsetDateTime.now());
                     alert.setCreatedAt(OffsetDateTime.now());
                     alert.setCreatedBy(userId.intValue());

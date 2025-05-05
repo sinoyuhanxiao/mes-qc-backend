@@ -1,6 +1,7 @@
 package com.fps.svmes.controllers;
 
 import com.fps.svmes.dto.dtos.alert.AlertRecordDTO;
+import com.fps.svmes.dto.dtos.alert.AlertSummaryDTO;
 import com.fps.svmes.dto.dtos.alert.DetailedAlertRecordDTO;
 import com.fps.svmes.dto.requests.alert.UpdateAlertRecordRequest;
 import com.fps.svmes.services.AlertRecordService;
@@ -72,6 +73,23 @@ public class AlertRecordController {
         Page<DetailedAlertRecordDTO> result = alertRecordService.getDetailedList(page, size);
         return ResponseEntity.ok(result);
     }
+
+    /**
+     * Retrieves a summary of alert records.
+     *
+     * @return An AlertSummaryDTO containing summary information
+     */
+    @GetMapping("/summary")
+    public ResponseEntity<?> getAlertSummary() {
+        try {
+            AlertSummaryDTO summary = alertRecordService.getAlertSummary();
+            return ResponseEntity.ok(summary);
+        } catch (Exception e) {
+            log.error("Failed to get alert summary", e);
+            return ResponseEntity.status(500).body("Error fetching summary: " + e.getMessage());
+        }
+    }
+
 
 
 }

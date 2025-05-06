@@ -5,6 +5,7 @@ import com.fps.svmes.dto.dtos.production.SuggestedBatchDTO;
 import com.fps.svmes.dto.dtos.production.SuggestedProductDTO;
 import com.fps.svmes.dto.dtos.qcForm.QcFormTemplateDTO;
 import com.fps.svmes.dto.dtos.user.UserDTO;
+import com.fps.svmes.dto.requests.alert.AlertRecordFilterRequest;
 import com.fps.svmes.models.sql.alert.*;
 import com.fps.svmes.models.sql.production.SuggestedProduct;
 import com.fps.svmes.models.sql.qcForm.QcFormTemplate;
@@ -18,13 +19,21 @@ import com.fps.svmes.repositories.jpaRepo.qcForm.QcFormTemplateRepository;
 import com.fps.svmes.repositories.jpaRepo.user.UserRepository;
 import com.fps.svmes.services.AlertRecordService;
 import com.fps.svmes.utils.AlertDiffBuilder;
+import jakarta.persistence.criteria.Join;
+import jakarta.persistence.criteria.JoinType;
+import jakarta.persistence.criteria.Predicate;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.modelmapper.ModelMapper;
 import org.springframework.data.domain.*;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
+import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -267,9 +276,11 @@ public class AlertRecordServiceImpl implements AlertRecordService {
 
         AlertRecordDTO oldDto = modelMapper.map(entity, AlertRecordDTO.class);
 
-        int newStatus = newRpn < 100 ? 1 : 0;
+        int newStatus = newRpn < 100 ? 2 : 1;
 
         entity.setRpn(newRpn);
+        // Set risk level according to tooltip rules
+        entity.setRiskLevelId(newRpn >= 200 ? 3 : newRpn >= 100 ? 2 : 1);
         entity.setAlertStatus(newStatus);
         entity.setUpdatedBy(userId);
         entity.setUpdatedAt(OffsetDateTime.now());
@@ -405,6 +416,167 @@ public class AlertRecordServiceImpl implements AlertRecordService {
         summary.setAlertStatusCounts(alertStatusCounts);
 
         return summary;
+    }
+
+    @Override
+    public Page<DetailedAlertRecordDTO> filterAlertRecords(AlertRecordFilterRequest request) {
+        Pageable pageable;
+        if (request.getSort() != null && StringUtils.hasText(request.getSort().getProp())) {
+            Sort.Direction direction = "descending".equals(request.getSort().getOrder()) ? Sort.Direction.DESC : Sort.Direction.ASC;
+            pageable = PageRequest.of(request.getPage(), request.getSize(), Sort.by(direction, request.getSort().getProp()));
+        } else {
+            pageable = PageRequest.of(request.getPage(), request.getSize());
+        }
+
+        Specification<AlertRecord> spec = (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+            if (request.getStatus() != null) {
+                predicates.add(cb.equal(root.get("status"), request.getStatus()));
+            }
+
+            if (request.getFilters() != null) {
+                String statusId = request.getFilters().get("alertStatusId");
+                if (StringUtils.hasText(statusId)) {
+                    predicates.add(cb.equal(root.get("alertStatus"), Integer.valueOf(statusId)));
+                }
+
+                String riskLevelId = request.getFilters().get("riskLevelId");
+                if (StringUtils.hasText(riskLevelId)) {
+                    predicates.add(cb.equal(root.get("riskLevelId"), Integer.valueOf(riskLevelId)));
+                }
+
+                String productId = request.getFilters().get("suggestedProductId");
+                if (StringUtils.hasText(productId)) {
+                    Join<AlertRecord, AlertProduct> productJoin = root.join("alertProducts", JoinType.LEFT);
+                    predicates.add(cb.equal(productJoin.get("productId"), Long.valueOf(productId)));
+                }
+
+                String batchId = request.getFilters().get("suggestedBatchId");
+                if (StringUtils.hasText(batchId)) {
+                    Join<AlertRecord, AlertBatch> batchJoin = root.join("alertBatches", JoinType.LEFT);
+                    predicates.add(cb.equal(batchJoin.get("batchId"), Long.valueOf(batchId)));
+                }
+
+                String general = request.getFilters().get("generalSearch");
+                if (StringUtils.hasText(general)) {
+                    predicates.add(cb.like(root.get("alertCode"), "%" + general + "%"));
+                }
+
+                String[] dateRange = request.getFilters().get("dateRange") != null
+                        ? request.getFilters().get("dateRange").split(",") : null;
+
+                if (dateRange != null && dateRange.length == 2) {
+                    try {
+                        OffsetDateTime start = OffsetDateTime.parse(dateRange[0]);
+                        OffsetDateTime end = OffsetDateTime.parse(dateRange[1]);
+                        predicates.add(cb.between(root.get("alertTime"), start.toLocalDateTime(), end.toLocalDateTime()));
+                    } catch (DateTimeParseException e) {
+                        throw new IllegalArgumentException("Invalid date format for UTC ISO string", e);
+                    }
+                }
+            }
+
+            return cb.and(predicates.toArray(new Predicate[0]));
+        };
+
+        Page<AlertRecord> entityPage = alertRecordRepository.findAll(spec, pageable);
+        List<AlertRecord> alertList = entityPage.getContent();
+
+        // 👇 以下逻辑复制自 getDetailedList()
+        Set<Long> templateIds = new HashSet<>();
+        Set<Long> productIds = new HashSet<>();
+        Set<Long> batchIds = new HashSet<>();
+        Set<Integer> userIds = new HashSet<>();
+        Set<Integer> statusIds = new HashSet<>();
+        Set<Integer> riskLevelIds = new HashSet<>();
+
+        for (AlertRecord alert : alertList) {
+            templateIds.add(alert.getQcFormTemplateId());
+            if (alert.getAlertStatus() != null) statusIds.add(alert.getAlertStatus());
+            if (alert.getRiskLevelId() != null) riskLevelIds.add(alert.getRiskLevelId());
+            alert.getAlertProducts().forEach(p -> productIds.add(p.getProductId()));
+            alert.getAlertBatches().forEach(b -> batchIds.add(b.getBatchId()));
+            alert.getAlertInspectors().forEach(i -> userIds.add(i.getInspectorId().intValue()));
+            alert.getAlertReviewers().forEach(r -> userIds.add(r.getReviewerId().intValue()));
+        }
+
+        Map<Long, QcFormTemplate> templateMap = qcFormTemplateRepository.findAllById(templateIds)
+                .stream().collect(Collectors.toMap(QcFormTemplate::getId, t -> t));
+
+        Map<Long, SuggestedProductDTO> productMap = suggestedProductRepository.findAllById(productIds)
+                .stream().collect(Collectors.toMap(p -> p.getId(), p -> modelMapper.map(p, SuggestedProductDTO.class)));
+
+        Map<Long, SuggestedBatchDTO> batchMap = suggestedBatchRepository.findAllById(batchIds)
+                .stream().collect(Collectors.toMap(b -> b.getId(), b -> modelMapper.map(b, SuggestedBatchDTO.class)));
+
+        Map<Integer, UserDTO> userMap = userRepository.findAllById(userIds)
+                .stream().collect(Collectors.toMap(u -> u.getId(), u -> modelMapper.map(u, UserDTO.class)));
+
+        Map<Integer, AlertStatusDTO> statusMap = alertStatusRepository.findAllById(statusIds)
+                .stream().collect(Collectors.toMap(s -> s.getId(), s -> modelMapper.map(s, AlertStatusDTO.class)));
+
+        Map<Integer, RiskLevelDTO> riskMap = riskLevelRepository.findAllById(riskLevelIds)
+                .stream().collect(Collectors.toMap(r -> r.getId(), r -> modelMapper.map(r, RiskLevelDTO.class)));
+
+        List<DetailedAlertRecordDTO> dtos = alertList.stream().map(alert -> {
+            DetailedAlertRecordDTO dto = new DetailedAlertRecordDTO();
+
+            dto.setId(alert.getId());
+            dto.setAlertCode(alert.getAlertCode());
+            dto.setAlertTime(alert.getAlertTime());
+            dto.setInspectionValue(alert.getInspectionValue());
+            dto.setRpn(alert.getRpn());
+            dto.setCreatedAt(alert.getCreatedAt());
+            dto.setStatus(alert.getStatus());
+            dto.setUpperControlLimit(alert.getUpperControlLimit());
+            dto.setLowerControlLimit(alert.getLowerControlLimit());
+
+            if (alert.getLowerControlLimit() != null && alert.getUpperControlLimit() != null) {
+                dto.setControlRange(alert.getLowerControlLimit() + " - " + alert.getUpperControlLimit());
+            }
+
+            QcFormTemplate template = templateMap.get(alert.getQcFormTemplateId());
+            if (template != null) {
+                QcFormTemplateDTO formDto = new QcFormTemplateDTO();
+                formDto.setId(template.getId());
+                formDto.setName(template.getName());
+                formDto.setFormTemplateJson(null);
+                dto.setQcFormTemplate(formDto);
+            }
+
+            InspectionItemDTO item = new InspectionItemDTO();
+            item.setKey(alert.getInspectionItemKey());
+            item.setLabel(alert.getInspectionItemLabel());
+            dto.setInspectionItem(item);
+
+            dto.setProducts(alert.getAlertProducts().stream()
+                    .map(p -> productMap.get(p.getProductId()))
+                    .filter(Objects::nonNull).toList());
+
+            dto.setBatches(alert.getAlertBatches().stream()
+                    .map(b -> batchMap.get(b.getBatchId()))
+                    .filter(Objects::nonNull).toList());
+
+            dto.setInspectors(alert.getAlertInspectors().stream()
+                    .map(i -> userMap.get(i.getInspectorId().intValue()))
+                    .filter(Objects::nonNull).toList());
+
+            dto.setReviewers(alert.getAlertReviewers().stream()
+                    .map(r -> userMap.get(r.getReviewerId().intValue()))
+                    .filter(Objects::nonNull).toList());
+
+            if (alert.getAlertStatus() != null) {
+                dto.setAlertStatus(statusMap.get(alert.getAlertStatus()));
+            }
+
+            if (alert.getRiskLevelId() != null) {
+                dto.setRiskLevel(riskMap.get(alert.getRiskLevelId()));
+            }
+
+            return dto;
+        }).toList();
+
+        return new PageImpl<>(dtos, pageable, entityPage.getTotalElements());
     }
 
 

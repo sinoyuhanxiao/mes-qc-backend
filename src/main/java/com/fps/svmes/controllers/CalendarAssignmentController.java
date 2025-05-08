@@ -2,6 +2,7 @@ package com.fps.svmes.controllers;
 
 import com.fps.svmes.dto.dtos.formAccessCalendar.CalendarAssignmentDTO;
 import com.fps.svmes.dto.responses.ResponseResult;
+import com.fps.svmes.models.nosql.FormNode;
 import com.fps.svmes.services.CalendarAssignmentService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -11,6 +12,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
+
+import java.time.OffsetDateTime;
 import java.util.List;
 
 @RestController
@@ -89,6 +92,17 @@ public class CalendarAssignmentController {
         } catch (Exception e) {
             logger.error("Error retrieving calendar assignment with ID: {}", id, e);
             return ResponseResult.fail("Failed to retrieve calendar assignment", e);
+        }
+    }
+
+    @GetMapping("/form-tree")
+    @Operation(summary = "Get team's form tree by team ID and date")
+    public ResponseResult<List<FormNode>> getFormTreeByTeamAndDate(@RequestParam Integer teamId, @RequestParam OffsetDateTime date) {
+        try {
+            List<FormNode> formTree = service.getFormTreeByTeamIdAndDate(teamId, date);
+            return ResponseResult.success(formTree);
+        } catch (Exception e) {
+            return ResponseResult.fail("Failed to retrieve team's form tree from calendar", e);
         }
     }
 }

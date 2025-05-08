@@ -1,6 +1,9 @@
 package com.fps.svmes.services;
 
 import com.fps.svmes.dto.dtos.formAccessCalendar.CalendarAssignmentDTO;
+import com.fps.svmes.models.nosql.FormNode;
+
+import java.time.OffsetDateTime;
 import java.util.List;
 
 public interface CalendarAssignmentService {
@@ -9,4 +12,5 @@ public interface CalendarAssignmentService {
     void deleteAssignment(Long id, Integer userId);
     List<CalendarAssignmentDTO> getAllAssignments();
     CalendarAssignmentDTO getAssignmentById(Long id);
+    List<FormNode> getFormTreeByTeamIdAndDate(Integer teamId, OffsetDateTime date);
 }

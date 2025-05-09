@@ -65,7 +65,7 @@ public class QcTaskSubmissionLogsServiceImpl implements QcTaskSubmissionLogsServ
         // Map the DTO to the entity
         QcTaskSubmissionLogs log = modelMapper.map(dto, QcTaskSubmissionLogs.class);
 
-        // Set timestamps to shanghai time
+        // Set timestamps to current time
         log.setCreatedAt(OffsetDateTime.now());
 
         // Save the entity
@@ -264,7 +264,7 @@ public class QcTaskSubmissionLogsServiceImpl implements QcTaskSubmissionLogsServ
         List<Document> widgetList = getWidgetListFromTemplate(formId);
 
         // **Step 1: 解析表单模板，构建字段归属的 `divider`**
-        String currentDivider = "未分类"; // 默认归类
+        String currentDivider = "uncategorized"; // 默认归类
         for (Document widget : widgetList) {
             String type = widget.getString("type");
             Document options = (Document) widget.get("options");
@@ -305,9 +305,9 @@ public class QcTaskSubmissionLogsServiceImpl implements QcTaskSubmissionLogsServ
             String formattedKey = keyValueMap.getOrDefault(key, key);
             String dividerLabel = fieldToDividerMap.get(key); // 获取字段归属的 `divider`
 
-            // **如果字段不属于任何 `divider`，默认归类到 `"未分类"`**
+            // **如果字段不属于任何 `divider`，默认归类到 `"uncategorized"`**
             if (dividerLabel == null) {
-                dividerLabel = "未分类";
+                dividerLabel = "uncategorized";
             }
 
             // **处理 optionItems 转换**

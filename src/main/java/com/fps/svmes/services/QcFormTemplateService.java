@@ -15,4 +15,5 @@ public interface QcFormTemplateService {
     void deleteTemplate(Long id);
     void extractNumberFields(JsonNode widgetList, ObjectNode controlLimits);
     void createControlLimitSetting(QcFormTemplateDTO template);
+    String resolveLabelFromTemplateByKey(Long templateId, String fieldKey);
 }

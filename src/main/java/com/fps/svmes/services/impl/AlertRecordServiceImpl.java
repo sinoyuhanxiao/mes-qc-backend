@@ -340,19 +340,20 @@ public class AlertRecordServiceImpl implements AlertRecordService {
 
     @Override
     public AlertSummaryDTO getAlertSummary() {
-        List<AlertRecord> allRecords = alertRecordRepository.findAll();
+//        List<AlertRecord> allRecords = alertRecordRepository.findAll();
+        List<AlertRecord> allRecords = alertRecordRepository.findByStatus(1);
 
-        // 1. 告警状态统计（按 alertStatus 外键聚合，展示名称）
+        // 1. 告警状态统计（按 alertStatus 外键聚合，展示名称）s
         Map<Integer, Long> alertStatusRaw = allRecords.stream()
                 .filter(r -> r.getAlertStatus() != null)
                 .collect(Collectors.groupingBy(AlertRecord::getAlertStatus, Collectors.counting()));
 
-        // 加载 ID 对应的 AlertStatus 实体
+            // 加载 ID 对应的 AlertStatus 实体
         Map<Integer, AlertStatus> alertStatusMap = alertStatusRepository.findAllById(alertStatusRaw.keySet())
                 .stream()
                 .collect(Collectors.toMap(AlertStatus::getId, a -> a));
 
-        // 映射为 <name, count>
+            // 映射为 <name, count>
         Map<String, Long> alertStatusCounts = alertStatusRaw.entrySet().stream()
                 .collect(Collectors.toMap(
                         e -> Optional.ofNullable(alertStatusMap.get(e.getKey()))
@@ -390,7 +391,8 @@ public class AlertRecordServiceImpl implements AlertRecordService {
                         e -> Optional.ofNullable(productMap.get(e.getKey()))
                                 .map(SuggestedProduct::getName)
                                 .orElse("未知"),
-                        Map.Entry::getValue
+                        Map.Entry::getValue,
+                        Long::sum // if the name of the products are the same then we combine the value
                 ));
 
         // 4. 检测项统计（key 聚合，label 展示）

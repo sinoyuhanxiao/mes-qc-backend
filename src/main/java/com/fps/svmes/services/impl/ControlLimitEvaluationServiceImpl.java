@@ -208,6 +208,25 @@ public class ControlLimitEvaluationServiceImpl implements ControlLimitEvaluation
                     List<String> invalid = selected.stream().filter(s -> !valid.contains(s)).toList();
                     info.setValidOptions(valid);
                     info.setInvalidOptions(invalid);
+
+                    List<String> validLabels = valid.stream()
+                            .map(val -> limit.getOptionItems().stream()
+                                    .filter(item -> item.getValue().equals(val))
+                                    .map(item -> item.getLabel())
+                                    .findFirst()
+                                    .orElse(val)
+                            ).toList();
+                    info.setValidOptionLabels(validLabels);
+
+                    List<String> invalidLabels = invalid.stream()
+                            .map(val -> limit.getOptionItems().stream()
+                                    .filter(item -> item.getValue().equals(val))
+                                    .map(item -> item.getLabel())
+                                    .findFirst()
+                                    .orElse(val)
+                            ).toList();
+                    info.setInvalidOptionLabels(invalidLabels);
+
                     if (!invalid.isEmpty()) info.setResult("invalid");
                 }
 

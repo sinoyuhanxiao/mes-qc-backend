@@ -29,6 +29,12 @@ public class ExceededFieldInfoDTO {
     @JsonProperty("invalid_options")
     private List<String> invalidOptions; // Only for type = "options"
 
+    @JsonProperty("valid_option_labels")
+    private List<String> validOptionLabels;
+
+    @JsonProperty("invalid_option_labels")
+    private List<String> invalidOptionLabels;
+
     @JsonProperty("result")
     private String result; // "high", "low", "invalid", etc.
 }

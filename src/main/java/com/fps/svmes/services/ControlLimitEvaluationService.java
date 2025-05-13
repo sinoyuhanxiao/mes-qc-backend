@@ -6,6 +6,5 @@ import java.util.Map;
 
 public interface ControlLimitEvaluationService {
     void evaluateAndTriggerAlerts(Long templateId, Long userId, Map<String, Object> formData);
-
     Map<String, ExceededFieldInfoDTO> evaluateExceededInfo(Long templateId, Map<String, Object> formData);
 }

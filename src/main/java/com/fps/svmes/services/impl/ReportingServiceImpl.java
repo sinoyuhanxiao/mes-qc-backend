@@ -530,6 +530,19 @@ public class ReportingServiceImpl implements ReportingService {
             }
         }
 
+        // 🔧 Remap exceeded_info keys from fieldName to fieldLabel
+        if (document.containsKey("exceeded_info")) {
+            Document originalExceededInfo = (Document) document.get("exceeded_info");
+            Document labeledExceededInfo = new Document();
+
+            for (String rawField : originalExceededInfo.keySet()) {
+                String labeledField = keyValueMap.getOrDefault(rawField, rawField); // name → label
+                labeledExceededInfo.put(labeledField, originalExceededInfo.get(rawField));
+            }
+
+            formattedDocument.put("exceeded_info", labeledExceededInfo);
+        }
+
         return formattedDocument;
     }
 

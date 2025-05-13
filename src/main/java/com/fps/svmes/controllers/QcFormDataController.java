@@ -1,5 +1,6 @@
 package com.fps.svmes.controllers;
 
+import com.fps.svmes.dto.dtos.alert.ExceededFieldInfoDTO;
 import com.fps.svmes.dto.dtos.qcForm.QcFormTemplateDTO;
 import com.fps.svmes.services.ControlLimitEvaluationService;
 import com.fps.svmes.services.QcFormTemplateService;
@@ -76,6 +77,9 @@ public class QcFormDataController {
             Map<String, Object> document = new HashMap<>(formData);
             document.put("created_at", LocalDateTime.now().toString());
             document.put("created_by", userId);
+
+            Map<String, ExceededFieldInfoDTO> exceededInfoMap = controlLimitEvaluationService.evaluateExceededInfo(formTemplateId, formData);
+            document.put("exceeded_info", exceededInfoMap);
 
             Document insertedDocument = mongoTemplate.insert(new Document(document), collectionName);
 

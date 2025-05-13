@@ -62,4 +62,26 @@ public class AlertRecordDTO extends CommonDTO {
 
     @JsonProperty("alert_status")
     private Integer alertStatus;
+
+    @JsonProperty("alert_type")
+    private String alertType; // "number" or "options"
+
+    @JsonProperty("option_items")
+    private List<String> optionItems;
+
+    @JsonProperty("option_labels")
+    private List<String> optionLabels;
+
+    @JsonProperty("invalid_option_items")
+    private List<String> invalidOptionItems;
+
+    @JsonProperty("invalid_option_labels")
+    private List<String> invalidOptionLabels;
+
+    @JsonProperty("input_option_items")
+    private List<String> inputOptionItems;
+
+    @JsonProperty("input_option_items_labels")
+    private List<String> inputOptionItemsLabels;
+
 }

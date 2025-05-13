@@ -59,6 +59,11 @@ public class AlertRecordServiceImpl implements AlertRecordService {
         entity.setUpdatedAt(OffsetDateTime.now());
         entity.setInspectionItemKey(dto.getInspectionItemKey());
         entity.setInspectionItemLabel(dto.getInspectionItemLabel());
+        entity.setAlertType(dto.getAlertType());
+        entity.setOptionItems(dto.getOptionItems());
+        entity.setOptionLabels(dto.getOptionLabels());
+        entity.setInvalidOptionItems(dto.getInvalidOptionItems());
+        entity.setInvalidOptionLabels(dto.getInvalidOptionLabels());
 
         // 1. Map productIds to AlertProduct
         if (dto.getProductIds() != null) {
@@ -207,7 +212,18 @@ public class AlertRecordServiceImpl implements AlertRecordService {
             dto.setUpperControlLimit(alert.getUpperControlLimit());
             dto.setLowerControlLimit(alert.getLowerControlLimit());
 
-            if (alert.getLowerControlLimit() != null && alert.getUpperControlLimit() != null) {
+            dto.setAlertType(alert.getAlertType());
+            dto.setOptionItems(alert.getOptionItems());
+            dto.setOptionLabels(alert.getOptionLabels());
+            dto.setInvalidOptionItems(alert.getInvalidOptionItems());
+            dto.setInvalidOptionItemsLabels(alert.getInvalidOptionLabels());
+
+            if ("options".equals(alert.getAlertType())) {
+                dto.setControlRange(
+                        alert.getOptionLabels() != null ? String.join(", ", alert.getOptionLabels()) : null
+                );
+            } else if ("number".equals(alert.getAlertType()) &&
+                    alert.getLowerControlLimit() != null && alert.getUpperControlLimit() != null) {
                 dto.setControlRange(alert.getLowerControlLimit() + " - " + alert.getUpperControlLimit());
             }
 
@@ -407,7 +423,8 @@ public class AlertRecordServiceImpl implements AlertRecordService {
         Map<String, Long> inspectionItemCounts = inspectionRaw.entrySet().stream()
                 .collect(Collectors.toMap(
                         e -> Optional.ofNullable(keyToLabel.get(e.getKey())).orElse("[未知检测项]"),
-                        Map.Entry::getValue
+                        Map.Entry::getValue,
+                        Long::sum
                 ));
 
         // 封装结果
@@ -484,7 +501,7 @@ public class AlertRecordServiceImpl implements AlertRecordService {
         Page<AlertRecord> entityPage = alertRecordRepository.findAll(spec, pageable);
         List<AlertRecord> alertList = entityPage.getContent();
 
-        // 👇 以下逻辑复制自 getDetailedList()
+        // 以下逻辑复制自 getDetailedList() 没时间refactor
         Set<Long> templateIds = new HashSet<>();
         Set<Long> productIds = new HashSet<>();
         Set<Long> batchIds = new HashSet<>();
@@ -533,7 +550,23 @@ public class AlertRecordServiceImpl implements AlertRecordService {
             dto.setUpperControlLimit(alert.getUpperControlLimit());
             dto.setLowerControlLimit(alert.getLowerControlLimit());
 
-            if (alert.getLowerControlLimit() != null && alert.getUpperControlLimit() != null) {
+            dto.setAlertType(alert.getAlertType());
+            dto.setOptionItems(alert.getOptionItems());
+            dto.setOptionLabels(alert.getOptionLabels());
+            dto.setInvalidOptionItems(alert.getInvalidOptionItems());
+            dto.setInvalidOptionItemsLabels(alert.getInvalidOptionLabels());
+            dto.setInputOptionItems(alert.getInputOptionItems());
+            dto.setInputOptionItemsLabels(alert.getInputOptionItemsLabels());
+
+            if ("options".equals(alert.getAlertType()) && alert.getOptionLabels() != null) {
+                List<String> validLabels = new ArrayList<>(alert.getOptionLabels());
+                if (alert.getInvalidOptionLabels() != null) {
+                    validLabels.removeAll(alert.getInvalidOptionLabels());
+                }
+                dto.setControlRange(String.join(", ", validLabels));
+            } else if ("number".equals(alert.getAlertType()) &&
+                    alert.getLowerControlLimit() != null &&
+                    alert.getUpperControlLimit() != null) {
                 dto.setControlRange(alert.getLowerControlLimit() + " - " + alert.getUpperControlLimit());
             }
 

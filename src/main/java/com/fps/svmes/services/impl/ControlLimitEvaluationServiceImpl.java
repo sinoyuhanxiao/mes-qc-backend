@@ -1,6 +1,7 @@
 package com.fps.svmes.services.impl;
 
 import com.fps.svmes.dto.dtos.alert.AlertRecordDTO;
+import com.fps.svmes.dto.dtos.alert.ExceededFieldInfoDTO;
 import com.fps.svmes.repositories.jpaRepo.qcForm.QcFormTemplateRepository;
 import com.fps.svmes.services.AlertRecordService;
 import com.fps.svmes.services.ControlLimitEvaluationService;
@@ -9,6 +10,7 @@ import com.fps.svmes.services.RecipeService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.util.HashMap;
 import java.util.List;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
@@ -33,61 +35,189 @@ public class ControlLimitEvaluationServiceImpl implements ControlLimitEvaluation
             Object valueObj = formData.get(fieldKey);
             if (valueObj == null) return;
 
+            boolean shouldAlert = false;
+            BigDecimal numericValue = null;
+
             try {
-                double value = Double.parseDouble(valueObj.toString());
-                Double upper = limit.getUpperControlLimit();
-                Double lower = limit.getLowerControlLimit();
-                boolean isAbove = upper != null && value > upper;
-                boolean isBelow = lower != null && value < lower;
+                // Case 1: 数值类型字段
+                if (limit.getUpperControlLimit() != null || limit.getLowerControlLimit() != null) {
+                    double value = Double.parseDouble(valueObj.toString());
+                    Double upper = limit.getUpperControlLimit();
+                    Double lower = limit.getLowerControlLimit();
+                    boolean isAbove = upper != null && value > upper;
+                    boolean isBelow = lower != null && value < lower;
+                    if (isAbove || isBelow) {
+                        shouldAlert = true;
+                        numericValue = BigDecimal.valueOf(value);
+                    }
+                }
 
-                if (isAbove || isBelow) {
+                // Case 2: option valid_keys 字段（支持单选或多选）
+                if (limit.getValidKeys() != null && !limit.getValidKeys().isEmpty()) {
+                    List<String> selectedValues;
+                    if (valueObj instanceof List<?>) {
+                        selectedValues = ((List<?>) valueObj).stream().map(Object::toString).toList();
+                    } else {
+                        selectedValues = List.of(valueObj.toString());
+                    }
+
+                    for (String val : selectedValues) {
+                        if (!limit.getValidKeys().contains(val)) {
+                            shouldAlert = true;
+                            break;
+                        }
+                    }
+                }
+
+                // 触发告警
+                if (shouldAlert) {
                     AlertRecordDTO alert = new AlertRecordDTO();
-
-                    // Safely extract arrays from formData and convert to List<Long>
-                    Object productObj = formData.get("related_product_ids");
-                    if (productObj instanceof List<?> productList && !productList.isEmpty()) {
-                        alert.setProductIds(productList.stream().map(Object::toString).map(Long::valueOf).toList());
-                    }
-
-                    Object batchObj = formData.get("related_batch_ids");
-                    if (batchObj instanceof List<?> batchList && !batchList.isEmpty()) {
-                        alert.setBatchIds(batchList.stream().map(Object::toString).map(Long::valueOf).toList());
-                    }
-
-                    Object inspectorObj = formData.get("related_inspector_ids");
-                    if (inspectorObj instanceof List<?> inspectorList && !inspectorList.isEmpty()) {
-                        alert.setInspectorIds(inspectorList.stream().map(Object::toString).map(Long::valueOf).toList());
-                    }
-
-                    Object reviewerObj = formData.get("related_reviewer_ids");
-                    if (reviewerObj instanceof List<?> reviewerList && !reviewerList.isEmpty()) {
-                        alert.setReviewerIds(reviewerList.stream().map(Object::toString).map(Long::valueOf).toList());
-                    }
 
                     alert.setQcFormTemplateId(templateId);
                     alert.setInspectionItemKey(fieldKey);
-                    alert.setInspectionItemLabel(qcFormTemplateService.resolveLabelFromTemplateByKey(templateId, fieldKey));
-                    alert.setInspectionValue(BigDecimal.valueOf(value));
-                    alert.setUpperControlLimit(upper == null ? null : BigDecimal.valueOf(upper));
-                    alert.setLowerControlLimit(lower == null ? null : BigDecimal.valueOf(lower));
-                    alert.setRpn(50); // hardcoded to 50 for now
-                    alert.setRiskLevelId(1); // default to low risk
+                    alert.setInspectionItemLabel(limit.getLabel());
                     alert.setAlertTime(OffsetDateTime.now());
                     alert.setCreatedAt(OffsetDateTime.now());
                     alert.setCreatedBy(userId.intValue());
-                    alert.setAlertStatus(1); // default to 处理中
-                    alert.setStatus(1); // default to active
+                    alert.setAlertStatus(1);
+                    alert.setStatus(1);
+                    alert.setRpn(50);
+                    alert.setRiskLevelId(1);
+                    alert.setAlertCode("AL" + OffsetDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS")));
 
-                    // generate alert code according to system time like "AL20250429143152384"
-                    String timestampCode = OffsetDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS"));
-                    String alertCode = "AL" + timestampCode;
-                    alert.setAlertCode(alertCode);
+                    // 设置数值型报警信息
+                    if (numericValue != null) {
+                        alert.setAlertType("number");
+                        alert.setInspectionValue(numericValue);
+                        alert.setUpperControlLimit(limit.getUpperControlLimit() != null ? BigDecimal.valueOf(limit.getUpperControlLimit()) : null);
+                        alert.setLowerControlLimit(limit.getLowerControlLimit() != null ? BigDecimal.valueOf(limit.getLowerControlLimit()) : null);
+                    }
+
+                    // 设置选项型报警信息
+                    if (limit.getValidKeys() != null && !limit.getValidKeys().isEmpty()) {
+                        alert.setAlertType("options");
+                        List<String> selectedValues = valueObj instanceof List<?> list
+                                ? list.stream().map(Object::toString).toList()
+                                : List.of(valueObj.toString());
+
+                        // 1. 所有选项
+                        List<String> allOptionValues = limit.getOptionItems() != null
+                                ? limit.getOptionItems().stream().map(item -> item.getValue()).toList()
+                                : List.of();
+                        List<String> allOptionLabels = limit.getOptionItems() != null
+                                ? limit.getOptionItems().stream().map(item -> item.getLabel()).toList()
+                                : List.of();
+
+                        alert.setOptionItems(allOptionValues);
+                        alert.setOptionLabels(allOptionLabels);
+
+                        // 2. 从用户输入中识别无效项
+                        List<String> invalidValues = selectedValues.stream()
+                                .filter(val -> !limit.getValidKeys().contains(val))
+                                .toList();
+                        alert.setInvalidOptionItems(invalidValues);
+                        alert.setInvalidOptionLabels(
+                                invalidValues.stream()
+                                        .map(invalidVal ->
+                                                limit.getOptionItems().stream()
+                                                        .filter(item -> item.getValue().equals(invalidVal))
+                                                        .map(item -> item.getLabel())
+                                                        .findFirst()
+                                                        .orElse(invalidVal)
+                                        )
+                                        .toList()
+                        );
+
+                        // 识别出不合格项
+                        List<String> invalidOptions = selectedValues.stream()
+                                .filter(val -> !limit.getValidKeys().contains(val))
+                                .toList();
+                        alert.setInvalidOptionItems(invalidOptions);
+                        alert.setInvalidOptionLabels(
+                                invalidOptions.stream().map(invalidVal ->
+                                        limit.getOptionItems().stream()
+                                                .filter(item -> item.getValue().equals(invalidVal))
+                                                .map(item -> item.getLabel())
+                                                .findFirst()
+                                                .orElse(invalidVal)
+                                ).toList()
+                        );
+
+                        // 3. 用户输入项（全部） → 存 inputOptionItems 和 inputOptionLabels
+                        alert.setInputOptionItems(selectedValues);
+                        alert.setInputOptionItemsLabels(
+                                selectedValues.stream()
+                                        .map(val -> limit.getOptionItems().stream()
+                                                .filter(item -> item.getValue().equals(val))
+                                                .map(item -> item.getLabel())
+                                                .findFirst()
+                                                .orElse(val))
+                                        .toList()
+                        );
+                    }
+
+                    // 人员字段
+                    extractLongList(alert::setProductIds, formData.get("related_product_ids"));
+                    extractLongList(alert::setBatchIds, formData.get("related_batch_ids"));
+                    extractLongList(alert::setInspectorIds, formData.get("related_inspector_ids"));
+                    extractLongList(alert::setReviewerIds, formData.get("related_reviewer_ids"));
 
                     alertRecordService.create(alert);
                 }
-            } catch (NumberFormatException e) {
-                // skip non-numeric fields
+            } catch (Exception e) {
+                // skip on error
             }
         });
     }
+
+    private void extractLongList(java.util.function.Consumer<List<Long>> setter, Object valueObj) {
+        if (valueObj instanceof List<?> list && !list.isEmpty()) {
+            setter.accept(list.stream().map(Object::toString).map(Long::valueOf).toList());
+        }
+    }
+
+    @Override
+    public Map<String, ExceededFieldInfoDTO> evaluateExceededInfo(Long templateId, Map<String, Object> formData) {
+        Map<String, ExceededFieldInfoDTO> resultMap = new HashMap<>();
+        var setting = recipeService.getByQcFormTemplateId(templateId);
+        if (setting == null || setting.getControlLimits() == null) return resultMap;
+
+        setting.getControlLimits().forEach((fieldKey, limit) -> {
+            Object valueObj = formData.get(fieldKey);
+            if (valueObj == null) return;
+
+            try {
+                ExceededFieldInfoDTO info = new ExceededFieldInfoDTO();
+                info.setType(limit.getValidKeys() != null ? "options" : "number");
+                info.setValue(valueObj);
+
+                if ("number".equals(info.getType())) {
+                    double val = Double.parseDouble(valueObj.toString());
+                    info.setLowerLimit(limit.getLowerControlLimit() != null ? BigDecimal.valueOf(limit.getLowerControlLimit()) : null);
+                    info.setUpperLimit(limit.getUpperControlLimit() != null ? BigDecimal.valueOf(limit.getUpperControlLimit()) : null);
+                    if (info.getUpperLimit() != null && val > info.getUpperLimit().doubleValue()) {
+                        info.setResult("high");
+                    } else if (info.getLowerLimit() != null && val < info.getLowerLimit().doubleValue()) {
+                        info.setResult("low");
+                    }
+                } else {
+                    List<String> selected = valueObj instanceof List<?> list
+                            ? list.stream().map(Object::toString).toList()
+                            : List.of(valueObj.toString());
+                    List<String> valid = limit.getValidKeys();
+                    List<String> invalid = selected.stream().filter(s -> !valid.contains(s)).toList();
+                    info.setValidOptions(valid);
+                    info.setInvalidOptions(invalid);
+                    if (!invalid.isEmpty()) info.setResult("invalid");
+                }
+
+                resultMap.put(fieldKey, info);
+            } catch (Exception e) {
+                // log or skip
+            }
+        });
+
+        return resultMap;
+    }
+
 }

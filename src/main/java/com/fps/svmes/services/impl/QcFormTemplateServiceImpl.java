@@ -16,7 +16,10 @@ import org.bson.Document;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -78,7 +81,7 @@ public class QcFormTemplateServiceImpl implements QcFormTemplateService {
     }
 
     @Override
-    public void extractNumberFields(JsonNode widgetList, ObjectNode controlLimits) {
+    public void extractControlLimits(JsonNode widgetList, ObjectNode controlLimits) {
         if (widgetList == null || !widgetList.isArray()) return;
 
         ObjectMapper mapper = new ObjectMapper();
@@ -86,26 +89,61 @@ public class QcFormTemplateServiceImpl implements QcFormTemplateService {
         for (JsonNode widget : widgetList) {
             String type = widget.get("type").asText();
 
+            // 递归解析 grid/col 中的 widgetList
             if ("grid".equals(type)) {
                 for (JsonNode col : widget.get("cols")) {
-                    extractNumberFields(col.get("widgetList"), controlLimits);
+                    extractControlLimits(col.get("widgetList"), controlLimits);
                 }
-            } else if ("number".equals(type)) {
+            }
+
+            // 处理数值字段（number）
+            else if ("number".equals(type)) {
                 JsonNode options = widget.get("options");
                 if (options != null && options.has("name") && options.has("label")) {
                     String name = options.get("name").asText();
                     String label = options.get("label").asText();
 
                     ObjectNode limit = mapper.createObjectNode();
-                    limit.put("upper_control_limit", 100.00); // or derive from options.get("max")
-                    limit.put("lower_control_limit", 0.00);   // or derive from options.get("min")
+                    limit.put("upper_control_limit", 100.00); // 可选从 options.get("max")
+                    limit.put("lower_control_limit", 0.00);   // 可选从 options.get("min")
                     limit.put("label", label);
+
+                    controlLimits.set(name, limit);
+                }
+            }
+
+            // 处理选项字段（select、radio、checkbox）
+            else if (type.equals("select") || type.equals("radio") || type.equals("checkbox")) {
+                JsonNode options = widget.get("options");
+                if (options != null && options.has("name") && options.has("label") && options.has("optionItems")) {
+                    String name = options.get("name").asText();
+                    String label = options.get("label").asText();
+                    JsonNode optionItems = options.get("optionItems");
+
+                    ObjectNode limit = mapper.createObjectNode();
+                    limit.put("label", label);
+
+                    List<String> validKeys = new ArrayList<>();
+                    for (JsonNode item : optionItems) {
+                        validKeys.add(item.get("value").asText());
+                    }
+                    limit.putPOJO("valid_keys", validKeys);
+
+                    List<Map<String, String>> optionList = new ArrayList<>();
+                    for (JsonNode item : optionItems) {
+                        Map<String, String> optionMap = new HashMap<>();
+                        optionMap.put("label", item.path("label").asText());
+                        optionMap.put("value", item.path("value").asText());
+                        optionList.add(optionMap);
+                    }
+                    limit.putPOJO("optionItems", optionList);
 
                     controlLimits.set(name, limit);
                 }
             }
         }
     }
+
 
     @Override
     public void createControlLimitSetting(QcFormTemplateDTO template) {
@@ -118,7 +156,7 @@ public class QcFormTemplateServiceImpl implements QcFormTemplateService {
             controlLimitDoc.put("qc_form_template_id", template.getId());
             ObjectNode controlLimits = mapper.createObjectNode();
 
-            extractNumberFields(widgetList, controlLimits);
+            extractControlLimits(widgetList, controlLimits);
             controlLimitDoc.set("control_limits", controlLimits);
             Document mongoDoc = Document.parse(mapper.writeValueAsString(controlLimitDoc));
             mongoService.insertOne("control_limit_setting", mongoDoc);

@@ -333,6 +333,21 @@ public class QcTaskSubmissionLogsServiceImpl implements QcTaskSubmissionLogsServ
             }
         }
 
+        // 🔧 Step 3: Remap exceeded_info keys from name → label
+        if (document.containsKey("exceeded_info")) {
+            Document exceededInfo = (Document) document.get("exceeded_info");
+            Document labeledExceededInfo = new Document();
+
+            for (String key : exceededInfo.keySet()) {
+                Object infoValue = exceededInfo.get(key);
+                String labeledKey = keyValueMap.getOrDefault(key, key); // key → label
+                labeledExceededInfo.put(labeledKey, infoValue);
+            }
+
+            formattedDocument.put("exceeded_info", labeledExceededInfo);
+        }
+
+
         // **合并分组数据到最终 JSON**
         formattedDocument.putAll(groupedData);
         return formattedDocument;

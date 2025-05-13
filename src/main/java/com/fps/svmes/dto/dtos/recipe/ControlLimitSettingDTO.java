@@ -2,6 +2,8 @@ package com.fps.svmes.dto.dtos.recipe;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
 
 import java.util.LinkedHashMap;
 
@@ -18,12 +20,25 @@ public class ControlLimitSettingDTO {
     @Data
     public static class ControlLimitEntry {
         @JsonProperty("upper_control_limit")
-        private double upperControlLimit;
+        private Double upperControlLimit;
 
         @JsonProperty("lower_control_limit")
-        private double lowerControlLimit;
+        private Double lowerControlLimit;
 
         @JsonProperty("label")
         private String label;
+
+        @JsonProperty("valid_keys")
+        private java.util.List<String> validKeys;
+
+        @JsonProperty("optionItems")
+        private java.util.List<OptionItem> optionItems;
+
+        @Data
+        public static class OptionItem {
+            private String label;
+            private String value;
+        }
     }
+
 }

@@ -13,7 +13,7 @@ public interface QcFormTemplateService {
     QcFormTemplateDTO createTemplate(QcFormTemplateDTO dto);
     QcFormTemplateDTO updateTemplate(Long id, QcFormTemplateDTO dto);
     void deleteTemplate(Long id);
-    void extractNumberFields(JsonNode widgetList, ObjectNode controlLimits);
+    void extractControlLimits(JsonNode widgetList, ObjectNode controlLimits);
     void createControlLimitSetting(QcFormTemplateDTO template);
     String resolveLabelFromTemplateByKey(Long templateId, String fieldKey);
 }

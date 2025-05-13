@@ -67,4 +67,25 @@ public class DetailedAlertRecordDTO extends CommonDTO {
     @JsonProperty("reviewers")
     private List<UserDTO> reviewers;
 
+    @JsonProperty("alert_type")
+    private String alertType;
+
+    @JsonProperty("option_items")
+    private List<String> optionItems;
+
+    @JsonProperty("option_labels")
+    private List<String> optionLabels;
+
+    @JsonProperty("invalid_option_items")
+    private List<String> invalidOptionItems;
+
+    @JsonProperty("invalid_option_items_labels")
+    private List<String> invalidOptionItemsLabels;
+
+    @JsonProperty("input_option_items")
+    private List<String> inputOptionItems;
+
+    @JsonProperty("input_option_items_labels")
+    private List<String> inputOptionItemsLabels;
+
 }

@@ -22,6 +22,7 @@ public class ControlLimitSetting {
 
     @Data
     public static class ControlLimitEntry {
+
         @Field("upper_control_limit")
         private Double upperControlLimit;
 
@@ -30,5 +31,19 @@ public class ControlLimitSetting {
 
         @Field("label")
         private String label;
+
+        // 允许选项值（用于 checkbox、radio、select）
+        @Field("valid_keys")
+        private java.util.List<String> validKeys;
+
+        // 所有可选项（用于 UI 渲染）
+        @Field("optionItems")
+        private java.util.List<OptionItem> optionItems;
+
+        @Data
+        public static class OptionItem {
+            private String label;
+            private String value;
+        }
     }
 }

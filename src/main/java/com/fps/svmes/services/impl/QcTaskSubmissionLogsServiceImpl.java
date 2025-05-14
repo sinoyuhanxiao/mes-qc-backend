@@ -12,6 +12,7 @@ import com.itextpdf.text.pdf.BaseFont;
 import com.itextpdf.text.pdf.PdfPCell;
 import com.itextpdf.text.pdf.PdfPTable;
 import com.itextpdf.text.pdf.PdfWriter;
+import com.mongodb.client.MongoCollection;
 import jakarta.validation.constraints.Null;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.Row;
@@ -547,6 +548,38 @@ public class QcTaskSubmissionLogsServiceImpl implements QcTaskSubmissionLogsServ
         // Delete the document
         mongoTemplate.remove(query, collectionName);
     }
+
+    @Override
+    public Document getRawDocumentBySubmissionId(String submissionId, String collectionName) {
+        if (!ObjectId.isValid(submissionId)) {
+            throw new IllegalArgumentException("Invalid submissionId format: " + submissionId);
+        }
+
+        if (!mongoTemplate.collectionExists(collectionName)) {
+            throw new RuntimeException("Collection not found: " + collectionName);
+        }
+
+        Query query = new Query(Criteria.where("_id").is(new ObjectId(submissionId)));
+        Document rawDocument = mongoTemplate.findOne(query, Document.class, collectionName);
+
+        if (rawDocument == null) {
+            return null;
+        }
+
+        // 🔥 清洗掉不需要的 key
+        Document cleanedDocument = new Document();
+        for (Map.Entry<String, Object> entry : rawDocument.entrySet()) {
+            String key = entry.getKey();
+            if (key.startsWith("related_") || key.equals("exceeded_info") || key.equals("e-signature") || key.equals("approval_info") || key.equals("_id") || key.equals("created_at") || key.equals("created_by")) {
+                continue; // 跳过
+            }
+            cleanedDocument.put(key, entry.getValue());
+        }
+
+        return cleanedDocument;
+    }
+
+
 
     private String convertToLocalTime(String utcTime) {
         try {

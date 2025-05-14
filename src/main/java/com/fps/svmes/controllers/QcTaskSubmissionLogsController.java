@@ -151,4 +151,30 @@ public class QcTaskSubmissionLogsController {
         }
     }
 
+    @GetMapping("/raw_document")
+    @Operation(summary = "Get raw MongoDB document by submissionId and createdAt (raw, unformatted)")
+    public ResponseEntity<?> getRawMongoDocument(
+            @RequestParam String submissionId,
+            @RequestParam Long qcFormTemplateId,
+            @RequestParam String createdAt // expected: 2025-05-01 16:50:52.427519100
+    ) {
+        try {
+            // Format: "form_template_{templateId}_{yyyyMM}"
+            String collectionSuffix = createdAt.substring(0, 7).replace("-", "");
+            String collectionName = "form_template_" + qcFormTemplateId + "_" + collectionSuffix;
+
+            Document rawDoc = qcTaskSubmissionLogsService.getRawDocumentBySubmissionId(submissionId, collectionName);
+
+            if (rawDoc == null) {
+                return ResponseEntity.status(404).body("Document not found in collection: " + collectionName);
+            }
+
+            return ResponseEntity.ok(rawDoc);
+        } catch (Exception e) {
+            logger.error("Failed to get raw MongoDB document", e);
+            return ResponseEntity.status(500).body("Error retrieving raw document: " + e.getMessage());
+        }
+    }
+
+
 }

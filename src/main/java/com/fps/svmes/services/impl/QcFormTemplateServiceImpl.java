@@ -52,6 +52,7 @@ public class QcFormTemplateServiceImpl implements QcFormTemplateService {
         QcFormTemplate template = modelMapper.map(dto, QcFormTemplate.class);
         template.setCreatedAt(OffsetDateTime.now());
         template.setStatus(1);
+        template.setApprovalType(dto.getApprovalType());
         return modelMapper.map(repository.save(template), QcFormTemplateDTO.class);
     }
 
@@ -66,6 +67,9 @@ public class QcFormTemplateServiceImpl implements QcFormTemplateService {
             template.setFormTemplateJson(dto.getFormTemplateJson());
         } else {
             template.setFormTemplateJson(template.getFormTemplateJson());
+        }
+        if (dto.getApprovalType() != null) {
+            template.setApprovalType(dto.getApprovalType());  // 更新审批类型（可选）
         }
         template.setUpdatedAt(OffsetDateTime.now());
         template.setUpdatedBy(dto.getUpdatedBy());

@@ -26,7 +26,7 @@ import java.util.stream.Collectors;
 public class QcFormTemplateServiceImpl implements QcFormTemplateService {
 
     @Autowired
-    private QcFormTemplateRepository repository;
+    private QcFormTemplateRepository qcFormTemplateRepository;
 
     @Autowired
     private ModelMapper modelMapper;
@@ -36,14 +36,14 @@ public class QcFormTemplateServiceImpl implements QcFormTemplateService {
 
     @Override
     public List<QcFormTemplateDTO> getAllActiveTemplates() {
-        return repository.findAllByStatus(1).stream()
+        return qcFormTemplateRepository.findAllByStatus(1).stream()
                 .map(template -> modelMapper.map(template, QcFormTemplateDTO.class))
                 .collect(Collectors.toList());
     }
 
     @Override
     public QcFormTemplateDTO getTemplateById(Long id) {
-        QcFormTemplate template = repository.findById(id).orElseThrow(() -> new RuntimeException("Template not found"));
+        QcFormTemplate template = qcFormTemplateRepository.findById(id).orElseThrow(() -> new RuntimeException("Template not found"));
         return modelMapper.map(template, QcFormTemplateDTO.class);
     }
 
@@ -53,12 +53,12 @@ public class QcFormTemplateServiceImpl implements QcFormTemplateService {
         template.setCreatedAt(OffsetDateTime.now());
         template.setStatus(1);
         template.setApprovalType(dto.getApprovalType());
-        return modelMapper.map(repository.save(template), QcFormTemplateDTO.class);
+        return modelMapper.map(qcFormTemplateRepository.save(template), QcFormTemplateDTO.class);
     }
 
     @Override
     public QcFormTemplateDTO updateTemplate(Long id, QcFormTemplateDTO dto) {
-        QcFormTemplate template = repository.findById(id).orElseThrow(() -> new RuntimeException("Template not found"));
+        QcFormTemplate template = qcFormTemplateRepository.findById(id).orElseThrow(() -> new RuntimeException("Template not found"));
 
         if (dto.getName() != null) {
             template.setName(dto.getName());
@@ -74,14 +74,14 @@ public class QcFormTemplateServiceImpl implements QcFormTemplateService {
         template.setUpdatedAt(OffsetDateTime.now());
         template.setUpdatedBy(dto.getUpdatedBy());
 
-        return modelMapper.map(repository.save(template), QcFormTemplateDTO.class);
+        return modelMapper.map(qcFormTemplateRepository.save(template), QcFormTemplateDTO.class);
     }
 
     @Override
     public void deleteTemplate(Long id) {
-        QcFormTemplate template = repository.findById(id).orElseThrow(() -> new RuntimeException("Template not found"));
+        QcFormTemplate template = qcFormTemplateRepository.findById(id).orElseThrow(() -> new RuntimeException("Template not found"));
         template.setStatus(0);
-        repository.save(template);
+        qcFormTemplateRepository.save(template);
     }
 
     @Override
@@ -171,7 +171,7 @@ public class QcFormTemplateServiceImpl implements QcFormTemplateService {
 
     @Override
     public String resolveLabelFromTemplateByKey(Long templateId, String fieldKey) {
-        QcFormTemplate template = repository.findById(templateId)
+        QcFormTemplate template = qcFormTemplateRepository.findById(templateId)
                 .orElseThrow(() -> new RuntimeException("Template not found"));
 
         try {
@@ -182,6 +182,11 @@ public class QcFormTemplateServiceImpl implements QcFormTemplateService {
         } catch (Exception e) {
             throw new RuntimeException("Failed to resolve label from form template", e);
         }
+    }
+
+    @Override
+    public String getApprovalTypeByFormId(Long formTemplateId) {
+        return qcFormTemplateRepository.findApprovalTypeById(formTemplateId);
     }
 
     private String findLabelInWidgetList(JsonNode widgetList, String fieldKey) {
@@ -207,6 +212,5 @@ public class QcFormTemplateServiceImpl implements QcFormTemplateService {
 
         return null; // not found
     }
-
 
 }

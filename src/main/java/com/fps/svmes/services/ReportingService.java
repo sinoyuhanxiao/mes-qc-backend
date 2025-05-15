@@ -15,5 +15,7 @@ public interface ReportingService {
     List<Document> fetchQcRecords(Long formTemplateId, String startDateTime, String endDateTime, Integer page, Integer size);
 
     List<Document> fetchQcRecordsFilteredByCreator(Long formTemplateId, String startDateTime, String endDateTime, Integer page, Integer size, Integer createdBy);
+
+    List<Document> fetchAllVersionsByGroupId(Long formTemplateId, String versionGroupId);
 }
 

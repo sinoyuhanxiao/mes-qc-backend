@@ -378,29 +378,36 @@ public class ReportingServiceImpl implements ReportingService {
     public List<Document> fetchQcRecords(Long formTemplateId, String startDateTime, String endDateTime, Integer page, Integer size) {
         MongoDatabase database = mongoClient.getDatabase("dev-mes-qc");
 
-        // Convert time range to UTC before querying
-//        String startUtc = convertToUtcString(startDateTime);
-//        String endUtc = convertToUtcString(endDateTime);
-
         // Get label mappings for formTemplateId
         HashMap<String, Object> optionItemsKeyValueMap = QcFormTemplateOptionItemsKeyValueMapping(formTemplateId);
         HashMap<String, String> keyValueMap = getFormTemplateKeyValueMapping(formTemplateId);
 
-        // Get target collections based on the UTC date range
+        // Get target collections based on the date range
         List<String> collectionNames = getRelevantCollections(database, formTemplateId, startDateTime, endDateTime);
 
-        List<Document> records = new ArrayList<>();
+        Map<String, Document> latestVersionMap = new HashMap<>();
         for (String collectionName : collectionNames) {
             MongoCollection<Document> collection = database.getCollection(collectionName);
-
-            // Query using UTC timestamps
             List<Document> collectionRecords = queryRecords(collection, startDateTime, endDateTime, page, size);
 
-            records.addAll(collectionRecords);
+            for (Document doc : collectionRecords) {
+                String groupId = doc.getString("version_group_id");
+                Integer version = doc.getInteger("version", 0);
+
+                if (groupId != null) {
+                    Document existing = latestVersionMap.get(groupId);
+                    if (existing == null || version > existing.getInteger("version", 0)) {
+                        latestVersionMap.put(groupId, doc);
+                    }
+                } else {
+                    // No versioning info, treat as standalone record
+                    latestVersionMap.put(doc.getObjectId("_id").toString(), doc);
+                }
+            }
         }
 
-        // Convert keys and values before returning
-        return records.stream()
+        // Convert and return only the latest versions
+        return latestVersionMap.values().stream()
                 .map(doc -> formattedResult(doc, optionItemsKeyValueMap, keyValueMap))
                 .collect(Collectors.toList());
     }
@@ -426,6 +433,35 @@ public class ReportingServiceImpl implements ReportingService {
                 .collect(Collectors.toList());
     }
 
+    @Override
+    public List<Document> fetchAllVersionsByGroupId(Long formTemplateId, String versionGroupId) {
+        MongoDatabase database = mongoClient.getDatabase("dev-mes-qc");
+
+        HashMap<String, Object> optionItemsKeyValueMap = QcFormTemplateOptionItemsKeyValueMapping(formTemplateId);
+        HashMap<String, String> keyValueMap = getFormTemplateKeyValueMapping(formTemplateId);
+
+        List<Document> versionedDocs = new ArrayList<>();
+
+        // Loop over all relevant collections in here
+        for (String collectionName : database.listCollectionNames()) {
+            if (!collectionName.startsWith("form_template_" + formTemplateId + "_")) continue;
+
+            MongoCollection<Document> collection = database.getCollection(collectionName);
+
+            List<Document> matches = collection.find(eq("version_group_id", versionGroupId)).into(new ArrayList<>());
+            versionedDocs.addAll(matches);
+        }
+
+        versionedDocs.sort((a, b) -> {
+            Integer v1 = a.getInteger("version", 0);
+            Integer v2 = b.getInteger("version", 0);
+            return v2.compareTo(v1); // latest first
+        });
+
+        return versionedDocs.stream()
+                .map(doc -> formattedResult(doc, optionItemsKeyValueMap, keyValueMap))
+                .collect(Collectors.toList());
+    }
 
 
     public HashMap<String, String> getFormTemplateKeyValueMapping(Long formId) {
@@ -640,6 +676,7 @@ public class ReportingServiceImpl implements ReportingService {
                 gte("created_at", formattedStartDateTime),
                 lte("created_at", formattedEndDateTime)
         );
+
 
         return collection.find(and(filters))
                 .skip(page * size)  // Pagination: skip past (page * size) records

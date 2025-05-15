@@ -7,14 +7,13 @@ import com.fps.svmes.services.*;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.mongodb.core.MongoTemplate;
+import org.bson.Document;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.bson.Document;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -101,7 +100,7 @@ public class QcFormDataController {
             assignmentDTO.setQcFormTemplateName(qcFormTemplateService.getTemplateById(formTemplateId).getName());
             assignmentDTO.setMongoCollection(collectionName);
             assignmentDTO.setApprovalType(approvalType);
-            assignmentDTO.setState("flow_1".equals(approvalType) ? "completed" : "pending");
+            assignmentDTO.setState("flow_1".equals(approvalType) ? "fully_approved" : "pending_leader"); // ['pending_leader', 'pending_supervisor', 'fully_approved']
 
             qcApprovalAssignmentService.insertIfNotExists(assignmentDTO);
 

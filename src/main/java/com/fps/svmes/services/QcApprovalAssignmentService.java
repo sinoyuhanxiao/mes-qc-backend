@@ -1,8 +1,11 @@
 package com.fps.svmes.services;
 
 import com.fps.svmes.dto.dtos.qcForm.QcApprovalAssignmentDTO;
+import org.bson.Document;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+
+import java.util.List;
 
 
 public interface QcApprovalAssignmentService {
@@ -18,4 +21,7 @@ public interface QcApprovalAssignmentService {
             String endDate,
             Pageable pageable
     );
+
+    List<Document> getVersionHistory(String submissionId, String collectionName);
+
 }

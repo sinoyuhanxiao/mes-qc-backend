@@ -4,9 +4,15 @@ import com.fps.svmes.dto.dtos.qcForm.QcApprovalAssignmentDTO;
 import com.fps.svmes.models.sql.qcForm.QcApprovalAssignment;
 import com.fps.svmes.repositories.jpaRepo.qcForm.QcApprovalAssignmentRepository;
 import com.fps.svmes.services.QcApprovalAssignmentService;
+import com.mongodb.client.MongoClient;
+import com.mongodb.client.MongoCollection;
+import com.mongodb.client.MongoDatabase;
+import com.mongodb.client.model.Filters;
 import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
+import org.bson.Document;
 import org.modelmapper.ModelMapper;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -25,6 +31,7 @@ public class QcApprovalAssignmentServiceImpl implements QcApprovalAssignmentServ
     private final QcApprovalAssignmentRepository repository;
     private final ModelMapper modelMapper;
     private final QcApprovalAssignmentRepository qcApprovalAssignmentRepository;
+    private final MongoClient mongoClient;
 
     @Override
     public void insertIfNotExists(QcApprovalAssignmentDTO dto) {
@@ -74,5 +81,25 @@ public class QcApprovalAssignmentServiceImpl implements QcApprovalAssignmentServ
         return qcApprovalAssignmentRepository.findAll(spec, pageable)
                 .map(entity -> modelMapper.map(entity, QcApprovalAssignmentDTO.class));
     }
+
+    @Override
+    public List<Document> getVersionHistory(String submissionId, String collectionName) {
+        // Step 1: Connect to the collection
+        MongoDatabase database = mongoClient.getDatabase("dev-mes-qc");
+        MongoCollection<Document> collection = database.getCollection(collectionName);
+
+        // Step 2: Find the initial document by submission ID
+        Document initial = collection.find(Filters.eq("_id", new org.bson.types.ObjectId(submissionId))).first();
+        if (initial == null) throw new IllegalArgumentException("Submission not found");
+
+        // Step 3: Extract version_group_id
+        String versionGroupId = initial.getString("version_group_id");
+
+        // Step 4: Return all versions in descending order
+        return collection.find(Filters.eq("version_group_id", versionGroupId))
+                .sort(new Document("version", -1))  // Descending order
+                .into(new ArrayList<>());
+    }
+
 
 }

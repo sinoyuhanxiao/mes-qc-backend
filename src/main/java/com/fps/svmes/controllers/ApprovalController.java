@@ -15,6 +15,9 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.bson.Document;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/approval")
@@ -69,6 +72,21 @@ public class ApprovalController {
         } catch (Exception e) {
             logger.error("Error retrieving approval assignments", e);
             return ResponseResult.fail("Failed to retrieve approval assignments", e);
+        }
+    }
+
+    @GetMapping("/version-history")
+    @Operation(summary = "Get version history by submission ID", description = "Returns all versions of a submission sorted by version desc")
+    public ResponseResult<List<Document>> getVersionHistoryBySubmissionId(
+            @RequestParam String submissionId,
+            @RequestParam String collectionName
+            ) {
+        try {
+            List<Document> versions = approvalAssignmentService.getVersionHistory(submissionId, collectionName);
+            return ResponseResult.success(versions);
+        } catch (Exception e) {
+            logger.error("Error retrieving version history", e);
+            return ResponseResult.fail("Failed to retrieve version history", e);
         }
     }
 

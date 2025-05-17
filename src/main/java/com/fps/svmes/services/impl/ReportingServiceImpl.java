@@ -463,7 +463,7 @@ public class ReportingServiceImpl implements ReportingService {
                 .collect(Collectors.toList());
     }
 
-
+    // TODO: use MongoFormTemplateUtils
     public HashMap<String, String> getFormTemplateKeyValueMapping(Long formId) {
         String formTemplateJson = qcFormTemplateRepository.findFormTemplateJsonById(formId);
 
@@ -518,7 +518,7 @@ public class ReportingServiceImpl implements ReportingService {
         }
     }
 
-
+    // TODO: use MongoFormTemplateUtils
     private Document formattedResult(Document document, HashMap<String, Object> optionItemsKeyValueMap, HashMap<String, String> keyValueMap) {
         Document formattedDocument = new Document();
 
@@ -582,6 +582,7 @@ public class ReportingServiceImpl implements ReportingService {
         return formattedDocument;
     }
 
+    // TODO: use MongoFormTemplateUtils
     private HashMap<String, Object> QcFormTemplateOptionItemsKeyValueMapping(Long formId) {
         String formTemplateJson = qcFormTemplateRepository.findFormTemplateJsonById(formId);
 

@@ -3,7 +3,10 @@ package com.fps.svmes.services.impl;
 import com.fps.svmes.dto.dtos.qcForm.QcApprovalAssignmentDTO;
 import com.fps.svmes.models.sql.qcForm.QcApprovalAssignment;
 import com.fps.svmes.repositories.jpaRepo.qcForm.QcApprovalAssignmentRepository;
+import com.fps.svmes.repositories.jpaRepo.qcForm.QcFormTemplateRepository;
 import com.fps.svmes.services.QcApprovalAssignmentService;
+import com.fps.svmes.services.UserService;
+import com.fps.svmes.utils.MongoFormTemplateUtils;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
@@ -21,8 +24,10 @@ import org.springframework.util.StringUtils;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -32,6 +37,9 @@ public class QcApprovalAssignmentServiceImpl implements QcApprovalAssignmentServ
     private final ModelMapper modelMapper;
     private final QcApprovalAssignmentRepository qcApprovalAssignmentRepository;
     private final MongoClient mongoClient;
+
+    @Autowired
+    MongoFormTemplateUtils mongoUtils;
 
     @Override
     public void insertIfNotExists(QcApprovalAssignmentDTO dto) {
@@ -96,10 +104,30 @@ public class QcApprovalAssignmentServiceImpl implements QcApprovalAssignmentServ
         String versionGroupId = initial.getString("version_group_id");
 
         // Step 4: Return all versions in descending order
-        return collection.find(Filters.eq("version_group_id", versionGroupId))
-                .sort(new Document("version", -1))  // Descending order
-                .into(new ArrayList<>());
-    }
+        List<Document> rawVersions;
+        if (versionGroupId == null || versionGroupId.isEmpty()) {
+            // ❗ 无 version_group_id，返回当前记录
+            rawVersions = List.of(initial);
+        } else {
+            // ✅ 有 version_group_id，返回该组全部版本，按 version 降序
+            rawVersions = collection.find(Filters.eq("version_group_id", versionGroupId))
+                    .sort(new Document("version", -1))
+                    .into(new ArrayList<>());
+        }
 
+        // 获取 formTemplateId（通过 collectionName 拆解出来）
+        String[] parts = collectionName.split("_");
+        if (parts.length < 3) throw new IllegalArgumentException("Invalid collection name format");
+        Long formTemplateId = Long.parseLong(parts[2]);
+
+        return rawVersions.stream()
+                .map(doc -> mongoUtils.formatRecord(
+                        doc,
+                        mongoUtils.getOptionItemsKeyValueMapping(formTemplateId),
+                        mongoUtils.getFormTemplateKeyValueMapping(formTemplateId)
+                ))
+                .collect(Collectors.toList());
+
+    }
 
 }

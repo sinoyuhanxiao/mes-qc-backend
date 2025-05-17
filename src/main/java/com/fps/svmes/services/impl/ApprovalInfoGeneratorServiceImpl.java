@@ -1,6 +1,8 @@
 package com.fps.svmes.services.impl;
 
+import com.fps.svmes.repositories.jpaRepo.user.UserRepository;
 import com.fps.svmes.services.ApprovalInfoGeneratorService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -8,6 +10,9 @@ import java.util.*;
 
 @Service
 public class ApprovalInfoGeneratorServiceImpl implements ApprovalInfoGeneratorService {
+
+    @Autowired
+    private UserRepository userRepository;
 
     @Override
     public List<Map<String, Object>> generateApprovalInfo(String approvalType, Long createdBy) {
@@ -34,10 +39,14 @@ public class ApprovalInfoGeneratorServiceImpl implements ApprovalInfoGeneratorSe
         Map<String, Object> node = new HashMap<>();
         node.put("role", role);
         node.put("user_id", userId);
+        if (userId != null) {
+            node.put("user_name", userRepository.findNameById(Math.toIntExact(userId)));
+        }
         node.put("label", label);
         node.put("status", status);
         node.put("timestamp", timestamp);
         node.put("comments", null);
+        node.put("suggest_retest", null);
 
         if (!"submitter".equals(role)) {
             node.put("e-signature", null);

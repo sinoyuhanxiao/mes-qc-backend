@@ -1,6 +1,7 @@
 package com.fps.svmes.controllers;
 
 import com.fps.svmes.dto.dtos.qcForm.QcApprovalAssignmentDTO;
+import com.fps.svmes.dto.requests.ApprovalActionRequest;
 import com.fps.svmes.dto.responses.ResponseResult;
 import com.fps.svmes.services.QcApprovalAssignmentService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -11,10 +12,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import org.bson.Document;
 
 import java.util.List;
@@ -89,5 +87,41 @@ public class ApprovalController {
             return ResponseResult.fail("Failed to retrieve version history", e);
         }
     }
+
+    @PostMapping("/approve")
+    @Operation(summary = "Approve action for current approver", description = "Sets signature, comment, status and updates next step")
+    public ResponseResult<String> approve(@RequestBody ApprovalActionRequest request) {
+        try {
+            approvalAssignmentService.approveAction(
+                    request.getSubmissionId(),
+                    request.getCollectionName(),
+                    request.getRole(),
+                    request.getApproverId(),
+                    request.getComment(),
+                    request.isSuggestRetest(),
+                    request.getESignature()
+            );
+            return ResponseResult.success("Approval submitted successfully");
+        } catch (Exception e) {
+            logger.error("Error during approval action", e);
+            return ResponseResult.fail("Approval action failed", e);
+        }
+    }
+
+    @GetMapping("/approval-info")
+    @Operation(summary = "Get approval_info for a submission", description = "Returns the approval steps for a given submission")
+    public ResponseResult<List<Document>> getApprovalInfoBySubmissionId(
+            @RequestParam String submissionId,
+            @RequestParam String collectionName
+    ) {
+        try {
+            List<Document> approvalInfo = approvalAssignmentService.getApprovalInfo(submissionId, collectionName);
+            return ResponseResult.success(approvalInfo);
+        } catch (Exception e) {
+            logger.error("Error retrieving approval_info", e);
+            return ResponseResult.fail("Failed to retrieve approval_info", e);
+        }
+    }
+
 
 }

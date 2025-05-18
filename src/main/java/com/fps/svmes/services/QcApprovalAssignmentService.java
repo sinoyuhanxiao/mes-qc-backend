@@ -24,4 +24,8 @@ public interface QcApprovalAssignmentService {
 
     List<Document> getVersionHistory(String submissionId, String collectionName);
 
+    void approveAction(String submissionId, String collectionName, String approverRole, Integer approverId, String comment, boolean suggestRetest, String eSignatureBase64);
+
+    List<Document> getApprovalInfo(String submissionId, String collectionName);
+
 }

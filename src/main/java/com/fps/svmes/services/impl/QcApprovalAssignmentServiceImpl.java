@@ -3,9 +3,8 @@ package com.fps.svmes.services.impl;
 import com.fps.svmes.dto.dtos.qcForm.QcApprovalAssignmentDTO;
 import com.fps.svmes.models.sql.qcForm.QcApprovalAssignment;
 import com.fps.svmes.repositories.jpaRepo.qcForm.QcApprovalAssignmentRepository;
-import com.fps.svmes.repositories.jpaRepo.qcForm.QcFormTemplateRepository;
+import com.fps.svmes.repositories.jpaRepo.user.UserRepository;
 import com.fps.svmes.services.QcApprovalAssignmentService;
-import com.fps.svmes.services.UserService;
 import com.fps.svmes.utils.MongoFormTemplateUtils;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoCollection;
@@ -14,6 +13,7 @@ import com.mongodb.client.model.Filters;
 import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
 import org.bson.Document;
+import org.bson.types.ObjectId;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -22,9 +22,10 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -40,6 +41,9 @@ public class QcApprovalAssignmentServiceImpl implements QcApprovalAssignmentServ
 
     @Autowired
     MongoFormTemplateUtils mongoUtils;
+
+    @Autowired
+    private final UserRepository userRepository;
 
     @Override
     public void insertIfNotExists(QcApprovalAssignmentDTO dto) {
@@ -128,6 +132,100 @@ public class QcApprovalAssignmentServiceImpl implements QcApprovalAssignmentServ
                 ))
                 .collect(Collectors.toList());
 
+    }
+
+    @Override
+    public void approveAction(String submissionId, String collectionName, String approverRole, Integer approverId, String comment, boolean suggestRetest, String eSignatureBase64) {
+        MongoDatabase database = mongoClient.getDatabase("dev-mes-qc");
+        MongoCollection<Document> collection = database.getCollection(collectionName);
+
+        // Step 1: Find the document
+        Document doc = collection.find(Filters.eq("_id", new ObjectId(submissionId))).first();
+        if (doc == null) {
+            throw new RuntimeException("❌ Document not found for submissionId: " + submissionId);
+        }
+
+        List<Document> approvalInfo = (List<Document>) doc.get("approval_info");
+        if (approvalInfo == null) {
+            throw new RuntimeException("❌ approval_info not found in document.");
+        }
+
+        // Step 2: Find the current approval step
+        int currentIndex = -1;
+        for (int i = 0; i < approvalInfo.size(); i++) {
+            Document step = approvalInfo.get(i);
+            if ("pending".equals(step.getString("status")) && approverRole.equals(step.getString("role"))) {
+                currentIndex = i;
+                break;
+            }
+        }
+
+        if (currentIndex == -1) {
+            throw new RuntimeException("❌ No pending approval step found for role: " + approverRole);
+        }
+
+        // Step 3: Update current step
+        Document currentStep = approvalInfo.get(currentIndex);
+        currentStep.put("comments", comment);
+        currentStep.put("user_id", approverId);
+        currentStep.put("user_name", userRepository.findNameById(approverId));
+        currentStep.put("suggest_retest", suggestRetest);
+        currentStep.put("e-signature", eSignatureBase64);
+        currentStep.put("timestamp", OffsetDateTime.now().toString());
+        currentStep.put("status", "completed");
+
+        // Step 4: Advance next step
+        if (currentIndex + 1 < approvalInfo.size()) {
+            Document nextStep = approvalInfo.get(currentIndex + 1);
+            String nextRole = nextStep.getString("role");
+            if ("supervisor".equals(nextRole)) {
+                nextStep.put("status", "pending");
+            } else {
+                nextStep.put("status", "completed");
+            }
+        }
+
+        // Step 5: Update back to MongoDB
+        collection.updateOne(
+                Filters.eq("_id", new ObjectId(submissionId)),
+                new Document("$set", new Document("approval_info", approvalInfo))
+        );
+
+        // Step 6: Update PostgreSQL snapshot state
+        repository.findBySubmissionId(submissionId).ifPresent(snapshot -> {
+            // Determine next PostgreSQL state
+            String updatedState;
+            if ("leader".equals(approverRole)) {
+                updatedState = "pending_supervisor";
+            } else if ("supervisor".equals(approverRole)) {
+                updatedState = "fully_approved";
+            } else {
+                updatedState = "pending_leader"; // fallback/default
+            }
+
+            snapshot.setState(updatedState);
+            snapshot.setUpdatedAt(OffsetDateTime.now());
+            repository.save(snapshot);
+        });
+
+    }
+
+    @Override
+    public List<Document> getApprovalInfo(String submissionId, String collectionName) {
+        MongoDatabase database = mongoClient.getDatabase("dev-mes-qc");
+        MongoCollection<Document> collection = database.getCollection(collectionName);
+
+        Document doc = collection.find(Filters.eq("_id", new ObjectId(submissionId))).first();
+        if (doc == null) {
+            throw new RuntimeException("Document not found for submissionId: " + submissionId);
+        }
+
+        List<Document> approvalInfo = (List<Document>) doc.get("approval_info");
+        if (approvalInfo == null) {
+            throw new RuntimeException("approval_info not found in document.");
+        }
+
+        return approvalInfo;
     }
 
 }

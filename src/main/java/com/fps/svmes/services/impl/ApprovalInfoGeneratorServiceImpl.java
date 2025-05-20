@@ -24,7 +24,7 @@ public class ApprovalInfoGeneratorServiceImpl implements ApprovalInfoGeneratorSe
         if ("flow_2".equals(approvalType)) {
             flow.add(createNode("leader", null, "班长签字", "pending", null));
         } else if ("flow_3".equals(approvalType)) {
-            flow.add(createNode("supervisor", null, "主管签字", "not_started", null));
+            flow.add(createNode("supervisor", null, "主管签字", "pending", null));
         } else if ("flow_4".equals(approvalType)) {
             flow.add(createNode("leader", null, "班长签字", "pending", null));
             flow.add(createNode("supervisor", null, "主管签字", "not_started", null));

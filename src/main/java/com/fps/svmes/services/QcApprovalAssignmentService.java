@@ -28,4 +28,6 @@ public interface QcApprovalAssignmentService {
 
     List<Document> getApprovalInfo(String submissionId, String collectionName);
 
+    void updateSubmissionId(String oldSubmissionId, String newSubmissionId);
+
 }

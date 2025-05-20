@@ -600,4 +600,58 @@ public class QcTaskSubmissionLogsServiceImpl implements QcTaskSubmissionLogsServ
         }
     }
 
+    @Override
+    public List<Map<String, Object>> getFormTemplateFieldList(Long formId) {
+        String formTemplateJson = qcFormTemplateRepository.findFormTemplateJsonById(formId);
+        if (formTemplateJson == null || formTemplateJson.isEmpty()) {
+            throw new RuntimeException("Form template JSON not found for formId: " + formId);
+        }
+
+        List<Map<String, Object>> fieldList = new ArrayList<>();
+
+        try {
+            Document formTemplate = Document.parse(formTemplateJson);
+            List<Document> widgetList = (List<Document>) formTemplate.get("widgetList");
+            if (widgetList != null) {
+                extractFieldDetailList(widgetList, fieldList); // 🔁 recursive helper
+            }
+        } catch (Exception e) {
+            logger.error("Error parsing form template JSON for formId: {}", formId, e);
+            throw new RuntimeException("Error parsing form template JSON", e);
+        }
+
+        return fieldList;
+    }
+
+    private void extractFieldDetailList(List<Document> widgetList, List<Map<String, Object>> fieldList) {
+        for (Document widget : widgetList) {
+            Document options = (Document) widget.get("options");
+            if (options != null && options.containsKey("name") && options.containsKey("label")) {
+                Map<String, Object> field = new HashMap<>();
+                field.put("name", options.getString("name"));
+                field.put("label", options.getString("label"));
+                if (options.containsKey("optionItems")) {
+                    field.put("optionItems", options.get("optionItems"));
+                }
+                fieldList.add(field);
+            }
+
+            List<Document> nestedWidgetList = (List<Document>) widget.get("widgetList");
+            if (nestedWidgetList != null) {
+                extractFieldDetailList(nestedWidgetList, fieldList);
+            }
+
+            List<Document> cols = (List<Document>) widget.get("cols");
+            if (cols != null) {
+                for (Document col : cols) {
+                    List<Document> colWidgetList = (List<Document>) col.get("widgetList");
+                    if (colWidgetList != null) {
+                        extractFieldDetailList(colWidgetList, fieldList);
+                    }
+                }
+            }
+        }
+    }
+
+
 }

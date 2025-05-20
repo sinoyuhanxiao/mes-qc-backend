@@ -16,6 +16,7 @@ import org.bson.Document;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @RestController
@@ -175,5 +176,18 @@ public class QcTaskSubmissionLogsController {
             return ResponseEntity.status(500).body("Error retrieving raw document: " + e.getMessage());
         }
     }
+
+    @GetMapping("/form-template-fields")
+    @Operation(summary = "Get all field key-label-optionItems for a given qcFormTemplateId")
+    public ResponseEntity<?> getFormTemplateFieldKeyLabelPairs(@RequestParam Long qcFormTemplateId) {
+        try {
+            List<Map<String, Object>> result = qcTaskSubmissionLogsService.getFormTemplateFieldList(qcFormTemplateId);
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            logger.error("Failed to get form template field list", e);
+            return ResponseEntity.status(500).body("Error retrieving field list: " + e.getMessage());
+        }
+    }
+
 
 }

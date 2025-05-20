@@ -22,4 +22,7 @@ public interface QcTaskSubmissionLogsService {
     void deleteSubmissionLog(String submissionId, String collectionName);
 
     Document getRawDocumentBySubmissionId(String submissionId, String collectionName);
+
+    List<Map<String, Object>> getFormTemplateFieldList(Long formId);
+
 }

@@ -100,7 +100,15 @@ public class QcFormDataController {
             assignmentDTO.setQcFormTemplateName(qcFormTemplateService.getTemplateById(formTemplateId).getName());
             assignmentDTO.setMongoCollection(collectionName);
             assignmentDTO.setApprovalType(approvalType);
-            assignmentDTO.setState("flow_1".equals(approvalType) ? "fully_approved" : "pending_leader"); // ['pending_leader', 'pending_supervisor', 'fully_approved']
+
+            // Hardcoded flow initial state for now
+            if ("flow_1".equals(approvalType)) {
+                assignmentDTO.setState("fully_approved");
+            } else if ("flow_3".equals(approvalType)) {
+                assignmentDTO.setState("pending_supervisor");
+            } else {
+                assignmentDTO.setState("pending_leader");
+            }
 
             qcApprovalAssignmentService.insertIfNotExists(assignmentDTO);
 
@@ -163,6 +171,9 @@ public class QcFormDataController {
 
             Document inserted = mongoTemplate.insert(new Document(newDoc), collectionName);
             String newSubmissionId = inserted.getObjectId("_id").toString();
+
+            // Update the approval assignment to point to the new submission id
+            qcApprovalAssignmentService.updateSubmissionId(parentSubmissionId, newSubmissionId);
 
             // 3. Trigger alerts if needed
             controlLimitEvaluationService.evaluateAndTriggerAlerts(formTemplateId, userId, updatedData);

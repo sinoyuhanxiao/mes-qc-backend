@@ -11,6 +11,7 @@ import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.Filters;
 import jakarta.persistence.criteria.Predicate;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.bson.Document;
 import org.bson.types.ObjectId;
@@ -134,6 +135,7 @@ public class QcApprovalAssignmentServiceImpl implements QcApprovalAssignmentServ
 
     }
 
+    @Transactional
     @Override
     public void approveAction(String submissionId, String collectionName, String approverRole, Integer approverId, String comment, boolean suggestRetest, String eSignatureBase64) {
         MongoDatabase database = mongoClient.getDatabase("dev-mes-qc");
@@ -227,5 +229,16 @@ public class QcApprovalAssignmentServiceImpl implements QcApprovalAssignmentServ
 
         return approvalInfo;
     }
+
+    @Override
+    public void updateSubmissionId(String oldSubmissionId, String newSubmissionId) {
+        Optional<QcApprovalAssignment> assignmentOpt = qcApprovalAssignmentRepository.findBySubmissionId(oldSubmissionId);
+        assignmentOpt.ifPresent(assignment -> {
+            assignment.setSubmissionId(newSubmissionId);
+            assignment.setUpdatedAt(OffsetDateTime.now());
+            qcApprovalAssignmentRepository.save(assignment);
+        });
+    }
+
 
 }

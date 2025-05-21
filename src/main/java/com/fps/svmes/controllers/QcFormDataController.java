@@ -13,10 +13,10 @@ import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Date;
 
 @RestController
 @Slf4j
@@ -80,7 +80,7 @@ public class QcFormDataController {
 
             // Insert the form data
             Map<String, Object> document = new HashMap<>(formData);
-            document.put("created_at", LocalDateTime.now().toString());
+            document.put("created_at", new Date());
             document.put("created_by", userId);
 
             Map<String, ExceededFieldInfoDTO> exceededInfoMap = controlLimitEvaluationService.evaluateExceededInfo(formTemplateId, formData);
@@ -162,7 +162,7 @@ public class QcFormDataController {
             // Set version info for the new version
             newDoc.put("version_group_id", versionGroupId);
             newDoc.put("version", parentVersion + 1);
-            newDoc.put("created_at", LocalDateTime.now().toString());
+            newDoc.put("created_at", new Date());
             newDoc.put("created_by", userId);
 
             Map<String, ExceededFieldInfoDTO> exceededInfoMap =

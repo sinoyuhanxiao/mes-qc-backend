@@ -8,9 +8,13 @@ import com.fps.svmes.models.sql.qcForm.QcFormTemplate;
 import com.fps.svmes.repositories.jpaRepo.qcForm.QcFormTemplateRepository;
 import com.fps.svmes.services.MongoService;
 import com.fps.svmes.services.QcFormTemplateService;
+import com.mongodb.client.MongoClient;
+import com.mongodb.client.MongoCollection;
+import com.mongodb.client.MongoDatabase;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import com.mongodb.client.model.ReplaceOptions;
 
 import org.bson.Document;
 import java.sql.Timestamp;
@@ -32,7 +36,10 @@ public class QcFormTemplateServiceImpl implements QcFormTemplateService {
     private ModelMapper modelMapper;
 
     @Autowired
-    private MongoService mongoService; // Assuming you already have this bean
+    private MongoService mongoService;
+
+    @Autowired
+    private MongoClient mongoClient;
 
     @Override
     public List<QcFormTemplateDTO> getAllActiveTemplates() {
@@ -187,6 +194,58 @@ public class QcFormTemplateServiceImpl implements QcFormTemplateService {
     @Override
     public String getApprovalTypeByFormId(Long formTemplateId) {
         return qcFormTemplateRepository.findApprovalTypeById(formTemplateId);
+    }
+
+    @Override
+    public void extractAndStoreKeyLabelPairs(QcFormTemplateDTO template) {
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+            JsonNode root = mapper.readTree(template.getFormTemplateJson());
+            JsonNode widgetList = root.get("widgetList");
+
+            List<Map<String, String>> fieldList = new ArrayList<>();
+            extractInputKeyLabelPairs(widgetList, fieldList);
+
+            Document mongoDoc = new Document();
+            mongoDoc.put("qc_form_template_id", template.getId());
+            mongoDoc.put("fields", fieldList);
+
+            mongoService.replaceOne("form_template_key_label_pairs",
+                    new Document("qc_form_template_id", template.getId()),
+                    mongoDoc);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to store key-label pairs", e);
+        }
+    }
+
+    private void extractInputKeyLabelPairs(JsonNode widgetList, List<Map<String, String>> result) {
+        if (widgetList == null || !widgetList.isArray()) return;
+
+        for (JsonNode widget : widgetList) {
+            if (widget.has("formItemFlag") && widget.get("formItemFlag").asBoolean()) {
+                JsonNode options = widget.get("options");
+                if (options != null && options.has("name") && options.has("label")) {
+                    String key = options.get("name").asText();
+                    String label = options.get("label").asText();
+                    Map<String, String> entry = new HashMap<>();
+                    entry.put("key", key);
+                    entry.put("label", label);
+                    result.add(entry);
+                }
+            }
+
+            if (widget.has("widgetList")) {
+                extractInputKeyLabelPairs(widget.get("widgetList"), result);
+            }
+
+            if (widget.has("cols")) {
+                for (JsonNode col : widget.get("cols")) {
+                    if (col.has("widgetList")) {
+                        extractInputKeyLabelPairs(col.get("widgetList"), result);
+                    }
+                }
+            }
+        }
     }
 
     private String findLabelInWidgetList(JsonNode widgetList, String fieldKey) {

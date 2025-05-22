@@ -127,7 +127,10 @@ public class QcFormTemplateController {
             String collectionName = "form_template_" + template.getId() + "_" + getCurrentYearMonth();
             mongoService.createCollection(collectionName);
 
-            // Step 4: Create the control limit setting in the recipe library
+            // Step 4: Store key-label mappings into MongoDB
+            service.extractAndStoreKeyLabelPairs(template);
+
+            // Step 5: Create the control limit setting in the recipe library
             service.createControlLimitSetting(template);
 
             logger.info("Template, nodes, and collection created successfully for multiple parent folders!");

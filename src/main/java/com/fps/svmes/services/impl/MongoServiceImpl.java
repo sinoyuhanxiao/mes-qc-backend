@@ -1,16 +1,24 @@
 package com.fps.svmes.services.impl;
 
 import com.fps.svmes.services.MongoService;
+import com.mongodb.client.MongoClient;
+import com.mongodb.client.MongoCollection;
+import com.mongodb.client.MongoDatabase;
 import org.bson.Document;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.stereotype.Service;
+import com.mongodb.client.model.ReplaceOptions;
+
 
 @Service
 public class MongoServiceImpl implements MongoService {
 
     @Autowired
     private MongoTemplate mongoTemplate;
+
+    @Autowired
+    private MongoClient mongoClient;
 
     @Override
     public void createCollection(String collectionName) {
@@ -28,4 +36,12 @@ public class MongoServiceImpl implements MongoService {
     public void insertOne(String collectionName, Document document) {
         mongoTemplate.getCollection(collectionName).insertOne(document);
     }
+
+    @Override
+    public void replaceOne(String collectionName, Document filter, Document newDoc) {
+        MongoDatabase db = mongoClient.getDatabase("dev-mes-qc"); // ✅ your real DB name
+        MongoCollection<Document> collection = db.getCollection(collectionName);
+        collection.replaceOne(filter, newDoc, new ReplaceOptions().upsert(true));
+    }
+
 }

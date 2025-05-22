@@ -17,4 +17,5 @@ public interface QcFormTemplateService {
     void createControlLimitSetting(QcFormTemplateDTO template);
     String getApprovalTypeByFormId(Long formTemplateId);
     String resolveLabelFromTemplateByKey(Long templateId, String fieldKey);
+    void extractAndStoreKeyLabelPairs(QcFormTemplateDTO template);
 }

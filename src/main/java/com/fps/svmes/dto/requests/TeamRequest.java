@@ -10,6 +10,7 @@ import lombok.NoArgsConstructor;
 
 import java.time.OffsetTime;
 import java.time.OffsetDateTime;
+import java.util.List;
 
 @Data
 @AllArgsConstructor
@@ -67,4 +68,16 @@ public class TeamRequest {
     @JsonProperty("updated_at")
     @Schema(description = "Last update timestamp of the team", example = "12:00:00+00:00")
     private OffsetDateTime updatedAt;
+
+    @JsonProperty("parent_id")
+    @Schema(description = "Parent team id", example = "1")
+    private Integer parentId;
+
+    @JsonProperty("member_ids")
+    @Schema(description = "List of integer of member ids assigned to this team")
+    private List<Integer> memberIds;
+
+    @JsonProperty("form_ids")
+    @Schema(description = "List of string of form ids assigned to this team")
+    private List<String> formIds;
 }

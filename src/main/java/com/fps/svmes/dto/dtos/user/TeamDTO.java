@@ -10,6 +10,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 
 import java.time.OffsetTime;
+import java.util.List;
 
 @Data
 @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -42,4 +43,10 @@ public class TeamDTO extends CommonDTO {
 
     @JsonProperty("description")
     private String description;
+
+    @JsonProperty("parent_id")
+    private Integer parentId;
+
+    @JsonProperty("children")
+    private List<TeamDTO> children;
 }

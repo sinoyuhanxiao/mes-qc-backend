@@ -1,6 +1,7 @@
 package com.fps.svmes.controllers;
 
 import com.fps.svmes.dto.dtos.user.TeamUserDTO;
+import com.fps.svmes.dto.dtos.user.UserDTO;
 import com.fps.svmes.dto.dtos.user.UserForTeamTableDTO;
 import com.fps.svmes.dto.responses.ResponseResult;
 import com.fps.svmes.services.TeamUserService;
@@ -120,10 +121,10 @@ public class TeamUserController {
 
     @GetMapping("/teams/{teamId}/users")
     @Operation(summary = "Get users for team", description = "Retrieve all users assigned to a specific team")
-    public ResponseResult<List<UserForTeamTableDTO>> getUsersForTeam(@PathVariable Integer teamId) {
+    public ResponseResult<List<UserDTO>> getUsersForTeam(@PathVariable Integer teamId) {
         try {
             // Now returns a list of UserForTeamTableDTO
-            List<UserForTeamTableDTO> users = teamUserService.getUsersForTeam(teamId);
+            List<UserDTO> users = teamUserService.getUsersForTeam(teamId);
             logger.info("Users for team {} retrieved: {}", teamId, users.size());
             return ResponseResult.success(users);
         } catch (Exception e) {

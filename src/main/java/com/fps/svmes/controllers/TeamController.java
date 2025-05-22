@@ -3,10 +3,12 @@ package com.fps.svmes.controllers;
 import com.fps.svmes.dto.dtos.user.TeamDTO;
 import com.fps.svmes.dto.requests.TeamRequest;
 import com.fps.svmes.dto.responses.ResponseResult;
+import com.fps.svmes.services.TeamFormService;
+import com.fps.svmes.services.TeamHierarchyService;
 import com.fps.svmes.services.TeamService;
+import com.fps.svmes.services.TeamUserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,19 +24,34 @@ public class TeamController {
     @Autowired
     private TeamService teamService;
 
+    @Autowired
+    private TeamFormService teamFormService;
+
+    @Autowired
+    private TeamUserService teamUserService;
+
+    @Autowired
+    private TeamHierarchyService teamHierarchyService;
+
     private static final Logger logger = LoggerFactory.getLogger(TeamController.class);
 
     /**
-     * Create a new team.
+     * Create a new team with the provided details.
      *
-     * @param createdBy   ID of the user creating the team
+     * @param teamRequest Team request object containing updated data
      * @return TeamDTO
      */
     @PostMapping
     @Operation(summary = "Create a new team", description = "Create a new team with the provided details")
-    public ResponseResult<TeamDTO> createTeam(@RequestBody TeamRequest TeamRequest, @RequestParam Integer createdBy) {
+    public ResponseResult<TeamDTO> createTeam(@RequestBody TeamRequest teamRequest) {
         try {
-            TeamDTO createdTeam = teamService.createTeam(TeamRequest, createdBy);
+            TeamDTO createdTeam = teamService.createTeam(teamRequest);
+            teamUserService.assignUsersToTeam(createdTeam.getId(), teamRequest.getMemberIds());
+
+            for (String formId: teamRequest.getFormIds()) {
+                teamFormService.assignFormToTeam(createdTeam.getId(), formId);
+            }
+
             return ResponseResult.success(createdTeam);
         } catch (Exception e) {
             logger.error("Error creating team", e);
@@ -43,35 +60,42 @@ public class TeamController {
     }
 
     /**
-     * Update an existing team.
+     * Update an existing team and sync children teams forms/members by removing association that are not included.
      *
-     * @param id          ID of the team to update
+     * @param id ID of the team to update
      * @param teamRequest Team request object containing updated data
-     * @param updatedBy   ID of the user updating the team
      * @return TeamDTO
      */
     @PutMapping("/{id}")
-    @Operation(summary = "Update an existing team", description = "Update a team with the provided details")
+    @Operation(summary = "Update an existing team", description = "Update an existing team and sync children teams " +
+            "forms/members by removing association that are not included")
     public ResponseResult<TeamDTO> updateTeam(
             @PathVariable Integer id,
-            @RequestBody @Valid TeamRequest teamRequest,
-            @RequestParam Integer updatedBy
+            @RequestBody TeamRequest teamRequest
     ) {
         try {
-            // Delegate the update logic to the service
-            TeamDTO updatedTeam = teamService.updateTeam(id, teamRequest, updatedBy);
+            TeamDTO updatedTeam = teamService.updateTeam(id, teamRequest);
 
-            // Return a success response with the updated DTO
+            teamUserService.removeTeamFromAllUsers(id);
+            List<Integer> memberIds = teamRequest.getMemberIds();
+            teamUserService.assignUsersToTeam(id, memberIds);
+            teamHierarchyService.syncUsers(id, memberIds);
+
+            List<String> formIds = teamRequest.getFormIds();
+            teamFormService.removeAllFormsFromTeam(id);
+
+            for (String formId: formIds) {
+                teamFormService.assignFormToTeam(id, formId);
+            }
+
+            teamHierarchyService.syncForms(id, formIds);
+
             return ResponseResult.success(updatedTeam);
         } catch (Exception e) {
             logger.error("Error updating team", e);
-
-            // Return a failure response with the error message
             return ResponseResult.fail("Failed to update team", e);
         }
     }
-
-
 
     /**
      * Get a specific team by ID.
@@ -91,6 +115,23 @@ public class TeamController {
         }
     }
 
+//    /**
+//     * Get all teams.
+//     *
+//     * @return List of TeamDTO
+//     */
+//    @GetMapping
+//    @Operation(summary = "Get all teams", description = "Fetch all teams")
+//    public ResponseResult<List<TeamDTO>> getAllTeams() {
+//        try {
+//            List<TeamDTO> teams = teamService.getAllTeams();
+//            return ResponseResult.success(teams);
+//        } catch (Exception e) {
+//            logger.error("Error retrieving all teams", e);
+//            return ResponseResult.fail("Failed to retrieve teams", e);
+//        }
+//    }
+
     /**
      * Get all teams.
      *
@@ -100,7 +141,7 @@ public class TeamController {
     @Operation(summary = "Get all teams", description = "Fetch all teams")
     public ResponseResult<List<TeamDTO>> getAllTeams() {
         try {
-            List<TeamDTO> teams = teamService.getAllTeams();
+            List<TeamDTO> teams = teamService.getTeamTree();
             return ResponseResult.success(teams);
         } catch (Exception e) {
             logger.error("Error retrieving all teams", e);
@@ -187,6 +228,28 @@ public class TeamController {
         } catch (Exception e) {
             logger.error("Error retrieving current leader ids", e);
             return ResponseResult.fail("Failed to retrieve current leader ids", e);
+        }
+    }
+
+    /**
+     * Get the depth (level) of a team in the hierarchy.
+     * Root team → 1, child of root → 2, etc.
+     *
+     * @param id Team ID
+     * @return depth as Integer
+     */
+    @GetMapping("/depth/{id}")
+    @Operation(
+            summary     = "Get depth of a team",
+            description = "Return the hierarchical depth of the specified team (root level = 1)"
+    )
+    public ResponseResult<Integer> getTeamDepth(@PathVariable Integer id) {
+        try {
+            int depth = teamService.getDepth(id);
+            return ResponseResult.success(depth);
+        } catch (Exception e) {
+            logger.error("Error retrieving depth for team {}", id, e);
+            return ResponseResult.fail("Failed to get team depth", e);
         }
     }
 }

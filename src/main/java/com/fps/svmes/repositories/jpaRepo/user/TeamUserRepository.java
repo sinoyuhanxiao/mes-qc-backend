@@ -4,7 +4,9 @@ import com.fps.svmes.dto.dtos.user.TeamForUserTableDTO;
 import com.fps.svmes.models.sql.user.TeamUser;
 import com.fps.svmes.models.sql.user.TeamUserId;
 import feign.Param;
+import jakarta.transaction.Transactional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
@@ -28,4 +30,13 @@ public interface TeamUserRepository extends JpaRepository<TeamUser, Integer> {
             "JOIN su.team s " +
             "WHERE su.id.userId = :userId")
     List<TeamForUserTableDTO> findTeamsByUserId(@Param("userId") Integer userId);
+
+    @Modifying
+    @Transactional
+    @Query("""
+       DELETE FROM TeamUser tu
+       WHERE tu.id.teamId = :teamId
+         AND tu.id.userId IN :userIds
+       """)
+    void deleteByTeamIdAndUserIdIn(Integer teamId, List<Integer> userIds);
 }

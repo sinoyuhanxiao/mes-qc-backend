@@ -1,5 +1,6 @@
 package com.fps.svmes.controllers;
 
+import com.fps.svmes.dto.dtos.user.LeaderDTO;
 import com.fps.svmes.dto.dtos.user.TeamDTO;
 import com.fps.svmes.dto.requests.TeamRequest;
 import com.fps.svmes.dto.responses.ResponseResult;
@@ -115,23 +116,6 @@ public class TeamController {
         }
     }
 
-//    /**
-//     * Get all teams.
-//     *
-//     * @return List of TeamDTO
-//     */
-//    @GetMapping
-//    @Operation(summary = "Get all teams", description = "Fetch all teams")
-//    public ResponseResult<List<TeamDTO>> getAllTeams() {
-//        try {
-//            List<TeamDTO> teams = teamService.getAllTeams();
-//            return ResponseResult.success(teams);
-//        } catch (Exception e) {
-//            logger.error("Error retrieving all teams", e);
-//            return ResponseResult.fail("Failed to retrieve teams", e);
-//        }
-//    }
-
     /**
      * Get all teams.
      *
@@ -141,7 +125,7 @@ public class TeamController {
     @Operation(summary = "Get all teams", description = "Fetch all teams")
     public ResponseResult<List<TeamDTO>> getAllTeams() {
         try {
-            List<TeamDTO> teams = teamService.getTeamTree();
+            List<TeamDTO> teams = teamService.getFullTeamTree();
             return ResponseResult.success(teams);
         } catch (Exception e) {
             logger.error("Error retrieving all teams", e);
@@ -220,11 +204,11 @@ public class TeamController {
 
     // get the list of current leader ids existing in the Team
     @GetMapping("/leaders")
-    @Operation(summary = "Get current leader ids", description = "Fetch a list of current leader ids")
-    public ResponseResult<List<Integer>> getCurrentLeaderIds() {
+    @Operation(summary = "Get current leaders", description = "Fetch a list of current leaders")
+    public ResponseResult<List<LeaderDTO>> getCurrentLeaders() {
         try {
-            List<Integer> leaderIds = teamService.getCurrentLeaderIds();
-            return ResponseResult.success(leaderIds);
+            List<LeaderDTO> leaders = teamService.getCurrentLeaders();
+            return ResponseResult.success(leaders);
         } catch (Exception e) {
             logger.error("Error retrieving current leader ids", e);
             return ResponseResult.fail("Failed to retrieve current leader ids", e);

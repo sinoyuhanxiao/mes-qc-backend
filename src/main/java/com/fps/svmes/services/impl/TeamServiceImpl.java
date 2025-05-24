@@ -12,6 +12,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.modelmapper.ModelMapper;
 import java.util.List;
+import java.util.Objects;
+
 import com.fps.svmes.repositories.jpaRepo.user.UserRepository;
 import com.fps.svmes.models.sql.user.User;
 import org.springframework.transaction.annotation.Transactional;
@@ -87,16 +89,20 @@ public class TeamServiceImpl implements TeamService {
             // Current (old) leader of this team – may be null
             User oldLeader = team.getLeader();
 
-            // Other team that currently has this new leader
+            // Other team that currently has this new leader - may be null
             Team otherTeam = teamRepository.findByLeaderId(newLeader.getId());
 
-            if (otherTeam != null && !otherTeam.getId().equals(team.getId())) {
+            if (Objects.equals(oldLeader, newLeader)) {
+                // Skip since same leader already assigned
+            } else if (otherTeam == null || otherTeam.getId().equals(team.getId())) {
+                team.setLeader(newLeader);
+            } else {
                 otherTeam.setLeader(oldLeader);
 
                 if (teamRequest.getUpdatedBy() != null) {
                     otherTeam.setUpdateDetails(teamRequest.getUpdatedBy(), otherTeam.getStatus());
                 }
-                // Hibernate will flush otherTeam because it's in the same persistence context
+
                 team.setLeader(newLeader);
             }
         } else {

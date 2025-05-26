@@ -528,25 +528,31 @@ public class QcTaskSubmissionLogsServiceImpl implements QcTaskSubmissionLogsServ
 
     @Override
     public void deleteSubmissionLog(String submissionId, String collectionName) {
-        // Check if collection exists
+        // 1. Check if collection exists
         if (!mongoTemplate.collectionExists(collectionName)) {
             throw new RuntimeException("Collection not found: " + collectionName);
         }
 
-        // Construct the MongoDB query
-        Query query = new Query();
-        query.addCriteria(Criteria.where("_id").is(submissionId));
+        // 2. Find the document by _id
+        Query idQuery = new Query(Criteria.where("_id").is(submissionId));
+        Document document = mongoTemplate.findOne(idQuery, Document.class, collectionName);
 
-        // Execute the query and fetch the documents
-        List<Document> documents = mongoTemplate.find(query, Document.class, collectionName);
-
-        // Check if the document exists
-        if (documents.isEmpty()) {
+        // 3. Check if it exists
+        if (document == null) {
             throw new RuntimeException("Document not found: " + submissionId);
         }
 
-        // Delete the document
-        mongoTemplate.remove(query, collectionName);
+        // 4. Check if it has version_group_id
+        Object versionGroupId = document.get("version_group_id");
+
+        if (versionGroupId != null) {
+            // Delete all documents with the same version_group_id
+            Query deleteGroupQuery = new Query(Criteria.where("version_group_id").is(versionGroupId));
+            mongoTemplate.remove(deleteGroupQuery, collectionName);
+        } else {
+            // Delete only this document
+            mongoTemplate.remove(idQuery, collectionName);
+        }
     }
 
     @Override

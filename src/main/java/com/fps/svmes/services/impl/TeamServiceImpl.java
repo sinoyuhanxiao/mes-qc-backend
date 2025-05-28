@@ -80,6 +80,8 @@ public class TeamServiceImpl implements TeamService {
             Team parentTeam = teamRepository.findById(teamRequest.getParentId())
                     .orElseThrow(() -> new IllegalArgumentException("Parent team not found: " + teamRequest.getParentId()));
             team.setParent(parentTeam);
+        } else {
+            team.setParent(null);
         }
 
         if (teamRequest.getLeaderId() != null) {
@@ -117,14 +119,17 @@ public class TeamServiceImpl implements TeamService {
     @Transactional
     public TeamDTO getTeamById(Integer id) {
         Team team = teamRepository.findById(id).orElseThrow(() -> new RuntimeException("Team not found"));
-        return modelMapper.map(team, TeamDTO.class);
+        List<Integer> ids = teamRepository.findSelfAndAncestorIds(id);
+        return mapWithChildren(team, ids.size());
     }
 
     @Override
     @Transactional(readOnly=true)
     public List<TeamDTO> getFullTeamTree() {
         List<Team> roots = teamRepository.findByParentIsNull();
-        return roots.stream().map(this::mapWithChildren).toList();
+        return roots.stream()
+                .map(t -> mapWithChildren(t,1))
+                .toList();
     }
 
     @Override
@@ -208,26 +213,30 @@ public class TeamServiceImpl implements TeamService {
                 .orElseThrow(() -> new RuntimeException("Team not found: " + teamId));
 
         int depth = 1;
-        Team cur  = team;
+        Team current  = team;
 
-        while (cur.getParent() != null) {
+        while (current.getParent() != null) {
             depth++;
-            cur = cur.getParent();
+            current = current.getParent();
         }
+
         return depth;
     }
 
-    private TeamDTO mapWithChildren(Team entity) {
+    private TeamDTO mapWithChildren(Team entity, int level) {
         TeamDTO dto = modelMapper.map(entity, TeamDTO.class);
+        dto.setLevel(level);
+
         if (entity.getParent() != null){
             dto.setParentId(entity.getParent().getId());
         }
 
         if (entity.getChildren() != null && !entity.getChildren().isEmpty()) {
             dto.setChildren(entity.getChildren().stream()
-                    .map(this::mapWithChildren)
+                    .map(c-> mapWithChildren(c, level + 1))
                     .toList());
         }
+
         return dto;
     }
 }

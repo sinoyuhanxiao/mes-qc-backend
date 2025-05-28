@@ -49,4 +49,6 @@ public class TeamDTO extends CommonDTO {
 
     @JsonProperty("children")
     private List<TeamDTO> children;
+
+    private Integer level;
 }

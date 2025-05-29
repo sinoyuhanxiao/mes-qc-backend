@@ -27,6 +27,7 @@ import org.springframework.util.StringUtils;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -173,7 +174,7 @@ public class QcApprovalAssignmentServiceImpl implements QcApprovalAssignmentServ
         currentStep.put("user_name", userRepository.findNameById(approverId));
         currentStep.put("suggest_retest", suggestRetest);
         currentStep.put("e-signature", eSignatureBase64);
-        currentStep.put("timestamp", OffsetDateTime.now().toString());
+        currentStep.put("timestamp", new Date());
         currentStep.put("status", "completed");
 
         // Step 4: Advance next step
@@ -190,7 +191,8 @@ public class QcApprovalAssignmentServiceImpl implements QcApprovalAssignmentServ
         // Step 5: Update back to MongoDB
         collection.updateOne(
                 Filters.eq("_id", new ObjectId(submissionId)),
-                new Document("$set", new Document("approval_info", approvalInfo))
+                new Document("$set", new Document("approval_info", approvalInfo)
+                        .append("approver_updated_at", new Date()))
         );
 
         // Step 6: Update PostgreSQL snapshot state

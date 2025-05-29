@@ -11,6 +11,7 @@ import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.modelmapper.ModelMapper;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 
@@ -128,6 +129,7 @@ public class TeamServiceImpl implements TeamService {
     public List<TeamDTO> getFullTeamTree() {
         List<Team> roots = teamRepository.findByParentIsNull();
         return roots.stream()
+                .sorted(Comparator.comparing(Team::getId))
                 .map(t -> mapWithChildren(t,1))
                 .toList();
     }
@@ -233,6 +235,7 @@ public class TeamServiceImpl implements TeamService {
 
         if (entity.getChildren() != null && !entity.getChildren().isEmpty()) {
             dto.setChildren(entity.getChildren().stream()
+                    .sorted(Comparator.comparing(Team::getId))
                     .map(c-> mapWithChildren(c, level + 1))
                     .toList());
         }

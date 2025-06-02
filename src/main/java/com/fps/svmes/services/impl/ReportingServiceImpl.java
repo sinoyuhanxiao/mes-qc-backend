@@ -685,11 +685,10 @@ public class ReportingServiceImpl implements ReportingService {
                 .collect(Collectors.toList());
     }
 
-
     private Instant convertStringToInstant(String dateTime) {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
         LocalDateTime localDateTime = LocalDateTime.parse(dateTime, formatter);
-        return localDateTime.atZone(ZoneId.systemDefault()).toInstant();
+        return localDateTime.atZone(ZoneId.of("UTC")).toInstant(); // Force UTC zone
     }
 
     private Instant convertMongoCreatedAtStringToInstant(String mongoDateTime) {

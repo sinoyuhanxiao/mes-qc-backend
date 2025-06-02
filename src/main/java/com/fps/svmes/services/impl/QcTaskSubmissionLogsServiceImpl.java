@@ -120,8 +120,6 @@ public class QcTaskSubmissionLogsServiceImpl implements QcTaskSubmissionLogsServ
             Document document = mongoTemplate.findOne(query, Document.class, collectionName);
 
             // adjust the document to categorize the results according to the form template
-
-
             if (document == null) {
                 logger.warn("No document found for submissionId: {}", submissionId);
                 return null;
@@ -264,7 +262,7 @@ public class QcTaskSubmissionLogsServiceImpl implements QcTaskSubmissionLogsServ
         HashMap<String, String> fieldToDividerMap = new HashMap<>();
         List<Document> widgetList = getWidgetListFromTemplate(formId);
 
-        // **Step 1: 解析表单模板，构建字段归属的 `divider`**
+        // Step 1: 解析表单模板，构建字段归属的 `divider`
         String currentDivider = "uncategorized"; // 默认归类
         for (Document widget : widgetList) {
             String type = widget.getString("type");
@@ -290,28 +288,28 @@ public class QcTaskSubmissionLogsServiceImpl implements QcTaskSubmissionLogsServ
                     }
                 }
             } else if (options != null && options.containsKey("name")) {
-                // **记录字段属于哪个分组**
+                // 记录字段属于哪个分组
                 fieldToDividerMap.put(options.getString("name"), currentDivider);
             }
         }
 
-        // **Step 2: 重新格式化 MongoDB 取出的数据**
+        // Step 2: 重新格式化 MongoDB 取出的数据
         Document formattedDocument = new Document();
         Document groupedData = new Document();
 
         for (String key : document.keySet()) {
             Object value = document.get(key);
 
-            // **获取格式化后的字段名**
+            // 获取格式化后的字段名
             String formattedKey = keyValueMap.getOrDefault(key, key);
             String dividerLabel = fieldToDividerMap.get(key); // 获取字段归属的 `divider`
 
-            // **如果字段不属于任何 `divider`，默认归类到 `"uncategorized"`**
+            // 如果字段不属于任何 `divider`，默认归类到 `"uncategorized"`
             if (dividerLabel == null) {
                 dividerLabel = "uncategorized";
             }
 
-            // **处理 optionItems 转换**
+            // 处理 optionItems 转换
             if (optionItemsKeyValueMap.containsKey(formattedKey) && value instanceof List) {
                 List<?> valueList = (List<?>) value;
                 HashMap<String, String> valueToLabelMap = (HashMap<String, String>) optionItemsKeyValueMap.get(formattedKey);
@@ -324,7 +322,7 @@ public class QcTaskSubmissionLogsServiceImpl implements QcTaskSubmissionLogsServ
                 value = valueToLabelMap.getOrDefault(value.toString(), value.toString());
             }
 
-            // **保留 `_id`, `created_at`, `created_by` 在根层级**
+            // 保留 `_id`, `created_at`, `created_by` 在根层级
             if (List.of("_id", "created_at", "created_by").contains(key)) {
                 formattedDocument.put(formattedKey, value);
             } else {

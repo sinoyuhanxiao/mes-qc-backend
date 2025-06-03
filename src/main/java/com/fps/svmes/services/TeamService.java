@@ -17,4 +17,6 @@ public interface TeamService {
     TeamDTO getTeamByTeamLeadId(Integer id);
     List<LeaderDTO> getCurrentLeaders();
     int getDepth(Integer teamId);
+    void syncSelfAndDescendantTeamMembers(Integer teamId, List<Integer> parentAllowedUserIds);
+    void syncSelfAndDescendantTeamForms(Integer teamId, List<String> parentAllowedFormIds);
     }

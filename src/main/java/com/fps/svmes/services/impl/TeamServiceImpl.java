@@ -4,16 +4,19 @@ import com.fps.svmes.dto.dtos.user.LeaderDTO;
 import com.fps.svmes.dto.dtos.user.TeamDTO;
 import com.fps.svmes.dto.requests.TeamRequest;
 import com.fps.svmes.models.sql.user.Team;
+import com.fps.svmes.repositories.jpaRepo.user.TeamFormRepository;
 import com.fps.svmes.repositories.jpaRepo.user.TeamRepository;
+import com.fps.svmes.repositories.jpaRepo.user.TeamUserRepository;
+import com.fps.svmes.services.TeamFormService;
 import com.fps.svmes.services.TeamService;
+import com.fps.svmes.services.TeamUserService;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.modelmapper.ModelMapper;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Objects;
+
+import java.util.*;
 
 import com.fps.svmes.repositories.jpaRepo.user.UserRepository;
 import com.fps.svmes.models.sql.user.User;
@@ -27,6 +30,18 @@ public class TeamServiceImpl implements TeamService {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private TeamUserRepository teamUserRepository;
+
+    @Autowired
+    private TeamFormRepository teamFormRepository;
+
+    @Autowired
+    private TeamUserService teamUserService;
+
+    @Autowired
+    private TeamFormService teamFormService;
 
     @Autowired
     private ModelMapper modelMapper;
@@ -52,8 +67,14 @@ public class TeamServiceImpl implements TeamService {
 
             // If leader is already assigned to another team, change that team's leader to null
             Team other = teamRepository.findByLeaderId(teamRequest.getLeaderId());
+
+
             if (other != null) {
                 other.setLeader(null);
+
+                // Remove the leader member since that leader is no longer within the team
+                teamUserService.removeUserFromTeam(leader.getId(), other.getId());
+
                 other.setUpdateDetails(teamRequest.getCreatedBy(), other.getStatus());
             }
 
@@ -101,6 +122,9 @@ public class TeamServiceImpl implements TeamService {
                 team.setLeader(newLeader);
             } else {
                 otherTeam.setLeader(oldLeader);
+
+                // Remove previous leader from the member list
+                teamUserService.removeUserFromTeam(newLeader.getId(), otherTeam.getId());
 
                 if (teamRequest.getUpdatedBy() != null) {
                     otherTeam.setUpdateDetails(teamRequest.getUpdatedBy(), otherTeam.getStatus());
@@ -156,6 +180,7 @@ public class TeamServiceImpl implements TeamService {
         if (!teamRepository.existsById(id)) {
             throw new RuntimeException("Team not found");
         }
+
         teamRepository.deleteById(id); // Permanently deletes the record
     }
 
@@ -223,6 +248,64 @@ public class TeamServiceImpl implements TeamService {
         }
 
         return depth;
+    }
+
+    @Override
+    @Transactional
+    public void syncSelfAndDescendantTeamMembers(Integer teamId, List<Integer> parentAllowedUserIds) {
+        Set<Integer> allowedSet = new HashSet<>(parentAllowedUserIds);
+
+        List<Integer> childTeamIds = descendantTeamIds(teamId);
+        if (childTeamIds.isEmpty()) return;
+
+        for (Integer childTeamId : childTeamIds) {
+            List<Integer> childUsers = teamUserRepository.findByIdTeamId(childTeamId)
+                    .stream()
+                    .map(teamUser -> teamUser.getUser().getId())
+                    .toList();
+
+            List<Integer> targetRemovalUserIds = childUsers.stream()
+                    .filter(id -> !allowedSet.contains(id))
+                    .toList();
+
+            if (!targetRemovalUserIds.isEmpty()) {
+                teamUserRepository.deleteByTeamIdAndUserIdIn(childTeamId, targetRemovalUserIds);
+            }
+        }
+    }
+
+    @Override
+    @Transactional
+    public void syncSelfAndDescendantTeamForms(Integer teamId, List<String> parentAllowedFormIds) {
+        Set<String> allowedSet = new HashSet<>(parentAllowedFormIds);
+
+        List<Integer> allChildTeamIds = descendantTeamIds(teamId);
+        if (allChildTeamIds.isEmpty()) return;
+
+        for (Integer childTeamId : allChildTeamIds) {
+            List<String> childForms =
+                    teamFormRepository.findByTeamId(childTeamId)
+                            .stream()
+                            .map(teamForm -> teamForm.getId().getFormId())
+                            .toList();
+
+            List<String> targetRemovalFormIds = childForms.stream()
+                    .filter(id -> !allowedSet.contains(id))
+                    .toList();
+
+            if (!targetRemovalFormIds.isEmpty()) {
+                teamFormRepository.deleteByTeamIdAndFormIdIn(childTeamId, targetRemovalFormIds);
+            }
+        }
+    }
+
+    /**
+     * ids of *all* descendants (NOT including the team itself)
+     */
+    private List<Integer> descendantTeamIds(Integer teamId) {
+        List<Integer> all = teamRepository.findSelfAndDescendantIds(teamId);
+        all.remove(teamId);
+        return all;
     }
 
     private TeamDTO mapWithChildren(Team entity, int level) {

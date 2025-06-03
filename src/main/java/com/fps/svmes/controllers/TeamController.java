@@ -5,7 +5,6 @@ import com.fps.svmes.dto.dtos.user.TeamDTO;
 import com.fps.svmes.dto.requests.TeamRequest;
 import com.fps.svmes.dto.responses.ResponseResult;
 import com.fps.svmes.services.TeamFormService;
-import com.fps.svmes.services.TeamHierarchyService;
 import com.fps.svmes.services.TeamService;
 import com.fps.svmes.services.TeamUserService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -31,9 +30,6 @@ public class TeamController {
     @Autowired
     private TeamUserService teamUserService;
 
-    @Autowired
-    private TeamHierarchyService teamHierarchyService;
-
     private static final Logger logger = LoggerFactory.getLogger(TeamController.class);
 
     /**
@@ -47,8 +43,14 @@ public class TeamController {
     public ResponseResult<TeamDTO> createTeam(@RequestBody TeamRequest teamRequest) {
         try {
             TeamDTO createdTeam = teamService.createTeam(teamRequest);
+
+            // Setup member associations
             teamUserService.assignUsersToTeam(createdTeam.getId(), teamRequest.getMemberIds());
 
+            // Sync leader as a member for all ascendant teams
+            teamUserService.assignUserToTeams(teamRequest.getLeaderId(), List.of(createdTeam.getId()));
+
+            // Setup form associations
             for (String formId: teamRequest.getFormIds()) {
                 teamFormService.assignFormToTeam(createdTeam.getId(), formId);
             }
@@ -77,11 +79,17 @@ public class TeamController {
         try {
             TeamDTO updatedTeam = teamService.updateTeam(id, teamRequest);
 
+            // Sync Member associations
             teamUserService.removeTeamFromAllUsers(id);
+
             List<Integer> memberIds = teamRequest.getMemberIds();
             teamUserService.assignUsersToTeam(id, memberIds);
-            teamHierarchyService.syncUsers(id, memberIds);
+            teamService.syncSelfAndDescendantTeamMembers(id, memberIds);
 
+            // Sync leader as a member for all ascendant teams
+            teamUserService.assignUserToTeams(teamRequest.getLeaderId(), List.of(updatedTeam.getId()));
+
+            // Sync Form associations
             List<String> formIds = teamRequest.getFormIds();
             teamFormService.removeAllFormsFromTeam(id);
 
@@ -89,7 +97,7 @@ public class TeamController {
                 teamFormService.assignFormToTeam(id, formId);
             }
 
-            teamHierarchyService.syncForms(id, formIds);
+            teamService.syncSelfAndDescendantTeamForms(id, formIds);
 
             return ResponseResult.success(updatedTeam);
         } catch (Exception e) {

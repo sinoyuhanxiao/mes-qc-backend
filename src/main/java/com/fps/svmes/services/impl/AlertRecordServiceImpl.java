@@ -558,6 +558,7 @@ public class AlertRecordServiceImpl implements AlertRecordService {
             dto.setInvalidOptionItemsLabels(alert.getInvalidOptionLabels());
             dto.setInputOptionItems(alert.getInputOptionItems());
             dto.setInputOptionItemsLabels(alert.getInputOptionItemsLabels());
+            dto.setSubmissionId(alert.getSubmissionId());
 
             if ("options".equals(alert.getAlertType()) && alert.getOptionLabels() != null) {
                 List<String> validLabels = new ArrayList<>(alert.getOptionLabels());

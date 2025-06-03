@@ -113,7 +113,7 @@ public class QcFormDataController {
             qcApprovalAssignmentService.insertIfNotExists(assignmentDTO);
 
             // Evaluate control limits and trigger alerts if needed
-            controlLimitEvaluationService.evaluateAndTriggerAlerts(formTemplateId, userId, formData);
+            controlLimitEvaluationService.evaluateAndTriggerAlerts(formTemplateId, userId, formData, insertedDocument.getObjectId("_id").toString());
 
             // Prepare response
             Map<String, Object> response = new HashMap<>();
@@ -176,7 +176,7 @@ public class QcFormDataController {
             qcApprovalAssignmentService.updateSubmissionId(parentSubmissionId, newSubmissionId);
 
             // 3. Trigger alerts if needed
-            controlLimitEvaluationService.evaluateAndTriggerAlerts(formTemplateId, userId, updatedData);
+            controlLimitEvaluationService.evaluateAndTriggerAlerts(formTemplateId, userId, updatedData, newSubmissionId);
 
             // 4. Return response
             Map<String, Object> res = new HashMap<>();

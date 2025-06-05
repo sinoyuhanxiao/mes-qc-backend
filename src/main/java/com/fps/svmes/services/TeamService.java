@@ -19,4 +19,5 @@ public interface TeamService {
     int getDepth(Integer teamId);
     void syncSelfAndDescendantTeamMembers(Integer teamId, List<Integer> parentAllowedUserIds);
     void syncSelfAndDescendantTeamForms(Integer teamId, List<String> parentAllowedFormIds);
-    }
+    void verifyAndUpdateLeader(Integer teamId, Short roleId);
+}

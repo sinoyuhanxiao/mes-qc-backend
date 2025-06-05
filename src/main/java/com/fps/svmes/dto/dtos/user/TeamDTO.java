@@ -51,4 +51,8 @@ public class TeamDTO extends CommonDTO {
     private List<TeamDTO> children;
 
     private Integer level;
+
+    private Integer memberCount;
+
+    private Integer associatedFormCount;
 }

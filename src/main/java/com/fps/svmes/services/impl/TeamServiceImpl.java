@@ -126,6 +126,9 @@ public class TeamServiceImpl implements TeamService {
                 // Remove previous leader from the member list
                 teamUserService.removeUserFromTeam(newLeader.getId(), otherTeam.getId());
 
+                // Add leader as a member to other team
+                teamUserService.assignUserToTeams(oldLeader.getId(), List.of(otherTeam.getId()));
+
                 if (teamRequest.getUpdatedBy() != null) {
                     otherTeam.setUpdateDetails(teamRequest.getUpdatedBy(), otherTeam.getStatus());
                 }
@@ -300,6 +303,40 @@ public class TeamServiceImpl implements TeamService {
     }
 
     /**
+     * Set target team's leader to null if role is not allowed, determine by team's depth/level
+     * depth 1: allow supervisor only
+     * depth 2 and below: allow team lead only
+     */
+    @Transactional
+    public void verifyAndUpdateLeader(Integer teamId, Short roleId) {
+        int teamDepth = getDepth(teamId);
+        Team team = teamRepository.findById(teamId)
+                .orElseThrow(() -> new EntityNotFoundException("Team " + teamId + " not found"));
+
+        if (roleId == 1) {
+            // Supervisor role only allowed on team with depth 1
+            if (teamDepth != 1) {
+                team.setLeader(null);
+            }
+        } else if (roleId == 2) {
+            // Worker role is not allowed to be leader
+            team.setLeader(null);
+        } else if (roleId == 3) {
+            // Team lead role only allowed on depth other than 1
+            if (teamDepth == 1) {
+             team.setLeader(null);
+            }
+        } else if (roleId == 4) {
+            // Manager role only allowed on team with depth 1
+            if (teamDepth != 1) {
+                team.setLeader(null);
+            }
+        }
+
+        teamRepository.save(team);
+    }
+
+    /**
      * ids of *all* descendants (NOT including the team itself)
      */
     private List<Integer> descendantTeamIds(Integer teamId) {
@@ -311,6 +348,9 @@ public class TeamServiceImpl implements TeamService {
     private TeamDTO mapWithChildren(Team entity, int level) {
         TeamDTO dto = modelMapper.map(entity, TeamDTO.class);
         dto.setLevel(level);
+
+        dto.setAssociatedFormCount(teamFormRepository.findByTeamId(entity.getId()).size());
+        dto.setMemberCount(teamUserRepository.findByIdTeamId(entity.getId()).size());
 
         if (entity.getParent() != null){
             dto.setParentId(entity.getParent().getId());

@@ -1,5 +1,7 @@
 package com.fps.svmes.models.sql.user;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import io.swagger.v3.oas.annotations.media.Schema;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -9,6 +11,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 
 import java.time.OffsetTime;
+import java.util.List;
 
 @Entity
 @Table(name = "team", schema = "quality_management")
@@ -49,4 +52,12 @@ public class Team extends Common {
     @Column(name = "description")
     private String description;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "parent_id")
+    @JsonBackReference
+    private Team parent;
+
+    @OneToMany(mappedBy = "parent", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonManagedReference
+    private List<Team> children;
 }

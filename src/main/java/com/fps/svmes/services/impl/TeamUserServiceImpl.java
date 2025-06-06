@@ -2,6 +2,7 @@ package com.fps.svmes.services.impl;
 
 import com.fps.svmes.dto.dtos.user.RoleDTO;
 import com.fps.svmes.dto.dtos.user.TeamUserDTO;
+import com.fps.svmes.dto.dtos.user.UserDTO;
 import com.fps.svmes.dto.dtos.user.UserForTeamTableDTO;
 import com.fps.svmes.models.sql.user.TeamUser;
 import com.fps.svmes.models.sql.user.TeamUserId;
@@ -13,9 +14,12 @@ import com.fps.svmes.services.TeamUserService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.modelmapper.ModelMapper;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -29,9 +33,33 @@ public class TeamUserServiceImpl implements TeamUserService {
 
     private final UserRepository userRepository;
 
+    @Autowired
+    private ModelMapper modelMapper;
+
+    // Assign user to teams. Teams with ancestor team will also get assigned with the user.
+    // Teams that already contain the user will be ignored.
     @Override
     public void assignUserToTeams(Integer userId, List<Integer> teamIds) {
-        List<TeamUser> teamUsers = teamIds.stream()
+        if (teamIds == null || teamIds.isEmpty()) {
+            log.warn("assignUserToTeams called with empty teamIds – nothing to do.");
+            return;
+        }
+
+        Set<Integer> targetTeamIds = teamIds.stream().flatMap(tid -> teamRepository.findSelfAndAncestorIds(tid)
+                .stream())
+                .collect(Collectors.toSet());
+
+        Set<Integer> alreadyAssigned = teamUserRepository.findByIdUserId(userId)
+                .stream()
+                .map(tu -> tu.getTeam().getId()).collect(Collectors.toSet());
+
+        targetTeamIds.removeAll(alreadyAssigned);
+        if (targetTeamIds.isEmpty()){
+            log.info("User {} is already assigned to all requested teams / ancestors.", userId);
+            return;
+        }
+
+        List<TeamUser> teamUsers = targetTeamIds.stream()
                 .map(teamId -> {
                     TeamUser teamUser = new TeamUser(new TeamUserId(teamId, userId));
                     teamUser.setTeam(teamRepository.findById(Math.toIntExact(teamId))
@@ -41,6 +69,7 @@ public class TeamUserServiceImpl implements TeamUserService {
                     return teamUser;
                 })
                 .collect(Collectors.toList());
+
         teamUserRepository.saveAll(teamUsers);
         log.info("Assigned user {} to teams {}", userId, teamIds);
     }
@@ -60,7 +89,6 @@ public class TeamUserServiceImpl implements TeamUserService {
         teamUserRepository.saveAll(teamUsers);
         log.info("Assigned users {} to team {}", userIds, teamId);
     }
-
 
     @Override
     @Transactional
@@ -105,46 +133,15 @@ public class TeamUserServiceImpl implements TeamUserService {
     }
 
     @Override
-    public List<UserForTeamTableDTO> getUsersForTeam(Integer teamId) {
+    @Transactional
+    public List<UserDTO> getUsersForTeam(Integer teamId) {
         // 1) Find all TeamUser records for this teamId
         List<TeamUser> teamUsers = teamUserRepository.findByIdTeamId(teamId);
         log.info("Retrieved users for team {}: {}", teamId, teamUsers.size());
 
-        // 2) Extract user IDs
-        List<Integer> userIds = teamUsers.stream()
-                .map(teamUser -> teamUser.getId().getUserId())
-                .collect(Collectors.toList());
-
-        // 3) Get all User entities for these userIds
-        List<User> users = userRepository.findAllById(userIds);
-
-        // 4) Map each User to UserForTeamTableDTO
-        return users.stream()
-                .map(this::mapToUserForTeamTableDTO)
-                .collect(Collectors.toList());
-    }
-
-    // Helper method to map User entity -> UserForTeamTableDTO
-    private UserForTeamTableDTO mapToUserForTeamTableDTO(User user) {
-        UserForTeamTableDTO dto = new UserForTeamTableDTO();
-        dto.setId(user.getId());
-        dto.setName(user.getName());
-
-        // Map Role to RoleDTO
-        RoleDTO roleDTO = new RoleDTO();
-        roleDTO.setId(user.getRole().getId());
-        roleDTO.setName(user.getRole().getName());
-        roleDTO.setDescription(user.getRole().getDescription());
-        roleDTO.setElTagType(user.getRole().getElTagType());
-
-        dto.setRole(roleDTO);  // Setting the roleDTO here
-
-        dto.setWecomId(user.getWecomId());
-        dto.setUsername(user.getUsername());
-        dto.setEmail(user.getEmail());
-        dto.setPhoneNumber(user.getPhoneNumber());
-
-        return dto;
+        return teamUsers.stream()
+                .map(teamUser -> modelMapper.map(teamUser.getUser(), UserDTO.class))
+                .toList();
     }
 
     @Override

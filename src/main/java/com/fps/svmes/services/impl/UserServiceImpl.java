@@ -3,6 +3,7 @@ package com.fps.svmes.services.impl;
 import com.fps.svmes.dto.dtos.user.TeamForUserTableDTO;
 import com.fps.svmes.dto.dtos.user.UserDTO;
 import com.fps.svmes.models.sql.user.Role;
+import com.fps.svmes.models.sql.user.Team;
 import com.fps.svmes.models.sql.user.TeamUser;
 import com.fps.svmes.models.sql.user.User;
 import com.fps.svmes.repositories.jpaRepo.user.RoleRepository;
@@ -94,6 +95,7 @@ public class UserServiceImpl implements UserService {
                     throw new RuntimeException("Role with ID " + userDTO.getRole().getId() + " not found");
                 }
             }
+
             if (userDTO.getWecomId() != null) {
                 existingUser.setWecomId(userDTO.getWecomId());
             }

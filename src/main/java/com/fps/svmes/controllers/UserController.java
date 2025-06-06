@@ -1,8 +1,12 @@
 package com.fps.svmes.controllers;
 
+import com.fps.svmes.dto.dtos.user.TeamDTO;
 import com.fps.svmes.dto.dtos.user.UserDTO;
 import com.fps.svmes.dto.responses.ResponseResult;
 import com.fps.svmes.dto.responses.ResponseStatus;
+import com.fps.svmes.models.sql.user.Team;
+import com.fps.svmes.services.TeamFormService;
+import com.fps.svmes.services.TeamService;
 import com.fps.svmes.services.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -22,6 +26,7 @@ import java.util.List;
 public class UserController {
 
     public final UserService userService;
+    public final TeamService teamService;
     public static Logger logger = LoggerFactory.getLogger(UserController.class);
 
     // GET - Retrieve all users
@@ -58,6 +63,21 @@ public class UserController {
     public ResponseResult<UserDTO> updateUser(@PathVariable Integer id, @RequestBody UserDTO userDTO) {
         try {
             UserDTO updatedUser = userService.updateUser(id, userDTO);
+
+            // Verify user's role change with associated team
+            if (userDTO.getRole() != null) {
+                try {
+                    Short roleId = userDTO.getRole().getId();
+
+                    // Get the team that this user is leader of
+                    TeamDTO leadingTeam = teamService.getTeamByTeamLeadId(id);
+                    teamService.verifyAndUpdateLeader(leadingTeam.getId(), roleId);
+                } catch (Exception e) {
+                    // Ignore if not leading a team
+                    logger.info("User is not leader of any team. Skipped verify and update associated team");
+                }
+            }
+
             logger.info("User updated: {}", updatedUser);
             return ResponseResult.success(updatedUser);
         } catch (Exception e) {

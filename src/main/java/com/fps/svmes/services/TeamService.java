@@ -1,19 +1,23 @@
 package com.fps.svmes.services;
 
+import com.fps.svmes.dto.dtos.user.LeaderDTO;
 import com.fps.svmes.dto.dtos.user.TeamDTO;
 import com.fps.svmes.dto.requests.TeamRequest;
 import jakarta.validation.Valid;
-
 import java.util.List;
 
 public interface TeamService {
-    TeamDTO createTeam(TeamRequest TeamRequest, Integer userId);
-    TeamDTO updateTeam(Integer id, @Valid TeamRequest teamDTO, Integer userId);
+    TeamDTO createTeam(TeamRequest TeamRequest);
+    TeamDTO updateTeam(Integer id, @Valid TeamRequest teamDTO);
     TeamDTO getTeamById(Integer id);
-    List<TeamDTO> getAllTeams();
+    List<TeamDTO> getFullTeamTree();
     void activateTeam(Integer id, Integer updatedBy);
     void softDeleteTeam(Integer id, Integer userId);
     void hardDeleteTeam(Integer id);
     TeamDTO getTeamByTeamLeadId(Integer id);
-    List<Integer> getCurrentLeaderIds();
+    List<LeaderDTO> getCurrentLeaders();
+    int getDepth(Integer teamId);
+    void syncSelfAndDescendantTeamMembers(Integer teamId, List<Integer> parentAllowedUserIds);
+    void syncSelfAndDescendantTeamForms(Integer teamId, List<String> parentAllowedFormIds);
+    void verifyAndUpdateLeader(Integer teamId, Short roleId);
 }

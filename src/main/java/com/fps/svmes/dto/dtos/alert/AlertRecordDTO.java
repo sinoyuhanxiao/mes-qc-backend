@@ -84,4 +84,6 @@ public class AlertRecordDTO extends CommonDTO {
     @JsonProperty("input_option_items_labels")
     private List<String> inputOptionItemsLabels;
 
+    @JsonProperty("submission_id")
+    private String submissionId;
 }

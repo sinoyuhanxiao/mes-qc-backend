@@ -17,4 +17,7 @@ public interface QcFormTemplateRepository extends JpaRepository<QcFormTemplate, 
     String findFormTemplateJsonById(@Param("formId") Long formId);
 
     Optional<QcFormTemplate> findById(Long id);
+
+    @Query("SELECT q.approvalType FROM QcFormTemplate q WHERE q.id = :id")
+    String findApprovalTypeById(@Param("id") Long id);
 }

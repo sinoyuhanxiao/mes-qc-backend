@@ -55,8 +55,9 @@ public class AlertRecordServiceImpl implements AlertRecordService {
     @Transactional
     public AlertRecordDTO create(AlertRecordDTO dto) {
         AlertRecord entity = modelMapper.map(dto, AlertRecord.class);
-        entity.setCreatedAt(OffsetDateTime.now());
-        entity.setUpdatedAt(OffsetDateTime.now());
+        entity.setCreatedAt(dto.getCreatedAt());
+        entity.setUpdatedAt(dto.getUpdatedAt());
+        entity.setAlertTime(dto.getAlertTime());
         entity.setInspectionItemKey(dto.getInspectionItemKey());
         entity.setInspectionItemLabel(dto.getInspectionItemLabel());
         entity.setAlertType(dto.getAlertType());
@@ -135,8 +136,8 @@ public class AlertRecordServiceImpl implements AlertRecordService {
             log.setDiff(diff);
             log.setCreatedBy(dto.getCreatedBy());
             log.setUpdatedBy(dto.getCreatedBy());
-            log.setCreatedAt(OffsetDateTime.now());
-            log.setUpdatedAt(OffsetDateTime.now());
+            log.setCreatedAt(dto.getCreatedAt());
+            log.setUpdatedAt(dto.getUpdatedAt());
             alertRecordLogRepository.save(log);
         }
 
@@ -557,6 +558,7 @@ public class AlertRecordServiceImpl implements AlertRecordService {
             dto.setInvalidOptionItemsLabels(alert.getInvalidOptionLabels());
             dto.setInputOptionItems(alert.getInputOptionItems());
             dto.setInputOptionItemsLabels(alert.getInputOptionItemsLabels());
+            dto.setSubmissionId(alert.getSubmissionId());
 
             if ("options".equals(alert.getAlertType()) && alert.getOptionLabels() != null) {
                 List<String> validLabels = new ArrayList<>(alert.getOptionLabels());

@@ -1,23 +1,22 @@
 package com.fps.svmes.controllers;
 
 import com.fps.svmes.dto.dtos.alert.ExceededFieldInfoDTO;
+import com.fps.svmes.dto.dtos.qcForm.QcApprovalAssignmentDTO;
 import com.fps.svmes.dto.dtos.qcForm.QcFormTemplateDTO;
-import com.fps.svmes.services.ControlLimitEvaluationService;
-import com.fps.svmes.services.QcFormTemplateService;
+import com.fps.svmes.services.*;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.mongodb.core.MongoTemplate;
+import org.bson.Document;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.bson.Document;
-import com.fps.svmes.services.RecipeService;
-import com.fps.svmes.services.AlertRecordService;
 
-import java.time.LocalDateTime;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Date;
 
 @RestController
 @Slf4j
@@ -40,6 +39,12 @@ public class QcFormDataController {
 
     @Autowired
     private ControlLimitEvaluationService controlLimitEvaluationService;
+
+    @Autowired
+    private ApprovalInfoGeneratorService approvalInfoGeneratorService;
+
+    @Autowired
+    private QcApprovalAssignmentService qcApprovalAssignmentService;
 
     @PostMapping("/insert-form/{userId}/{collectionName}")
     public ResponseEntity<?> insertFormData(
@@ -75,16 +80,40 @@ public class QcFormDataController {
 
             // Insert the form data
             Map<String, Object> document = new HashMap<>(formData);
-            document.put("created_at", LocalDateTime.now().toString());
+            document.put("created_at", new Date());
             document.put("created_by", userId);
 
             Map<String, ExceededFieldInfoDTO> exceededInfoMap = controlLimitEvaluationService.evaluateExceededInfo(formTemplateId, formData);
             document.put("exceeded_info", exceededInfoMap);
 
+            String approvalType = qcFormTemplateService.getApprovalTypeByFormId(formTemplateId);
+            List<Map<String, Object>> approvalInfo = approvalInfoGeneratorService.generateApprovalInfo(approvalType, userId);
+            document.put("approval_info", approvalInfo);
+
+            // 👉 Insert the document into MongoDB
             Document insertedDocument = mongoTemplate.insert(new Document(document), collectionName);
 
+            // ✅ Approval snapshot logic comes AFTER insertedDocument is available
+            QcApprovalAssignmentDTO assignmentDTO = new QcApprovalAssignmentDTO();
+            assignmentDTO.setSubmissionId(insertedDocument.getObjectId("_id").toString());
+            assignmentDTO.setQcFormTemplateId(formTemplateId);
+            assignmentDTO.setQcFormTemplateName(qcFormTemplateService.getTemplateById(formTemplateId).getName());
+            assignmentDTO.setMongoCollection(collectionName);
+            assignmentDTO.setApprovalType(approvalType);
+
+            // Hardcoded flow initial state for now
+            if ("flow_1".equals(approvalType)) {
+                assignmentDTO.setState("fully_approved");
+            } else if ("flow_3".equals(approvalType)) {
+                assignmentDTO.setState("pending_supervisor");
+            } else {
+                assignmentDTO.setState("pending_leader");
+            }
+
+            qcApprovalAssignmentService.insertIfNotExists(assignmentDTO);
+
             // Evaluate control limits and trigger alerts if needed
-            controlLimitEvaluationService.evaluateAndTriggerAlerts(formTemplateId, userId, formData);
+            controlLimitEvaluationService.evaluateAndTriggerAlerts(formTemplateId, userId, formData, insertedDocument.getObjectId("_id").toString());
 
             // Prepare response
             Map<String, Object> response = new HashMap<>();
@@ -97,4 +126,85 @@ public class QcFormDataController {
             return ResponseEntity.status(500).body("Error inserting form data: " + e.getMessage());
         }
     }
+
+    @PostMapping("/edit-form/{userId}/{collectionName}")
+    public ResponseEntity<?> editFormData(
+            @PathVariable String collectionName,
+            @PathVariable Long userId,
+            @RequestParam("parentId") String parentSubmissionId,
+            @RequestParam("templateId") Long formTemplateId,
+            @RequestBody Map<String, Object> updatedData) {
+        try {
+            // 1. Construct new document (no approval_info here)
+            Map<String, Object> newDoc = new HashMap<>(updatedData);
+            // Fetch parent document
+            Document parent = mongoTemplate.findById(parentSubmissionId, Document.class, collectionName);
+            if (parent == null) {
+                return ResponseEntity.status(404).body("Parent record not found.");
+            }
+
+            enrichNewDocWithParentData(newDoc, parent);
+
+            // Determine version group and version
+            String versionGroupId = parent.getString("version_group_id");
+            Integer parentVersion = parent.getInteger("version");
+
+            if (versionGroupId == null || parentVersion == null) {
+                // First time versioning is introduced
+                versionGroupId = java.util.UUID.randomUUID().toString();
+                parentVersion = 1;
+
+                parent.put("version_group_id", versionGroupId);
+                parent.put("version", parentVersion);
+                mongoTemplate.save(parent, collectionName);  // update parent with version info
+            }
+
+            // Set version info for the new version
+            newDoc.put("version_group_id", versionGroupId);
+            newDoc.put("version", parentVersion + 1);
+            newDoc.put("created_at", new Date());
+            newDoc.put("created_by", userId);
+
+            Map<String, ExceededFieldInfoDTO> exceededInfoMap =
+                    controlLimitEvaluationService.evaluateExceededInfo(formTemplateId, updatedData);
+            newDoc.put("exceeded_info", exceededInfoMap);
+
+            Document inserted = mongoTemplate.insert(new Document(newDoc), collectionName);
+            String newSubmissionId = inserted.getObjectId("_id").toString();
+
+            // Update the approval assignment to point to the new submission id
+            qcApprovalAssignmentService.updateSubmissionId(parentSubmissionId, newSubmissionId);
+
+            // 3. Trigger alerts if needed
+            controlLimitEvaluationService.evaluateAndTriggerAlerts(formTemplateId, userId, updatedData, newSubmissionId);
+
+            // 4. Return response
+            Map<String, Object> res = new HashMap<>();
+            res.put("new_submission_id", newSubmissionId);
+            res.put("message", "Edited form data inserted with parent linkage.");
+            return ResponseEntity.ok(res);
+
+        } catch (Exception e) {
+            log.error("Error editing form data", e);
+            return ResponseEntity.status(500).body("Error editing form data: " + e.getMessage());
+        }
+    }
+
+    private void enrichNewDocWithParentData(Map<String, Object> newDoc, Document parent) {
+        for (Map.Entry<String, Object> entry : parent.entrySet()) {
+            String key = entry.getKey();
+            Object value = entry.getValue();
+
+            if (key.startsWith("related_")) {
+                newDoc.put(key, value);
+            }
+        }
+
+        if (parent.containsKey("approval_info")) {
+            newDoc.put("approval_info", parent.get("approval_info"));
+            parent.remove("approval_info"); // optional: only if you want to clean it from parent
+        }
+    }
+
+
 }

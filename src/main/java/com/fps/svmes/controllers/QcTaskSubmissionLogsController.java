@@ -16,6 +16,7 @@ import org.bson.Document;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @RestController
@@ -150,5 +151,43 @@ public class QcTaskSubmissionLogsController {
             return ResponseEntity.status(500).body("Error deleting submission log: " + e.getMessage());
         }
     }
+
+    @GetMapping("/raw_document")
+    @Operation(summary = "Get raw MongoDB document by submissionId and createdAt (raw, unformatted)")
+    public ResponseEntity<?> getRawMongoDocument(
+            @RequestParam String submissionId,
+            @RequestParam Long qcFormTemplateId,
+            @RequestParam String createdAt // expected: 2025-05-01 16:50:52.427519100
+    ) {
+        try {
+            // Format: "form_template_{templateId}_{yyyyMM}"
+            String collectionSuffix = createdAt.substring(0, 7).replace("-", "");
+            String collectionName = "form_template_" + qcFormTemplateId + "_" + collectionSuffix;
+
+            Document rawDoc = qcTaskSubmissionLogsService.getRawDocumentBySubmissionId(submissionId, collectionName);
+
+            if (rawDoc == null) {
+                return ResponseEntity.status(404).body("Document not found in collection: " + collectionName);
+            }
+
+            return ResponseEntity.ok(rawDoc);
+        } catch (Exception e) {
+            logger.error("Failed to get raw MongoDB document", e);
+            return ResponseEntity.status(500).body("Error retrieving raw document: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/form-template-fields")
+    @Operation(summary = "Get all field key-label-optionItems for a given qcFormTemplateId")
+    public ResponseEntity<?> getFormTemplateFieldKeyLabelPairs(@RequestParam Long qcFormTemplateId) {
+        try {
+            List<Map<String, Object>> result = qcTaskSubmissionLogsService.getFormTemplateFieldList(qcFormTemplateId);
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            logger.error("Failed to get form template field list", e);
+            return ResponseEntity.status(500).body("Error retrieving field list: " + e.getMessage());
+        }
+    }
+
 
 }

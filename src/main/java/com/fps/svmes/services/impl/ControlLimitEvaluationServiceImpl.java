@@ -10,6 +10,7 @@ import com.fps.svmes.services.RecipeService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.time.ZoneOffset;
 import java.util.HashMap;
 import java.util.List;
 import java.math.BigDecimal;
@@ -27,7 +28,7 @@ public class ControlLimitEvaluationServiceImpl implements ControlLimitEvaluation
     private final QcFormTemplateRepository qcFormTemplateRepository;
 
     @Override
-    public void evaluateAndTriggerAlerts(Long templateId, Long userId, Map<String, Object> formData) {
+    public void evaluateAndTriggerAlerts(Long templateId, Long userId, Map<String, Object> formData, String submissionId) {
         var setting = recipeService.getByQcFormTemplateId(templateId);
         if (setting == null || setting.getControlLimits() == null) return;
 
@@ -76,14 +77,15 @@ public class ControlLimitEvaluationServiceImpl implements ControlLimitEvaluation
                     alert.setQcFormTemplateId(templateId);
                     alert.setInspectionItemKey(fieldKey);
                     alert.setInspectionItemLabel(limit.getLabel());
-                    alert.setAlertTime(OffsetDateTime.now());
-                    alert.setCreatedAt(OffsetDateTime.now());
+                    alert.setAlertTime(OffsetDateTime.now(ZoneOffset.UTC));
+                    alert.setCreatedAt(OffsetDateTime.now(ZoneOffset.UTC));
                     alert.setCreatedBy(userId.intValue());
                     alert.setAlertStatus(1);
                     alert.setStatus(1);
                     alert.setRpn(50);
                     alert.setRiskLevelId(1);
-                    alert.setAlertCode("AL" + OffsetDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS")));
+                    alert.setAlertCode("AL" + OffsetDateTime.now(ZoneOffset.UTC).format(DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS")));
+                    alert.setSubmissionId(submissionId);
 
                     // 设置数值型报警信息
                     if (numericValue != null) {

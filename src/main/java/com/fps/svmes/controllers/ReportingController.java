@@ -62,4 +62,13 @@ public class ReportingController {
         return reportingService.fetchQcRecordsFilteredByCreator(formTemplateId, startDateTime, endDateTime, page, size, createdBy);
     }
 
+    @GetMapping("/qc-records/versions")
+    public List<Document> getAllVersionsByGroupId(
+            @RequestParam Long formTemplateId,
+            @RequestParam String versionGroupId
+    ) {
+        return reportingService.fetchAllVersionsByGroupId(formTemplateId, versionGroupId);
+    }
+
+
 }

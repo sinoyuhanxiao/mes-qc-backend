@@ -8,9 +8,13 @@ import com.fps.svmes.models.sql.qcForm.QcFormTemplate;
 import com.fps.svmes.repositories.jpaRepo.qcForm.QcFormTemplateRepository;
 import com.fps.svmes.services.MongoService;
 import com.fps.svmes.services.QcFormTemplateService;
+import com.mongodb.client.MongoClient;
+import com.mongodb.client.MongoCollection;
+import com.mongodb.client.MongoDatabase;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import com.mongodb.client.model.ReplaceOptions;
 
 import org.bson.Document;
 import java.sql.Timestamp;
@@ -26,24 +30,27 @@ import java.util.stream.Collectors;
 public class QcFormTemplateServiceImpl implements QcFormTemplateService {
 
     @Autowired
-    private QcFormTemplateRepository repository;
+    private QcFormTemplateRepository qcFormTemplateRepository;
 
     @Autowired
     private ModelMapper modelMapper;
 
     @Autowired
-    private MongoService mongoService; // Assuming you already have this bean
+    private MongoService mongoService;
+
+    @Autowired
+    private MongoClient mongoClient;
 
     @Override
     public List<QcFormTemplateDTO> getAllActiveTemplates() {
-        return repository.findAllByStatus(1).stream()
+        return qcFormTemplateRepository.findAllByStatus(1).stream()
                 .map(template -> modelMapper.map(template, QcFormTemplateDTO.class))
                 .collect(Collectors.toList());
     }
 
     @Override
     public QcFormTemplateDTO getTemplateById(Long id) {
-        QcFormTemplate template = repository.findById(id).orElseThrow(() -> new RuntimeException("Template not found"));
+        QcFormTemplate template = qcFormTemplateRepository.findById(id).orElseThrow(() -> new RuntimeException("Template not found"));
         return modelMapper.map(template, QcFormTemplateDTO.class);
     }
 
@@ -52,12 +59,13 @@ public class QcFormTemplateServiceImpl implements QcFormTemplateService {
         QcFormTemplate template = modelMapper.map(dto, QcFormTemplate.class);
         template.setCreatedAt(OffsetDateTime.now());
         template.setStatus(1);
-        return modelMapper.map(repository.save(template), QcFormTemplateDTO.class);
+        template.setApprovalType(dto.getApprovalType());
+        return modelMapper.map(qcFormTemplateRepository.save(template), QcFormTemplateDTO.class);
     }
 
     @Override
     public QcFormTemplateDTO updateTemplate(Long id, QcFormTemplateDTO dto) {
-        QcFormTemplate template = repository.findById(id).orElseThrow(() -> new RuntimeException("Template not found"));
+        QcFormTemplate template = qcFormTemplateRepository.findById(id).orElseThrow(() -> new RuntimeException("Template not found"));
 
         if (dto.getName() != null) {
             template.setName(dto.getName());
@@ -67,17 +75,20 @@ public class QcFormTemplateServiceImpl implements QcFormTemplateService {
         } else {
             template.setFormTemplateJson(template.getFormTemplateJson());
         }
+        if (dto.getApprovalType() != null) {
+            template.setApprovalType(dto.getApprovalType());  // 更新审批类型（可选）
+        }
         template.setUpdatedAt(OffsetDateTime.now());
         template.setUpdatedBy(dto.getUpdatedBy());
 
-        return modelMapper.map(repository.save(template), QcFormTemplateDTO.class);
+        return modelMapper.map(qcFormTemplateRepository.save(template), QcFormTemplateDTO.class);
     }
 
     @Override
     public void deleteTemplate(Long id) {
-        QcFormTemplate template = repository.findById(id).orElseThrow(() -> new RuntimeException("Template not found"));
+        QcFormTemplate template = qcFormTemplateRepository.findById(id).orElseThrow(() -> new RuntimeException("Template not found"));
         template.setStatus(0);
-        repository.save(template);
+        qcFormTemplateRepository.save(template);
     }
 
     @Override
@@ -167,7 +178,7 @@ public class QcFormTemplateServiceImpl implements QcFormTemplateService {
 
     @Override
     public String resolveLabelFromTemplateByKey(Long templateId, String fieldKey) {
-        QcFormTemplate template = repository.findById(templateId)
+        QcFormTemplate template = qcFormTemplateRepository.findById(templateId)
                 .orElseThrow(() -> new RuntimeException("Template not found"));
 
         try {
@@ -177,6 +188,63 @@ public class QcFormTemplateServiceImpl implements QcFormTemplateService {
             return findLabelInWidgetList(widgetList, fieldKey);
         } catch (Exception e) {
             throw new RuntimeException("Failed to resolve label from form template", e);
+        }
+    }
+
+    @Override
+    public String getApprovalTypeByFormId(Long formTemplateId) {
+        return qcFormTemplateRepository.findApprovalTypeById(formTemplateId);
+    }
+
+    @Override
+    public void extractAndStoreKeyLabelPairs(QcFormTemplateDTO template) {
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+            JsonNode root = mapper.readTree(template.getFormTemplateJson());
+            JsonNode widgetList = root.get("widgetList");
+
+            List<Map<String, String>> fieldList = new ArrayList<>();
+            extractInputKeyLabelPairs(widgetList, fieldList);
+
+            Document mongoDoc = new Document();
+            mongoDoc.put("qc_form_template_id", template.getId());
+            mongoDoc.put("fields", fieldList);
+
+            mongoService.replaceOne("form_template_key_label_pairs",
+                    new Document("qc_form_template_id", template.getId()),
+                    mongoDoc);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to store key-label pairs", e);
+        }
+    }
+
+    private void extractInputKeyLabelPairs(JsonNode widgetList, List<Map<String, String>> result) {
+        if (widgetList == null || !widgetList.isArray()) return;
+
+        for (JsonNode widget : widgetList) {
+            if (widget.has("formItemFlag") && widget.get("formItemFlag").asBoolean()) {
+                JsonNode options = widget.get("options");
+                if (options != null && options.has("name") && options.has("label")) {
+                    String key = options.get("name").asText();
+                    String label = options.get("label").asText();
+                    Map<String, String> entry = new HashMap<>();
+                    entry.put("key", key);
+                    entry.put("label", label);
+                    result.add(entry);
+                }
+            }
+
+            if (widget.has("widgetList")) {
+                extractInputKeyLabelPairs(widget.get("widgetList"), result);
+            }
+
+            if (widget.has("cols")) {
+                for (JsonNode col : widget.get("cols")) {
+                    if (col.has("widgetList")) {
+                        extractInputKeyLabelPairs(col.get("widgetList"), result);
+                    }
+                }
+            }
         }
     }
 
@@ -203,6 +271,5 @@ public class QcFormTemplateServiceImpl implements QcFormTemplateService {
 
         return null; // not found
     }
-
 
 }

@@ -1,5 +1,7 @@
 package com.fps.svmes.services;
 
+import org.bson.Document;
+
 public interface MongoService {
 
     /**
@@ -24,5 +26,8 @@ public interface MongoService {
      * @param document The document to insert
      */
     void insertOne(String collectionName, org.bson.Document document);
+
+
+    void replaceOne(String collectionName, Document filter, Document newDoc);
 
 }

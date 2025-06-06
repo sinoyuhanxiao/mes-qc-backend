@@ -242,38 +242,30 @@ public class ReportingServiceImpl implements ReportingService {
                 List<Double> chartData = new ArrayList<>();
                 List<String> xaxisData = new ArrayList<>();
 
-                for (Document doc : collection.find(and(
-                        gte("created_at", startDateTime.toInstant().truncatedTo(ChronoUnit.SECONDS).toString()),
-                        lte("created_at", endDateTime.toInstant().truncatedTo(ChronoUnit.SECONDS).toString())))) {
+                for (Document doc : collection.find()) {
+                    Date rawDate = doc.getDate("created_at");
+                    Instant createdAt = rawDate != null ? rawDate.toInstant() : null;
 
-                    if (doc.containsKey(widget.getName())) {
-                        Object value = doc.get(widget.getName());
-                        if (value instanceof Integer) {
-                            chartData.add(((Integer) value).doubleValue());
-                        } else if (value instanceof Double) {
-                            chartData.add((Double) value);
+                    if (createdAt != null &&
+                            !createdAt.isBefore(startDateTime.toInstant()) &&
+                            !createdAt.isAfter(endDateTime.toInstant())) {
+
+                        if (doc.containsKey(widget.getName())) {
+                            Object value = doc.get(widget.getName());
+                            if (value instanceof Integer) {
+                                chartData.add(((Integer) value).doubleValue());
+                            } else if (value instanceof Double) {
+                                chartData.add((Double) value);
+                            }
                         }
-                    }
 
-                    if (doc.containsKey("created_at")) {
-                        String rawTimestamp = doc.getString("created_at");
-
-                        try {
-                            // Correctly parse as LocalDateTime (ignoring timezone)
-                            LocalDateTime dateTime = LocalDateTime.parse(rawTimestamp, formatter);
-
-                            // Convert to UTC if necessary (optional)
-                            // ZonedDateTime utcDateTime = dateTime.atZone(ZoneId.systemDefault()).withZoneSameInstant(ZoneId.of("UTC"));
-
-                            // Format it correctly without nanoseconds
-                            String formattedDate = dateTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
-                            xaxisData.add(formattedDate);
-                        } catch (Exception e) {
-                            System.out.println("Error parsing created_at: " + rawTimestamp + " - " + e.getMessage());
-                        }
+                        // 格式化时间为 "yyyy-MM-dd HH:mm:ss"
+                        String formattedDate = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
+                                .withZone(ZoneId.systemDefault())
+                                .format(createdAt);
+                        xaxisData.add(formattedDate);
                     }
                 }
-
                 updatedWidgets.add(new WidgetDataDTO(widget.getName(), widget.getLabel(), widget.getType(),
                         new ArrayList<>(), chartData, xaxisData));
             }
@@ -345,26 +337,29 @@ public class ReportingServiceImpl implements ReportingService {
         startDateTime = Timestamp.valueOf(startDateTime.toLocalDateTime().atZone(ZoneId.systemDefault()).withZoneSameInstant(ZoneId.of("Asia/Shanghai")).toLocalDateTime());
         endDateTime = Timestamp.valueOf(endDateTime.toLocalDateTime().atZone(ZoneId.systemDefault()).withZoneSameInstant(ZoneId.of("Asia/Shanghai")).toLocalDateTime());
 
-        List<Bson> pipeline = Arrays.asList(
-                match(and(
-                        exists(fieldName, true),
-                        gte("created_at", startDateTime.toString()),
-                        lte("created_at", endDateTime.toString())
-                )),
-                unwind("$" + fieldName),
-                group("$" + fieldName, sum("count", 1))
-        );
+        List<Document> allDocs = collection.find(exists(fieldName, true)).into(new ArrayList<>());
+        List<Document> filteredDocs = new ArrayList<>();
 
-        for (Document doc : collection.aggregate(pipeline)) {
-            Object value = doc.get("_id");
-            Integer count = doc.getInteger("count");
+        for (Document doc : allDocs) {
+            Date rawDate = doc.getDate("created_at");
+            Instant createdAt = rawDate != null ? rawDate.toInstant() : null;
+            if (createdAt != null &&
+                    !createdAt.isBefore(startDateTime.toInstant()) &&
+                    !createdAt.isAfter(endDateTime.toInstant())) {
+                filteredDocs.add(doc);
+            }
+        }
 
-            if (value instanceof Integer) {
-                countMap.put((Integer) value, count);
-            } else if (value instanceof String) {
-                try {
-                    countMap.put(Integer.parseInt((String) value), count);
-                } catch (NumberFormatException ignored) {}
+        for (Document doc : filteredDocs) {
+            Object val = doc.get(fieldName);
+            if (val instanceof List<?>) {
+                for (Object item : (List<?>) val) {
+                    int intVal = Integer.parseInt(item.toString());
+                    countMap.put(intVal, countMap.getOrDefault(intVal, 0) + 1);
+                }
+            } else if (val instanceof Integer) {
+                int intVal = (Integer) val;
+                countMap.put(intVal, countMap.getOrDefault(intVal, 0) + 1);
             }
         }
 
@@ -378,29 +373,36 @@ public class ReportingServiceImpl implements ReportingService {
     public List<Document> fetchQcRecords(Long formTemplateId, String startDateTime, String endDateTime, Integer page, Integer size) {
         MongoDatabase database = mongoClient.getDatabase("dev-mes-qc");
 
-        // Convert time range to UTC before querying
-//        String startUtc = convertToUtcString(startDateTime);
-//        String endUtc = convertToUtcString(endDateTime);
-
         // Get label mappings for formTemplateId
         HashMap<String, Object> optionItemsKeyValueMap = QcFormTemplateOptionItemsKeyValueMapping(formTemplateId);
         HashMap<String, String> keyValueMap = getFormTemplateKeyValueMapping(formTemplateId);
 
-        // Get target collections based on the UTC date range
+        // Get target collections based on the date range
         List<String> collectionNames = getRelevantCollections(database, formTemplateId, startDateTime, endDateTime);
 
-        List<Document> records = new ArrayList<>();
+        Map<String, Document> latestVersionMap = new HashMap<>();
         for (String collectionName : collectionNames) {
             MongoCollection<Document> collection = database.getCollection(collectionName);
-
-            // Query using UTC timestamps
             List<Document> collectionRecords = queryRecords(collection, startDateTime, endDateTime, page, size);
 
-            records.addAll(collectionRecords);
+            for (Document doc : collectionRecords) {
+                String groupId = doc.getString("version_group_id");
+                Integer version = doc.getInteger("version", 0);
+
+                if (groupId != null) {
+                    Document existing = latestVersionMap.get(groupId);
+                    if (existing == null || version > existing.getInteger("version", 0)) {
+                        latestVersionMap.put(groupId, doc);
+                    }
+                } else {
+                    // No versioning info, treat as standalone record
+                    latestVersionMap.put(doc.getObjectId("_id").toString(), doc);
+                }
+            }
         }
 
-        // Convert keys and values before returning
-        return records.stream()
+        // Convert and return only the latest versions
+        return latestVersionMap.values().stream()
                 .map(doc -> formattedResult(doc, optionItemsKeyValueMap, keyValueMap))
                 .collect(Collectors.toList());
     }
@@ -426,8 +428,37 @@ public class ReportingServiceImpl implements ReportingService {
                 .collect(Collectors.toList());
     }
 
+    @Override
+    public List<Document> fetchAllVersionsByGroupId(Long formTemplateId, String versionGroupId) {
+        MongoDatabase database = mongoClient.getDatabase("dev-mes-qc");
 
+        HashMap<String, Object> optionItemsKeyValueMap = QcFormTemplateOptionItemsKeyValueMapping(formTemplateId);
+        HashMap<String, String> keyValueMap = getFormTemplateKeyValueMapping(formTemplateId);
 
+        List<Document> versionedDocs = new ArrayList<>();
+
+        // Loop over all relevant collections in here
+        for (String collectionName : database.listCollectionNames()) {
+            if (!collectionName.startsWith("form_template_" + formTemplateId + "_")) continue;
+
+            MongoCollection<Document> collection = database.getCollection(collectionName);
+
+            List<Document> matches = collection.find(eq("version_group_id", versionGroupId)).into(new ArrayList<>());
+            versionedDocs.addAll(matches);
+        }
+
+        versionedDocs.sort((a, b) -> {
+            Integer v1 = a.getInteger("version", 0);
+            Integer v2 = b.getInteger("version", 0);
+            return v2.compareTo(v1); // latest first
+        });
+
+        return versionedDocs.stream()
+                .map(doc -> formattedResult(doc, optionItemsKeyValueMap, keyValueMap))
+                .collect(Collectors.toList());
+    }
+
+    // TODO: use MongoFormTemplateUtils
     public HashMap<String, String> getFormTemplateKeyValueMapping(Long formId) {
         String formTemplateJson = qcFormTemplateRepository.findFormTemplateJsonById(formId);
 
@@ -482,7 +513,7 @@ public class ReportingServiceImpl implements ReportingService {
         }
     }
 
-
+    // TODO: use MongoFormTemplateUtils
     private Document formattedResult(Document document, HashMap<String, Object> optionItemsKeyValueMap, HashMap<String, String> keyValueMap) {
         Document formattedDocument = new Document();
 
@@ -546,6 +577,7 @@ public class ReportingServiceImpl implements ReportingService {
         return formattedDocument;
     }
 
+    // TODO: use MongoFormTemplateUtils
     private HashMap<String, Object> QcFormTemplateOptionItemsKeyValueMapping(Long formId) {
         String formTemplateJson = qcFormTemplateRepository.findFormTemplateJsonById(formId);
 
@@ -630,22 +662,50 @@ public class ReportingServiceImpl implements ReportingService {
     }
 
     private List<Document> queryRecords(MongoCollection<Document> collection, String startDateTime, String endDateTime, int page, int size) {
-        // ✅ Convert input string dates to the correct MongoDB format: "2025-01-22T21:55:14.982746326"
-        String formattedStartDateTime = convertToMongoDateTimeFormat(startDateTime);
-        String formattedEndDateTime = convertToMongoDateTimeFormat(endDateTime);
+        Instant startInstant = convertStringToInstant(startDateTime);
+        Instant endInstant = convertStringToInstant(endDateTime);
 
-        System.out.println("Querying records with range: " + formattedStartDateTime + " to " + formattedEndDateTime);
+        System.out.println("Querying records with range: " + startInstant + " to " + endInstant);
 
-        List<Bson> filters = Arrays.asList(
-                gte("created_at", formattedStartDateTime),
-                lte("created_at", formattedEndDateTime)
-        );
+        List<Document> allRecords = collection.find().into(new ArrayList<>());
+        List<Document> filtered = new ArrayList<>();
 
-        return collection.find(and(filters))
-                .skip(page * size)  // Pagination: skip past (page * size) records
-                .limit(size)        // Limit results to `size` per page
-                .into(new ArrayList<>());
+        for (Document doc : allRecords) {
+            Date rawDate = doc.getDate("created_at");
+            Instant createdAt = rawDate != null ? rawDate.toInstant() : null;
+
+            if (createdAt != null && !createdAt.isBefore(startInstant) && !createdAt.isAfter(endInstant)) {
+                filtered.add(doc);
+            }
+        }
+
+        return filtered.stream()
+                .skip(page * size)
+                .limit(size)
+                .collect(Collectors.toList());
     }
+
+    private Instant convertStringToInstant(String dateTime) {
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+        LocalDateTime localDateTime = LocalDateTime.parse(dateTime, formatter);
+        return localDateTime.atZone(ZoneId.of("UTC")).toInstant(); // Force UTC zone
+    }
+
+    private Instant convertMongoCreatedAtStringToInstant(String mongoDateTime) {
+        try {
+            if (mongoDateTime.length() >= 29) { // nanosecond precision
+                return Instant.parse(mongoDateTime.substring(0, 26) + "Z"); // truncate to microsecond precision
+            } else if (mongoDateTime.length() >= 26) {
+                return Instant.parse(mongoDateTime.substring(0, 26) + "Z");
+            } else {
+                return Instant.parse(mongoDateTime + "Z");
+            }
+        } catch (Exception e) {
+            System.out.println("Error parsing MongoDB created_at: " + mongoDateTime + " - " + e.getMessage());
+            return null;
+        }
+    }
+
 
     /**
      * ✅ Converts "yyyy-MM-dd HH:mm:ss" to MongoDB's "yyyy-MM-dd'T'HH:mm:ss.SSSSSSSSS" format.

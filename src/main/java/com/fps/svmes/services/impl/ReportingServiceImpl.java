@@ -98,7 +98,8 @@ public class ReportingServiceImpl implements ReportingService {
                     existingWidget.getXaxisData().addAll(newWidget.getXaxisData());
 
                     List<Map.Entry<String, Double>> sortedEntries = new ArrayList<>();
-                    for (int i = 0; i < existingWidget.getXaxisData().size(); i++) {
+                    int size = Math.min(existingWidget.getXaxisData().size(), existingWidget.getChartData().size());
+                    for (int i = 0; i < size; i++) {
                         sortedEntries.add(Map.entry(existingWidget.getXaxisData().get(i), existingWidget.getChartData().get(i)));
                     }
                     sortedEntries.sort(Map.Entry.comparingByKey());

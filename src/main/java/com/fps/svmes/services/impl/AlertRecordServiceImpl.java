@@ -293,7 +293,7 @@ public class AlertRecordServiceImpl implements AlertRecordService {
 
         AlertRecordDTO oldDto = modelMapper.map(entity, AlertRecordDTO.class);
 
-        int newStatus = newRpn < 100 ? 2 : 1;
+        int newStatus = newRpn < 20 ? 2 : 1;
 
         entity.setRpn(newRpn);
         // Set risk level according to tooltip rules

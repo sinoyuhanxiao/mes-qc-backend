@@ -30,6 +30,7 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 @Service
@@ -178,10 +179,14 @@ public class QcApprovalAssignmentServiceImpl implements QcApprovalAssignmentServ
         currentStep.put("status", "completed");
 
         // Step 4: Advance next step
+        Document nextStep = null;
+        AtomicReference<String> nextRoleRef = new AtomicReference<>(null);
+
         if (currentIndex + 1 < approvalInfo.size()) {
-            Document nextStep = approvalInfo.get(currentIndex + 1);
-            String nextRole = nextStep.getString("role");
-            if ("supervisor".equals(nextRole)) {
+            nextStep = approvalInfo.get(currentIndex + 1);
+            nextRoleRef.set(nextStep.getString("role"));
+
+            if ("supervisor".equals(nextRoleRef.get())) {
                 nextStep.put("status", "pending");
             } else {
                 nextStep.put("status", "completed");
@@ -197,20 +202,25 @@ public class QcApprovalAssignmentServiceImpl implements QcApprovalAssignmentServ
 
         // Step 6: Update PostgreSQL snapshot state
         repository.findBySubmissionId(submissionId).ifPresent(snapshot -> {
-            // Determine next PostgreSQL state
+            String nextRole = nextRoleRef.get();
             String updatedState;
             if ("leader".equals(approverRole)) {
-                updatedState = "pending_supervisor";
+                if ("archive".equals(nextRole)) {
+                    updatedState = "fully_approved";
+                } else {
+                    updatedState = "pending_supervisor";
+                }
             } else if ("supervisor".equals(approverRole)) {
                 updatedState = "fully_approved";
             } else {
-                updatedState = "pending_leader"; // fallback/default
+                updatedState = "pending_leader";
             }
 
             snapshot.setState(updatedState);
             snapshot.setUpdatedAt(OffsetDateTime.now());
             repository.save(snapshot);
         });
+
 
     }
 

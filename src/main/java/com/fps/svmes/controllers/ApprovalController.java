@@ -12,6 +12,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.web.bind.annotation.*;
 import org.bson.Document;
 
@@ -59,10 +60,18 @@ public class ApprovalController {
             @RequestParam(required = false) String approvalType,
             @RequestParam(required = false) String templateName,
             @RequestParam(required = false) String startDate,
-            @RequestParam(required = false) String endDate
+            @RequestParam(required = false) String endDate,
+            @RequestParam(required = false) String sortBy,
+            @RequestParam(required = false) String sortDirection
     ) {
         try {
-            Pageable pageable = PageRequest.of(page, size);
+            Sort sort = Sort.unsorted();
+            if (sortBy != null && !sortBy.isBlank()) {
+                sort = "desc".equalsIgnoreCase(sortDirection) ?
+                        Sort.by(sortBy).descending() :
+                        Sort.by(sortBy).ascending();
+            }
+            Pageable pageable = PageRequest.of(page, size, sort);
             Page<QcApprovalAssignmentDTO> result = approvalAssignmentService.getFilteredAssignments(
                     state, approvalType, templateName, startDate, endDate, pageable
             );

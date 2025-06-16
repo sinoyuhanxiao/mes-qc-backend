@@ -25,9 +25,10 @@ public interface TeamUserRepository extends JpaRepository<TeamUser, Integer> {
 
     void deleteById(TeamUserId teamUserId);
 
-    @Query("SELECT new com.fps.svmes.dto.dtos.user.TeamForUserTableDTO(s.id, s.name, s.leader.name) " +
+    @Query("SELECT new com.fps.svmes.dto.dtos.user.TeamForUserTableDTO(s.id, s.name, l.name) " +
             "FROM TeamUser su " +
             "JOIN su.team s " +
+            "LEFT JOIN s.leader l " +
             "WHERE su.id.userId = :userId")
     List<TeamForUserTableDTO> findTeamsByUserId(@Param("userId") Integer userId);
 

@@ -48,7 +48,9 @@ public class TeamController {
             teamUserService.assignUsersToTeam(createdTeam.getId(), teamRequest.getMemberIds());
 
             // Sync leader as a member for all ascendant teams
-            teamUserService.assignUserToTeams(teamRequest.getLeaderId(), List.of(createdTeam.getId()));
+            if (teamRequest.getLeaderId() != null) {
+                teamUserService.assignUserToTeams(teamRequest.getLeaderId(), List.of(createdTeam.getId()));
+            }
 
             // Setup form associations
             for (String formId: teamRequest.getFormIds()) {
@@ -87,7 +89,9 @@ public class TeamController {
             teamService.syncSelfAndDescendantTeamMembers(id, memberIds);
 
             // Sync leader as a member for all ascendant teams
-            teamUserService.assignUserToTeams(teamRequest.getLeaderId(), List.of(updatedTeam.getId()));
+            if (teamRequest.getLeaderId() != null) {
+                teamUserService.assignUserToTeams(teamRequest.getLeaderId(), List.of(updatedTeam.getId()));
+            }
 
             // Sync Form associations
             List<String> formIds = teamRequest.getFormIds();

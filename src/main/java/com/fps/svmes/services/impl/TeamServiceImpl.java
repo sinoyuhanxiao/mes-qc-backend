@@ -126,8 +126,12 @@ public class TeamServiceImpl implements TeamService {
                 // Remove previous leader from the member list
                 teamUserService.removeUserFromTeam(newLeader.getId(), otherTeam.getId());
 
-                // Add leader as a member to other team
-                teamUserService.assignUserToTeams(oldLeader.getId(), List.of(otherTeam.getId()));
+                if (oldLeader != null)
+                {
+                    // Add leader as a member to other team
+                    teamUserService.assignUserToTeams(oldLeader.getId(), List.of(otherTeam.getId()));
+                }
+
 
                 if (teamRequest.getUpdatedBy() != null) {
                     otherTeam.setUpdateDetails(teamRequest.getUpdatedBy(), otherTeam.getStatus());

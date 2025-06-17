@@ -132,12 +132,16 @@ public class MongoFormTemplateUtils {
                 List<?> valueList = (List<?>) value;
                 HashMap<String, String> labelMap = (HashMap<String, String>) optionItemsKeyValueMap.get(key);
                 List<String> resolvedLabels = valueList.stream()
-                        .map(val -> labelMap.getOrDefault(val.toString(), val.toString()))
+                        .map(val -> val != null ? labelMap.getOrDefault(val.toString(), val.toString()) : null)
                         .collect(Collectors.toList());
                 formatted.put(displayKey, resolvedLabels);
             } else if (optionItemsKeyValueMap.containsKey(key)) {
                 HashMap<String, String> labelMap = (HashMap<String, String>) optionItemsKeyValueMap.get(key);
-                formatted.put(displayKey, labelMap.getOrDefault(value.toString(), value.toString()));
+                if (value != null) {
+                    formatted.put(displayKey, labelMap.getOrDefault(value.toString(), value.toString()));
+                } else {
+                    formatted.put(displayKey, null);
+                }
             } else {
                 formatted.put(displayKey, value);
             }

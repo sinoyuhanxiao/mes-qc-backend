@@ -176,7 +176,7 @@ public class QcFormDataController {
             qcApprovalAssignmentService.updateSubmissionId(parentSubmissionId, newSubmissionId);
 
             // 3. Trigger alerts if needed
-            controlLimitEvaluationService.evaluateAndTriggerAlerts(formTemplateId, userId, updatedData, newSubmissionId);
+            controlLimitEvaluationService.evaluateAndTriggerAlerts(formTemplateId, userId, newDoc, newSubmissionId);
 
             // 4. Return response
             Map<String, Object> res = new HashMap<>();

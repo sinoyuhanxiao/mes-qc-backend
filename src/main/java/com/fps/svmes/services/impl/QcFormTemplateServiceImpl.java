@@ -115,7 +115,7 @@ public class QcFormTemplateServiceImpl implements QcFormTemplateService {
                     String label = options.get("label").asText();
 
                     ObjectNode limit = mapper.createObjectNode();
-                    limit.put("upper_control_limit", 100.00); // 可选从 options.get("max")
+                    limit.put("upper_control_limit", 99999.00); // 可选从 options.get("max")
                     limit.put("lower_control_limit", 0.00);   // 可选从 options.get("min")
                     limit.put("label", label);
 

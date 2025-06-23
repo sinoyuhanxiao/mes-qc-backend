@@ -10,10 +10,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import jakarta.transaction.Transactional;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 
 @Service
 public class FormNodeServiceImpl implements FormNodeService {
@@ -173,6 +170,56 @@ public class FormNodeServiceImpl implements FormNodeService {
             }
         }
         return Optional.empty(); // Node not found
+    }
+
+    @Override
+    public boolean moveNode(String movingNodeId, String newParentId) {
+        List<FormNode> roots = repository.findAll();
+        for (FormNode root : roots) {
+            FormNode movingNode = extractAndRemoveNode(root, movingNodeId);
+            if (movingNode == null) continue;
+
+            if (isDescendantOf(movingNode, newParentId)) return false;
+
+            FormNode targetFolder = findNodeById(root, newParentId);
+            if (targetFolder != null && "folder".equals(targetFolder.getNodeType())) {
+                if (targetFolder.getChildren() == null) targetFolder.setChildren(new ArrayList<>());
+                targetFolder.getChildren().add(movingNode);
+                repository.save(root);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private FormNode findNodeById(FormNode currentNode, String id) {
+        return findNodeByIdOrUuid(currentNode, id).orElse(null);
+    }
+
+    private FormNode extractAndRemoveNode(FormNode current, String targetId) {
+        if (current.getChildren() == null) return null;
+
+        Iterator<FormNode> iterator = current.getChildren().iterator();
+        while (iterator.hasNext()) {
+            FormNode child = iterator.next();
+            if (child.getId().equals(targetId)) {
+                iterator.remove();
+                return child;
+            }
+            FormNode result = extractAndRemoveNode(child, targetId);
+            if (result != null) return result;
+        }
+        return null;
+    }
+
+    private boolean isDescendantOf(FormNode node, String possibleChildId) {
+        if (node.getChildren() == null) return false;
+
+        for (FormNode child : node.getChildren()) {
+            if (child.getId().equals(possibleChildId)) return true;
+            if (isDescendantOf(child, possibleChildId)) return true;
+        }
+        return false;
     }
 
     // Helper method for recursive traversal

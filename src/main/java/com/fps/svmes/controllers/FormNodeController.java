@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/form-nodes")
@@ -60,5 +61,13 @@ public class FormNodeController {
         return updated.map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
+
+    @PutMapping("/{id}/move")
+    public ResponseEntity<?> moveNode(@PathVariable String id, @RequestBody Map<String, String> payload) {
+        String newParentId = payload.get("newParentId");
+        boolean moved = service.moveNode(id, newParentId);
+        return moved ? ResponseEntity.ok().build() : ResponseEntity.badRequest().body("Move failed");
+    }
+
 
 }

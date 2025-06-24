@@ -13,4 +13,5 @@ public interface FormNodeService {
     boolean deleteNodeByIdOrUuid(String id);
     List<FormNode> getNodesWithLabelContaining(String keyword);
     Optional<FormNode> updateNodeById(String id, FormNode updatedNode);
+    boolean moveNode(String nodeId, String newParentId);
 }

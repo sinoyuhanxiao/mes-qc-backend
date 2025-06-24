@@ -1,0 +1,49 @@
+name: Sync Fork (master, dev, feature/edit-form)
+
+on:
+  schedule:
+    - cron: '0 1 * * *'     # Runs daily at 01:00 UTC
+  workflow_dispatch:         # Allows manual run
+
+jobs:
+  sync-master:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Sync master branch
+        uses: tgymnich/fork-sync@v1.8
+        with:
+          owner: FPS-Food-Process-Solutions-Corp
+          repo: mes-qc-backend
+          base: master
+          head: master
+          ignore_fail: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  sync-dev:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Sync dev branch
+        uses: tgymnich/fork-sync@v1.8
+        with:
+          owner: FPS-Food-Process-Solutions-Corp
+          repo: mes-qc-backend
+          base: dev
+          head: dev
+          ignore_fail: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  sync-feature-edit-form:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Sync feature/edit-form branch
+        uses: tgymnich/fork-sync@v1.8
+        with:
+          owner: FPS-Food-Process-Solutions-Corp
+          repo: mes-qc-backend
+          base: feature/edit-form
+          head: feature/edit-form
+          ignore_fail: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

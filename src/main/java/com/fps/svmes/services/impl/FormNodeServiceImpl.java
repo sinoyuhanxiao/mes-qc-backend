@@ -175,26 +175,78 @@ public class FormNodeServiceImpl implements FormNodeService {
     @Override
     public boolean moveNode(String movingNodeId, String newParentId) {
         List<FormNode> roots = repository.findAll();
+
+        FormNode movingNode = null;
+        FormNode fromRoot = null;
+        boolean isRootNode = false;
+
+        // Step 1: Locate the moving node and its origin root
+        Iterator<FormNode> rootIter = roots.iterator();
+        while (rootIter.hasNext()) {
+            FormNode root = rootIter.next();
+
+            if (root.getId().equals(movingNodeId)) {
+                movingNode = root;
+                fromRoot = root;
+                isRootNode = true;
+                rootIter.remove(); // prepare for reinsertion
+                break;
+            }
+
+            movingNode = extractAndRemoveNode(root, movingNodeId);
+            if (movingNode != null) {
+                fromRoot = root;
+                break;
+            }
+        }
+
+        if (movingNode == null) {
+            logger.warn("❌ Moving node not found: {}", movingNodeId);
+            return false;
+        }
+
+        // Special case: Move to top-level (i.e., no parent)
+        if ("root".equalsIgnoreCase(newParentId)) {
+            repository.save(movingNode); // save as a new root document
+            if (!isRootNode) {
+                repository.save(fromRoot); // persist where it was removed from
+            } else {
+                repository.deleteById(movingNodeId); // cleanup duplicate
+            }
+            return true;
+        }
+
+        // Prevent loop: do not move under its own descendant
+        if (isDescendantOf(movingNode, newParentId)) {
+            logger.warn("⛔ Cannot move a node into its own descendant: {}", newParentId);
+            return false;
+        }
+
+        // Step 2: Find the target folder
         for (FormNode root : roots) {
-            FormNode movingNode = extractAndRemoveNode(root, movingNodeId);
-            if (movingNode == null) continue;
-
-            if (isDescendantOf(movingNode, newParentId)) return false;
-
-            FormNode targetFolder = findNodeById(root, newParentId);
+            FormNode targetFolder = findNodeByIdOrUuid(root, newParentId).orElse(null);
             if (targetFolder != null && "folder".equals(targetFolder.getNodeType())) {
-                if (targetFolder.getChildren() == null) targetFolder.setChildren(new ArrayList<>());
+                if (targetFolder.getChildren() == null) {
+                    targetFolder.setChildren(new ArrayList<>());
+                }
+
                 targetFolder.getChildren().add(movingNode);
+
+                if (!isRootNode) {
+                    repository.save(fromRoot);
+                } else {
+                    repository.deleteById(movingNodeId);
+                }
+
                 repository.save(root);
                 return true;
             }
         }
+
+        logger.warn("❌ Target folder not found or not a folder: {}", newParentId);
         return false;
     }
 
-    private FormNode findNodeById(FormNode currentNode, String id) {
-        return findNodeByIdOrUuid(currentNode, id).orElse(null);
-    }
 
     private FormNode extractAndRemoveNode(FormNode current, String targetId) {
         if (current.getChildren() == null) return null;

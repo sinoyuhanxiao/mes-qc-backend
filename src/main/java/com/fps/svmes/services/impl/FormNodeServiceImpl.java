@@ -10,10 +10,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import jakarta.transaction.Transactional;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 
 @Service
 public class FormNodeServiceImpl implements FormNodeService {
@@ -173,6 +170,108 @@ public class FormNodeServiceImpl implements FormNodeService {
             }
         }
         return Optional.empty(); // Node not found
+    }
+
+    @Override
+    public boolean moveNode(String movingNodeId, String newParentId) {
+        List<FormNode> roots = repository.findAll();
+
+        FormNode movingNode = null;
+        FormNode fromRoot = null;
+        boolean isRootNode = false;
+
+        // Step 1: Locate the moving node and its origin root
+        Iterator<FormNode> rootIter = roots.iterator();
+        while (rootIter.hasNext()) {
+            FormNode root = rootIter.next();
+
+            if (root.getId().equals(movingNodeId)) {
+                movingNode = root;
+                fromRoot = root;
+                isRootNode = true;
+                rootIter.remove(); // prepare for reinsertion
+                break;
+            }
+
+            movingNode = extractAndRemoveNode(root, movingNodeId);
+            if (movingNode != null) {
+                fromRoot = root;
+                break;
+            }
+        }
+
+        if (movingNode == null) {
+            logger.warn("❌ Moving node not found: {}", movingNodeId);
+            return false;
+        }
+
+        // Special case: Move to top-level (i.e., no parent)
+        if ("root".equalsIgnoreCase(newParentId)) {
+            repository.save(movingNode); // save as a new root document
+            if (!isRootNode) {
+                repository.save(fromRoot); // persist where it was removed from
+            } else {
+                repository.deleteById(movingNodeId); // cleanup duplicate
+            }
+            return true;
+        }
+
+        // Prevent loop: do not move under its own descendant
+        if (isDescendantOf(movingNode, newParentId)) {
+            logger.warn("⛔ Cannot move a node into its own descendant: {}", newParentId);
+            return false;
+        }
+
+        // Step 2: Find the target folder
+        for (FormNode root : roots) {
+            FormNode targetFolder = findNodeByIdOrUuid(root, newParentId).orElse(null);
+            if (targetFolder != null && "folder".equals(targetFolder.getNodeType())) {
+                if (targetFolder.getChildren() == null) {
+                    targetFolder.setChildren(new ArrayList<>());
+                }
+
+                targetFolder.getChildren().add(movingNode);
+
+                if (!isRootNode) {
+                    repository.save(fromRoot);
+                } else {
+                    repository.deleteById(movingNodeId);
+                }
+
+                repository.save(root);
+                return true;
+            }
+        }
+
+        logger.warn("❌ Target folder not found or not a folder: {}", newParentId);
+        return false;
+    }
+
+
+    private FormNode extractAndRemoveNode(FormNode current, String targetId) {
+        if (current.getChildren() == null) return null;
+
+        Iterator<FormNode> iterator = current.getChildren().iterator();
+        while (iterator.hasNext()) {
+            FormNode child = iterator.next();
+            if (child.getId().equals(targetId)) {
+                iterator.remove();
+                return child;
+            }
+            FormNode result = extractAndRemoveNode(child, targetId);
+            if (result != null) return result;
+        }
+        return null;
+    }
+
+    private boolean isDescendantOf(FormNode node, String possibleChildId) {
+        if (node.getChildren() == null) return false;
+
+        for (FormNode child : node.getChildren()) {
+            if (child.getId().equals(possibleChildId)) return true;
+            if (isDescendantOf(child, possibleChildId)) return true;
+        }
+        return false;
     }
 
     // Helper method for recursive traversal

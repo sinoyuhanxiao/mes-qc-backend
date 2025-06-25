@@ -2,7 +2,7 @@ name: Sync Fork (master, dev, feature/edit-form)
 
 on:
   schedule:
-    - cron: '0 1 * * *'     # Runs daily at 01:00 UTC
+    - cron: '* * * * *'     # Runs daily at 01:00 UTC
   workflow_dispatch:         # Allows manual run
 
 jobs:

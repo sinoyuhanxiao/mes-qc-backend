@@ -2,6 +2,7 @@ package com.fps.svmes.services.impl;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fps.svmes.dto.PagedResultDTO;
 import com.fps.svmes.dto.dtos.reporting.OptionItemDTO;
 import com.fps.svmes.dto.dtos.reporting.WidgetDataDTO;
 import com.fps.svmes.repositories.jpaRepo.qcForm.QcFormTemplateRepository;
@@ -23,13 +24,19 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
-import java.time.temporal.ChronoUnit;
+import java.time.format.DateTimeParseException;
 import java.util.*;
 import java.util.stream.Collectors;
 
-import static com.mongodb.client.model.Aggregates.*;
 import static com.mongodb.client.model.Filters.*;
-import static com.mongodb.client.model.Accumulators.sum;
+import static com.mongodb.client.model.Sorts.ascending;
+import static com.mongodb.client.model.Sorts.descending;
+
+import java.util.List;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.Optional;
+import java.util.stream.Stream;
 
 @Service
 public class ReportingServiceImpl implements ReportingService {
@@ -430,6 +437,186 @@ public class ReportingServiceImpl implements ReportingService {
     }
 
     @Override
+    public PagedResultDTO<Document> fetchQcRecordsPaged(
+            Long formTemplateId,
+            String startDateTime,
+            String endDateTime,
+            Integer page,
+            Integer size,
+            String sort,
+            String search
+    ) {
+        MongoDatabase database = mongoClient.getDatabase("dev-mes-qc");
+
+        // Get label mappings
+        HashMap<String, Object> optionItemsKeyValueMap = QcFormTemplateOptionItemsKeyValueMapping(formTemplateId);
+        HashMap<String, String> keyValueMap = getFormTemplateKeyValueMapping(formTemplateId);
+
+        // Identify relevant collections
+        List<String> collectionNames = getRelevantCollections(database, formTemplateId, startDateTime, endDateTime);
+
+        Map<String, Document> latestVersionMap = new HashMap<>();
+
+        for (String collectionName : collectionNames) {
+            MongoCollection<Document> collection = database.getCollection(collectionName);
+
+            List<Document> allDocs = queryRecords(collection, startDateTime, endDateTime, 0, Integer.MAX_VALUE);
+            for (Document doc : allDocs) {
+                String groupId = doc.getString("version_group_id");
+                Integer version = doc.getInteger("version", 0);
+
+                if (groupId != null) {
+                    Document existing = latestVersionMap.get(groupId);
+                    if (existing == null || version > existing.getInteger("version", 0)) {
+                        latestVersionMap.put(groupId, doc);
+                    }
+                } else {
+                    latestVersionMap.put(doc.getObjectId("_id").toString(), doc);
+                }
+            }
+        }
+
+        // Filtering (search)
+        Stream<Document> stream = latestVersionMap.values().stream();
+        if (search != null && !search.isEmpty()) {
+            String lower = search.toLowerCase();
+            stream = stream.filter(doc ->
+                    doc.values().stream().anyMatch(v ->
+                            v != null && v.toString().toLowerCase().contains(lower)
+                    )
+            );
+        }
+
+        // Sorting
+        if (sort != null && sort.contains(",")) {
+            String[] parts = sort.split(",", 2);
+            String field = parts[0];
+            boolean desc = "desc".equalsIgnoreCase(parts[1]);
+            Comparator<Document> cmp;
+            if ("created_at".equals(field)) {
+                cmp = Comparator.comparing(d -> Optional.ofNullable(d.getDate("created_at")).orElse(new Date(0)));
+            } else {
+                cmp = Comparator.comparing(d -> Optional.ofNullable(d.get(field)).map(Object::toString).orElse(""));
+            }
+            if (desc) cmp = cmp.reversed();
+            stream = stream.sorted(cmp);
+        }
+
+        // Pagination
+        List<Document> filtered = stream.collect(Collectors.toList());
+        long total = filtered.size();
+        int from = page * size;
+        int to = Math.min(from + size, filtered.size());
+        List<Document> pageContent = (from >= filtered.size())
+                ? Collections.emptyList()
+                : filtered.subList(from, to);
+
+        // Final formatting
+        List<Document> formattedDocs = pageContent.stream()
+                .map(doc -> formattedResult(doc, optionItemsKeyValueMap, keyValueMap))
+                .collect(Collectors.toList());
+
+        int totalPages = (int) Math.ceil((double) total / size);
+        return new PagedResultDTO<>(
+                formattedDocs,
+                total,
+                totalPages,
+                page,
+                size
+        );
+    }
+
+
+    /**
+     * 将 "field,asc|desc" 转换为 MongoDB 排序 Bson
+     */
+    private Bson parseSortBson(String sort) {
+        if (sort == null || !sort.contains(",")) {
+            return ascending("_id");
+        }
+        String[] parts = sort.split(",", 2);
+        return "desc".equalsIgnoreCase(parts[1])
+                ? descending(parts[0])
+                : ascending(parts[0]);
+    }
+
+    @Override
+    public List<Document> fetchAllRecordsWithoutPagination(Long formTemplateId,
+                                                           String startDateTime,
+                                                           String endDateTime,
+                                                           String search,
+                                                           String sort) {
+
+        MongoDatabase database = mongoClient.getDatabase("dev-mes-qc");
+
+        // label / optionItems 映射
+        HashMap<String, Object> optionItemsKeyValueMap = QcFormTemplateOptionItemsKeyValueMapping(formTemplateId);
+        HashMap<String, String> keyValueMap            = getFormTemplateKeyValueMapping(formTemplateId);
+
+        // 找到时间范围内相关集合
+        List<String> collectionNames = getRelevantCollections(database, formTemplateId,
+                startDateTime, endDateTime);
+
+        /** ---------- 1. 取最新版本 ---------- */
+        Map<String, Document> latestVersionMap = new HashMap<>();
+
+        for (String colName : collectionNames) {
+            MongoCollection<Document> col = database.getCollection(colName);
+
+            // **0, Integer.MAX_VALUE** ：一次性取完
+            List<Document> docs = queryRecords(col, startDateTime, endDateTime, 0, Integer.MAX_VALUE);
+
+            for (Document d : docs) {
+                String gid      = d.getString("version_group_id");
+                Integer version = d.getInteger("version", 0);
+
+                if (gid != null) {
+                    Document existing = latestVersionMap.get(gid);
+                    if (existing == null || version > existing.getInteger("version", 0)) {
+                        latestVersionMap.put(gid, d);
+                    }
+                } else {
+                    latestVersionMap.put(d.getObjectId("_id").toString(), d);
+                }
+            }
+        }
+
+        /** ---------- 2. 关键词过滤 ---------- */
+        Stream<Document> stream = latestVersionMap.values().stream();
+        if (search != null && !search.isEmpty()) {
+            String kw = search.toLowerCase();
+            stream = stream.filter(doc ->
+                    doc.values().stream().anyMatch(v ->
+                            v != null && v.toString().toLowerCase().contains(kw)
+                    )
+            );
+        }
+
+        /** ---------- 3. 排序 ---------- */
+        if (sort != null && sort.contains(",")) {
+            String[] parts   = sort.split(",", 2);
+            String field     = parts[0];
+            boolean desc     = "desc".equalsIgnoreCase(parts[1]);
+
+            Comparator<Document> cmp;
+            if ("created_at".equals(field)) {
+                cmp = Comparator.comparing(d ->
+                        Optional.ofNullable(d.getDate("created_at")).orElse(new Date(0)));
+            } else {
+                cmp = Comparator.comparing(d ->
+                        Optional.ofNullable(d.get(field)).map(Object::toString).orElse(""));
+            }
+            if (desc) cmp = cmp.reversed();
+            stream = stream.sorted(cmp);
+        }
+
+        /** ---------- 4. 最终格式化 ---------- */
+        return stream
+                .map(doc -> formattedResult(doc, optionItemsKeyValueMap, keyValueMap))
+                .collect(Collectors.toList());
+    }
+
+    @Override
     public List<Document> fetchAllVersionsByGroupId(Long formTemplateId, String versionGroupId) {
         MongoDatabase database = mongoClient.getDatabase("dev-mes-qc");
 
@@ -666,8 +853,8 @@ public class ReportingServiceImpl implements ReportingService {
         Instant startInstant = convertStringToInstant(startDateTime);
         Instant endInstant = convertStringToInstant(endDateTime);
 
+//
         System.out.println("Querying records with range: " + startInstant + " to " + endInstant);
-
         List<Document> allRecords = collection.find().into(new ArrayList<>());
         List<Document> filtered = new ArrayList<>();
 
@@ -687,9 +874,15 @@ public class ReportingServiceImpl implements ReportingService {
     }
 
     private Instant convertStringToInstant(String dateTime) {
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-        LocalDateTime localDateTime = LocalDateTime.parse(dateTime, formatter);
-        return localDateTime.atZone(ZoneId.of("UTC")).toInstant(); // Force UTC zone
+        try {
+            // Expected format: "yyyy-MM-dd HH:mm:ss"
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+            LocalDateTime localDateTime = LocalDateTime.parse(dateTime, formatter);
+            return localDateTime.atZone(ZoneId.systemDefault()).toInstant();
+        } catch (DateTimeParseException e) {
+            // Fallback if Swagger or frontend passes "2025-06-01T14:00:00Z"
+            return Instant.parse(dateTime);
+        }
     }
 
     private Instant convertMongoCreatedAtStringToInstant(String mongoDateTime) {

@@ -39,4 +39,7 @@ public class UserDTO extends CommonDTO {
 
     @JsonProperty("teams")
     private List<TeamForUserTableDTO> teams;
+
+    @JsonProperty("leadership_teams")
+    private List<Integer> leadershipTeams;
 }

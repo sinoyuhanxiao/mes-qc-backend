@@ -17,6 +17,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -52,6 +53,16 @@ public class UserServiceImpl implements UserService {
 
                     // Fetch teams directly using the repository method that returns TeamForUserTableDTO
                     List<TeamForUserTableDTO> teams = teamUserRepository.findTeamsByUserId(user.getId());
+
+                    // Check if user is leader of any team, and return list of these ids.
+                    Team leaderTeam = teamRepository.findByLeaderId(user.getId());
+                    if (leaderTeam != null){
+                        List<Integer> t = new ArrayList<Integer>();
+                        t.add(leaderTeam.getId());
+                        userDTO.setLeadershipTeams(t);
+                    } else {
+                        userDTO.setLeadershipTeams(null);
+                    }
 
                     // Assign the mapped teams to the UserDTO
                     userDTO.setTeams(teams);

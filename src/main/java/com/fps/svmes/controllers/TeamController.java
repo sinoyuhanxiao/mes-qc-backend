@@ -111,6 +111,37 @@ public class TeamController {
     }
 
     /**
+     * Change an existing team leader, if leader or team does not exist then the operation is skip.
+     *
+     * @param teamId ID of the team to update
+     * @param leaderId user ID to set as leader of the target team
+     *
+     */
+    @PutMapping("/leadership/{teamId}/{leaderId}")
+    @Operation(summary = "Change an existing team's leader", description = "Change an existing team's leader'")
+    public ResponseResult<Void> setTeamLeader(@PathVariable Integer teamId, @PathVariable Integer leaderId) {
+        try {
+            teamService.setTeamLeader(teamId, leaderId);
+            return ResponseResult.success();
+        } catch (Exception e) {
+            logger.error("Error setting leader for team", e);
+            return ResponseResult.fail("Failed to set leader for team");
+        }
+    }
+
+    @PutMapping("/leadership/{teamId}")
+    @Operation(summary = "Set leader as null for an existing team", description = "Set leader as null for an existing team")
+    public ResponseResult<Void> clearTeamLeader(@PathVariable Integer teamId) {
+        try {
+            teamService.clearTeamLeader(teamId);
+            return ResponseResult.success();
+        } catch (Exception e) {
+            logger.error("Error clearing leader for team", e);
+            return ResponseResult.fail("Failed to clear leader for team");
+        }
+    }
+
+    /**
      * Get a specific team by ID.
      *
      * @param id Team ID
@@ -184,6 +215,24 @@ public class TeamController {
     }
 
     /**
+     * Check user's current team leadership association, remove the association if invalid
+     *
+     * @param userId ID of the user to check leadership
+     * @return Void
+     */
+    @PostMapping("/leadership/{userId}")
+    @Operation(summary = "Check user's leading team association and remove association if invalid (ascendant team membership missing)")
+    public ResponseResult<Void> removeOrphanLeadership(@PathVariable Integer userId) {
+        try {
+            teamService.removeOrphanLeadership(userId);
+            return ResponseResult.success();
+        } catch (Exception e) {
+            logger.error("Error removing orphan user's team leadership", e);
+            return ResponseResult.fail("Failed to removing orphan user's team leadership", e);
+        }
+    }
+
+    /**
      * Hard delete a team.
      *
      * @param id ID of the team to hard delete
@@ -248,4 +297,7 @@ public class TeamController {
             return ResponseResult.fail("Failed to get team depth", e);
         }
     }
+
+
+
 }

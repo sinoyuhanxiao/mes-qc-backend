@@ -9,6 +9,8 @@ import java.util.List;
 public interface TeamService {
     TeamDTO createTeam(TeamRequest TeamRequest);
     TeamDTO updateTeam(Integer id, @Valid TeamRequest teamDTO);
+    void setTeamLeader(Integer teamId, Integer leaderId);
+    void clearTeamLeader(Integer teamId);
     TeamDTO getTeamById(Integer id);
     List<TeamDTO> getFullTeamTree();
     void activateTeam(Integer id, Integer updatedBy);
@@ -20,4 +22,5 @@ public interface TeamService {
     void syncSelfAndDescendantTeamMembers(Integer teamId, List<Integer> parentAllowedUserIds);
     void syncSelfAndDescendantTeamForms(Integer teamId, List<String> parentAllowedFormIds);
     void verifyAndUpdateLeader(Integer teamId, Short roleId);
+    void removeOrphanLeadership(Integer userId);
 }

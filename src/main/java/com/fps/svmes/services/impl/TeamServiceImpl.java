@@ -2,49 +2,43 @@ package com.fps.svmes.services.impl;
 
 import com.fps.svmes.dto.dtos.user.LeaderDTO;
 import com.fps.svmes.dto.dtos.user.TeamDTO;
+import com.fps.svmes.dto.dtos.user.TeamUserDTO;
 import com.fps.svmes.dto.requests.TeamRequest;
 import com.fps.svmes.models.sql.user.Team;
 import com.fps.svmes.repositories.jpaRepo.user.TeamFormRepository;
 import com.fps.svmes.repositories.jpaRepo.user.TeamRepository;
 import com.fps.svmes.repositories.jpaRepo.user.TeamUserRepository;
-import com.fps.svmes.services.TeamFormService;
 import com.fps.svmes.services.TeamService;
 import com.fps.svmes.services.TeamUserService;
+import com.fps.svmes.repositories.jpaRepo.user.UserRepository;
+import com.fps.svmes.models.sql.user.User;
+
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.Valid;
-import org.springframework.beans.factory.annotation.Autowired;
+
+import lombok.RequiredArgsConstructor;
+
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.modelmapper.ModelMapper;
 
 import java.util.*;
 
-import com.fps.svmes.repositories.jpaRepo.user.UserRepository;
-import com.fps.svmes.models.sql.user.User;
-import org.springframework.transaction.annotation.Transactional;
-
 @Service
+@RequiredArgsConstructor
 public class TeamServiceImpl implements TeamService {
 
-    @Autowired
-    private TeamRepository teamRepository;
+    private final TeamRepository teamRepository;
 
-    @Autowired
-    private UserRepository userRepository;
+    private final UserRepository userRepository;
 
-    @Autowired
-    private TeamUserRepository teamUserRepository;
+    private final TeamUserRepository teamUserRepository;
 
-    @Autowired
-    private TeamFormRepository teamFormRepository;
+    private final TeamFormRepository teamFormRepository;
 
-    @Autowired
-    private TeamUserService teamUserService;
+    private final TeamUserService teamUserService;
 
-    @Autowired
-    private TeamFormService teamFormService;
-
-    @Autowired
-    private ModelMapper modelMapper;
+    private final ModelMapper modelMapper;
 
     @Override
     @Transactional
@@ -132,7 +126,6 @@ public class TeamServiceImpl implements TeamService {
                     teamUserService.assignUserToTeams(oldLeader.getId(), List.of(otherTeam.getId()));
                 }
 
-
                 if (teamRequest.getUpdatedBy() != null) {
                     otherTeam.setUpdateDetails(teamRequest.getUpdatedBy(), otherTeam.getStatus());
                 }
@@ -145,6 +138,53 @@ public class TeamServiceImpl implements TeamService {
 
         team = teamRepository.save(team);
         return modelMapper.map(team, TeamDTO.class);
+    }
+
+    @Override
+    @Transactional
+    public void setTeamLeader(Integer teamId, Integer leaderId) {
+        Team team = teamRepository.findById(teamId)
+                .orElseThrow(() -> new EntityNotFoundException("Team " + teamId + " not found"));
+
+        User leader = userRepository.findById(leaderId)
+                .orElseThrow(() -> new EntityNotFoundException("User " + leaderId + " not found"));
+
+        // No changes needed
+        if (leader.equals(team.getLeader())) {
+            return;
+        }
+
+        if (team.getLeader() != null) {
+            Integer oldLeaderId = team.getLeader().getId();
+            teamUserService.removeUserFromTeam(oldLeaderId, teamId);
+            team.setLeader(null);
+        }
+
+        Team oldTeam = teamRepository.findByLeaderId(leaderId);
+
+        if (oldTeam != null && !oldTeam.getId().equals(teamId)) {
+            // Clear user's leadership on the previous team (if different)
+            oldTeam.setLeader(null);
+
+            // remove that user's membership from the previous team
+            teamUserService.removeUserFromTeam(leaderId, oldTeam.getId());
+            teamRepository.save(oldTeam);
+        }
+
+        team.setLeader(leader);
+        teamUserService.assignUserToTeams(leaderId, List.of(team.getId()));
+        teamRepository.save(team);
+    }
+
+    @Transactional
+    public void clearTeamLeader(Integer teamId) {
+        Team team = teamRepository.findById(teamId).orElseThrow(()-> new EntityNotFoundException("Team " + teamId));
+
+        if (team.getLeader() != null) {
+            teamUserService.removeUserFromTeam(team.getLeader().getId(), teamId);
+            team.setLeader(null);
+            teamRepository.save(team);
+        }
     }
 
     @Override
@@ -338,6 +378,31 @@ public class TeamServiceImpl implements TeamService {
         }
 
         teamRepository.save(team);
+    }
+
+    // Cleanup orphan leadership association: Remove this user's leadership association if exist and ascendant team's membership is missing
+    @Override
+    @Transactional
+    public void removeOrphanLeadership(Integer userId) {
+        userRepository.findById(userId).orElseThrow(() -> new EntityNotFoundException("User does not exist, skipping removeOrphanLeadership method"));
+
+        Team userLeadingTeam = teamRepository.findByLeaderId(userId);
+
+        if (userLeadingTeam != null) {
+            // all membership association team ids for this user
+            List<Integer> membershipTeamIds = teamUserService.getTeamsForUser(userId).stream().map(TeamUserDTO::getTeamId).toList();
+            List<Integer> leadingTeamAncestorIds = teamRepository.findSelfAndAncestorIds(userLeadingTeam.getId());
+
+            // if membershipTeamIds does not include leading team's ancestor id,
+            // then the userLeadingTeam association is invalid and should be removed
+            leadingTeamAncestorIds.forEach(ancestor_id -> {
+                if (!membershipTeamIds.contains(ancestor_id)) {
+                    userLeadingTeam.setLeader(null);
+                }
+            });
+
+            teamRepository.save(userLeadingTeam);
+        }
     }
 
     /**

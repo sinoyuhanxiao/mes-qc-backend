@@ -4,7 +4,6 @@ import com.fps.svmes.dto.dtos.user.TeamForUserTableDTO;
 import com.fps.svmes.dto.dtos.user.UserDTO;
 import com.fps.svmes.models.sql.user.Role;
 import com.fps.svmes.models.sql.user.Team;
-import com.fps.svmes.models.sql.user.TeamUser;
 import com.fps.svmes.models.sql.user.User;
 import com.fps.svmes.repositories.jpaRepo.user.RoleRepository;
 import com.fps.svmes.repositories.jpaRepo.user.TeamRepository;
@@ -13,7 +12,6 @@ import com.fps.svmes.repositories.jpaRepo.user.UserRepository;
 import com.fps.svmes.services.UserService;
 import lombok.RequiredArgsConstructor;
 import org.modelmapper.ModelMapper;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,19 +24,15 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class UserServiceImpl implements UserService {
 
-    @Autowired
-    private UserRepository userRepository;
+    private final UserRepository userRepository;
 
-    @Autowired
-    private TeamUserRepository teamUserRepository;
+    private final TeamUserRepository teamUserRepository;
 
-    @Autowired
-    private RoleRepository roleRepository;
+    private final RoleRepository roleRepository;
 
-    @Autowired
-    private ModelMapper modelMapper;
-    @Autowired
-    private TeamRepository teamRepository;
+    private final ModelMapper modelMapper;
+
+    private final TeamRepository teamRepository;
 
     // Get all users
     // TODO: add the teams
@@ -71,7 +65,6 @@ public class UserServiceImpl implements UserService {
                 })
                 .collect(Collectors.toList());
     }
-
 
     // Create a new user
     @Override
@@ -149,7 +142,6 @@ public class UserServiceImpl implements UserService {
             throw new RuntimeException("User with ID " + id + " not found");
         }
     }
-
 
     // Delete a user by ID
     @Override

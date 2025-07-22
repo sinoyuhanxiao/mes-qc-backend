@@ -46,4 +46,7 @@ public class User extends Common {
     @Column(name = "phone_number")
     private String phoneNumber;
 
+    @JsonProperty("activation_status")
+    @Column(name = "activation_status")
+    private Short activationStatus;
 }

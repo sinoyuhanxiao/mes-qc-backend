@@ -41,6 +41,7 @@ public class UserServiceImpl implements UserService {
     public List<UserDTO> getAllUsers() {
         return userRepository.findAll()
                 .stream()
+                .filter(user -> user.getStatus().equals(1))
                 .map(user -> {
                     // Map the user entity to UserDTO
                     UserDTO userDTO = modelMapper.map(user, UserDTO.class);
@@ -49,10 +50,10 @@ public class UserServiceImpl implements UserService {
                     List<TeamForUserTableDTO> teams = teamUserRepository.findTeamsByUserId(user.getId());
 
                     // Check if user is leader of any team, and return list of these ids.
-                    Team leaderTeam = teamRepository.findByLeaderId(user.getId());
-                    if (leaderTeam != null){
+                    Optional<Team> optionalLeaderTeam = teamRepository.findByLeaderId(user.getId());
+                    if (optionalLeaderTeam.isPresent()){
                         List<Integer> t = new ArrayList<Integer>();
-                        t.add(leaderTeam.getId());
+                        t.add(optionalLeaderTeam.get().getId());
                         userDTO.setLeadershipTeams(t);
                     } else {
                         userDTO.setLeadershipTeams(null);
@@ -64,6 +65,43 @@ public class UserServiceImpl implements UserService {
                     return userDTO;
                 })
                 .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public UserDTO getUserById(Integer id) {
+        Optional<User> userOptional = userRepository.findById(id);
+
+        if (userOptional.isPresent() && userOptional.get().getStatus().equals(1)) {
+            User user = userOptional.get();
+            UserDTO userDTO = modelMapper.map(user, UserDTO.class);
+
+            // Fetch teams directly using the repository method that returns TeamForUserTableDTO
+            List<TeamForUserTableDTO> teams = teamUserRepository.findTeamsByUserId(user.getId());
+
+            // Check if user is leader of any team, and return list of these ids.
+            Optional<Team> optionalLeaderTeam = teamRepository.findByLeaderId(user.getId());
+
+            if (optionalLeaderTeam.isPresent()){
+                List<Integer> t = new ArrayList<Integer>();
+                t.add(optionalLeaderTeam.get().getId());
+                userDTO.setLeadershipTeams(t);
+            } else {
+                userDTO.setLeadershipTeams(null);
+            }
+
+            // Assign the mapped teams to the UserDTO
+            userDTO.setTeams(teams);
+
+            return userDTO;
+        } else {
+            throw new RuntimeException("User with id " + id  + " not found");
+        }
+    }
+
+    public List<UserDTO> getUsersByIds(List<Integer> userIds) {
+        return getAllUsers().stream()
+                .filter(user -> userIds.contains(user.getId()))
+                .toList();
     }
 
     // Create a new user
@@ -115,9 +153,13 @@ public class UserServiceImpl implements UserService {
             if (userDTO.getPhoneNumber() != null) {
                 existingUser.setPhoneNumber(userDTO.getPhoneNumber());
             }
-            // basic 5
+
             if (userDTO.getStatus() != null) {
                 existingUser.setStatus(userDTO.getStatus());
+            }
+
+            if (userDTO.getActivationStatus() != null) {
+                existingUser.setActivationStatus(userDTO.getActivationStatus());
             }
 
             if (userDTO.getCreatedBy() != null) {
@@ -143,14 +185,39 @@ public class UserServiceImpl implements UserService {
         }
     }
 
-    // Delete a user by ID
+    // Hard delete a user by ID
     @Override
     @Transactional
-    public void deleteUser(Integer id) {
+    public void hardDeleteUser(Integer id) {
         if (userRepository.existsById(id)) {
             userRepository.deleteById(id);
         } else {
             throw new RuntimeException("User with ID " + id + " not found");
+        }
+    }
+
+    // Soft delete a user by ID
+    @Override
+    @Transactional
+    public void softDeleteUser(Integer id) {
+        Optional<User> userOptional = userRepository.findById(id);
+
+        if (userOptional.isPresent()){
+            userOptional.get().setStatus(0);
+        } else {
+            throw new RuntimeException("User with ID " + id + " not found");
+        }
+
+        // Clean up team user association for this user
+        teamUserRepository.deleteByIdUserId(id);
+
+        // Clean up any team where leader is this user
+        Optional<Team> optionalTeam = teamRepository.findByLeaderId(id);
+
+        if (optionalTeam.isPresent()){
+            Team team = optionalTeam.get();
+            team.setLeader(null);
+            teamRepository.save(team);
         }
     }
 
@@ -167,6 +234,7 @@ public class UserServiceImpl implements UserService {
 
         return false;
     }
+
     @Override
     @Transactional(readOnly = true)
     public UserDTO getUserByUsername(String username) {
@@ -179,23 +247,4 @@ public class UserServiceImpl implements UserService {
             throw new RuntimeException("User with username " + username + " not found");
         }
     }
-
-    @Transactional(readOnly = true)
-    public UserDTO getUserById(Integer id) {
-        Optional<User> userOptional = userRepository.findById(id);
-
-        if (userOptional.isPresent()) {
-            User user = userOptional.get();
-            return modelMapper.map(user, UserDTO.class);
-        } else {
-            throw new RuntimeException("User with id " + id  + " not found");
-        }
-    }
-
-    public List<UserDTO> getUsersByIds(List<Integer> userIds) {
-        return getAllUsers().stream()
-                .filter(user -> userIds.contains(user.getId()))
-                .toList();
-    }
-
 }

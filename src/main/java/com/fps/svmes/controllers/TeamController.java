@@ -183,7 +183,7 @@ public class TeamController {
      * @param updatedBy ID of the user performing the action
      * @return Void
      */
-    @PutMapping("/deactivate/{id}")
+    @PutMapping("/soft-delete/{id}")
     @Operation(summary = "Soft delete a team", description = "Mark a team as inactive by performing a soft delete")
     public ResponseResult<Void> softDeleteTeam(@PathVariable Integer id, @RequestParam Integer updatedBy) {
         try {
@@ -192,25 +192,6 @@ public class TeamController {
         } catch (Exception e) {
             logger.error("Error soft deleting team", e);
             return ResponseResult.fail("Failed to soft delete team", e);
-        }
-    }
-
-    /**
-     * Activate an inactive team.
-     *
-     * @param id        ID of the team to activate
-     * @param updatedBy ID of the user performing the action
-     * @return Void
-     */
-    @PutMapping("/activate/{id}")
-    @Operation(summary = "Activate an inactive team", description = "Mark an inactive team as active")
-    public ResponseResult<Void> activateTeam(@PathVariable Integer id, @RequestParam Integer updatedBy) {
-        try {
-            teamService.activateTeam(id, updatedBy);
-            return ResponseResult.success();
-        } catch (Exception e) {
-            logger.error("Error activating team", e);
-            return ResponseResult.fail("Failed to activate team", e);
         }
     }
 
@@ -255,7 +236,7 @@ public class TeamController {
     @Operation(summary = "Get team by team lead id", description = "Fetch a team by its team lead id")
     public ResponseResult<TeamDTO> getTeamByTeamLeadId(@PathVariable Integer id) {
         try {
-            TeamDTO team = teamService.getTeamByTeamLeadId(id);
+            TeamDTO team = teamService.getTeamDTOByTeamLeadId(id);
             return ResponseResult.success(team);
         } catch (Exception e) {
             logger.error("Error retrieving team by team lead id", e);

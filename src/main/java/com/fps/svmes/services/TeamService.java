@@ -13,10 +13,9 @@ public interface TeamService {
     void clearTeamLeader(Integer teamId);
     TeamDTO getTeamById(Integer id);
     List<TeamDTO> getFullTeamTree();
-    void activateTeam(Integer id, Integer updatedBy);
     void softDeleteTeam(Integer id, Integer userId);
     void hardDeleteTeam(Integer id);
-    TeamDTO getTeamByTeamLeadId(Integer id);
+    TeamDTO getTeamDTOByTeamLeadId(Integer id);
     List<LeaderDTO> getCurrentLeaders();
     int getDepth(Integer teamId);
     void syncSelfAndDescendantTeamMembers(Integer teamId, List<Integer> parentAllowedUserIds);

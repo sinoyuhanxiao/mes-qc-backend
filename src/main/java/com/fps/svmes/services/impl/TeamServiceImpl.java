@@ -60,16 +60,16 @@ public class TeamServiceImpl implements TeamService {
                     .orElseThrow(() -> new IllegalArgumentException("Leader not found with ID: " + teamRequest.getLeaderId()));
 
             // If leader is already assigned to another team, change that team's leader to null
-            Team other = teamRepository.findByLeaderId(teamRequest.getLeaderId());
+            Optional<Team> optionalOtherTeam = teamRepository.findByLeaderId(teamRequest.getLeaderId());
 
-
-            if (other != null) {
-                other.setLeader(null);
+            if (optionalOtherTeam.isPresent()) {
+                Team otherTeam = optionalOtherTeam.get();
+                otherTeam.setLeader(null);
 
                 // Remove the leader member since that leader is no longer within the team
-                teamUserService.removeUserFromTeam(leader.getId(), other.getId());
+                teamUserService.removeUserFromTeam(leader.getId(), otherTeam.getId());
 
-                other.setUpdateDetails(teamRequest.getCreatedBy(), other.getStatus());
+                otherTeam.setUpdateDetails(teamRequest.getCreatedBy(), otherTeam.getStatus());
             }
 
             team.setLeader(leader);
@@ -108,13 +108,14 @@ public class TeamServiceImpl implements TeamService {
             User oldLeader = team.getLeader();
 
             // Other team that currently has this new leader - may be null
-            Team otherTeam = teamRepository.findByLeaderId(newLeader.getId());
+            Optional<Team> optionalOtherTeam = teamRepository.findByLeaderId(newLeader.getId());
 
             if (Objects.equals(oldLeader, newLeader)) {
                 // Skip since same leader already assigned
-            } else if (otherTeam == null || otherTeam.getId().equals(team.getId())) {
+            } else if (optionalOtherTeam.isEmpty() || optionalOtherTeam.get().getId().equals(team.getId())) {
                 team.setLeader(newLeader);
             } else {
+                Team otherTeam = optionalOtherTeam.get();
                 otherTeam.setLeader(oldLeader);
 
                 // Remove previous leader from the member list
@@ -160,9 +161,11 @@ public class TeamServiceImpl implements TeamService {
             team.setLeader(null);
         }
 
-        Team oldTeam = teamRepository.findByLeaderId(leaderId);
+        Optional<Team> optionalOldTeam = teamRepository.findByLeaderId(leaderId);
 
-        if (oldTeam != null && !oldTeam.getId().equals(teamId)) {
+        if (optionalOldTeam.isPresent() && !optionalOldTeam.get().getId().equals(teamId)) {
+            Team oldTeam = optionalOldTeam.get();
+
             // Clear user's leadership on the previous team (if different)
             oldTeam.setLeader(null);
 
@@ -190,9 +193,15 @@ public class TeamServiceImpl implements TeamService {
     @Override
     @Transactional
     public TeamDTO getTeamById(Integer id) {
-        Team team = teamRepository.findById(id).orElseThrow(() -> new RuntimeException("Team not found"));
-        List<Integer> ids = teamRepository.findSelfAndAncestorIds(id);
-        return mapWithChildren(team, ids.size());
+        Optional<Team> optionalTeam = teamRepository.findById(id);
+        if (optionalTeam.isPresent() && optionalTeam.get().getStatus().equals(1)){
+            Team team = optionalTeam.get();
+            List<Integer> ids = teamRepository.findSelfAndAncestorIds(id);
+
+            return mapWithChildren(team, ids.size());
+        } else {
+            throw new RuntimeException("Team with id " + id + "not found");
+        }
     }
 
     @Override
@@ -200,6 +209,7 @@ public class TeamServiceImpl implements TeamService {
     public List<TeamDTO> getFullTeamTree() {
         List<Team> roots = teamRepository.findByParentIsNull();
         return roots.stream()
+                .filter(team -> team.getStatus().equals(1))
                 .sorted(Comparator.comparing(Team::getId))
                 .map(t -> mapWithChildren(t,1))
                 .toList();
@@ -211,6 +221,12 @@ public class TeamServiceImpl implements TeamService {
         Team team = teamRepository.findById(id).orElseThrow(() -> new RuntimeException("Team not found"));
         softDeleteRecursively(team, userId);
         teamRepository.save(team);
+
+        // Clean up team user association for this team
+        teamUserRepository.deleteByIdTeamId(id);
+
+        // Clean up team form association for this team
+        teamFormRepository.deleteByTeamId(id);
     }
 
     // Helper to soft-delete a team and all descendant teams of it
@@ -229,36 +245,23 @@ public class TeamServiceImpl implements TeamService {
         }
 
         teamRepository.deleteById(id); // Permanently deletes the record
+
+        // Just in case. Not necessary as team user table and team form table should already have cascade on delete
+        // foreign key constraint to automatically handle for this
+        teamUserRepository.deleteByIdTeamId(id);
+        teamFormRepository.deleteByTeamId(id);
     }
 
     @Override
     @Transactional
-    public void activateTeam(Integer id, Integer updatedBy) {
-        Team team = teamRepository.findById(id).orElseThrow(() -> new RuntimeException("Team not found"));
+    public TeamDTO getTeamDTOByTeamLeadId(Integer id) {
+        Optional<Team> optionalTeam = teamRepository.findByLeaderId(id);
 
-        if (team.getStatus() == 1) {
-            throw new RuntimeException("Team is already active");
-        }
-
-        // Prevent activating a team when it has a parent team and parent team is not activated
-        if (team.getParent() != null && team.getParent().getStatus() != 1) {
-            throw new RuntimeException("Cannot activate team: parent team is inactive");
-        }
-
-        team.setUpdateDetails(updatedBy, 1);
-        teamRepository.save(team);
-    }
-
-    @Override
-    @Transactional
-    public TeamDTO getTeamByTeamLeadId(Integer id) {
-        Team team = teamRepository.findByLeaderId(id);
-
-        if (team == null) {
+        if (optionalTeam.isEmpty()) {
             throw new EntityNotFoundException("No team found for leader ID: " + id);
         }
 
-        return modelMapper.map(team, TeamDTO.class);
+        return modelMapper.map(optionalTeam.get(), TeamDTO.class);
     }
 
     @Override
@@ -266,7 +269,7 @@ public class TeamServiceImpl implements TeamService {
     public List<LeaderDTO> getCurrentLeaders() {
         return teamRepository.findAll()
                 .stream()
-                .filter(team -> team.getLeader() != null)      // Keep only teams that have a leader
+                .filter(team -> team.getStatus().equals(1) && team.getLeader() != null)      // Keep only teams that have a leader
                 .map(team ->  new LeaderDTO(team.getLeader().getId(),
                         team.getLeader().getName(),
                         team.getId(),
@@ -386,9 +389,11 @@ public class TeamServiceImpl implements TeamService {
     public void removeOrphanLeadership(Integer userId) {
         userRepository.findById(userId).orElseThrow(() -> new EntityNotFoundException("User does not exist, skipping removeOrphanLeadership method"));
 
-        Team userLeadingTeam = teamRepository.findByLeaderId(userId);
+        Optional<Team> optionalUserLeadingTeam = teamRepository.findByLeaderId(userId);
 
-        if (userLeadingTeam != null) {
+        if (optionalUserLeadingTeam.isPresent()) {
+            Team userLeadingTeam = optionalUserLeadingTeam.get();
+
             // all membership association team ids for this user
             List<Integer> membershipTeamIds = teamUserService.getTeamsForUser(userId).stream().map(TeamUserDTO::getTeamId).toList();
             List<Integer> leadingTeamAncestorIds = teamRepository.findSelfAndAncestorIds(userLeadingTeam.getId());
@@ -427,6 +432,7 @@ public class TeamServiceImpl implements TeamService {
 
         if (entity.getChildren() != null && !entity.getChildren().isEmpty()) {
             dto.setChildren(entity.getChildren().stream()
+                    .filter(child -> child.getStatus().equals(1))
                     .sorted(Comparator.comparing(Team::getId))
                     .map(c-> mapWithChildren(c, level + 1))
                     .toList());

@@ -4,7 +4,6 @@ import com.fps.svmes.dto.dtos.user.TeamForUserTableDTO;
 import com.fps.svmes.dto.dtos.user.UserDTO;
 import com.fps.svmes.models.sql.user.Role;
 import com.fps.svmes.models.sql.user.Team;
-import com.fps.svmes.models.sql.user.TeamUser;
 import com.fps.svmes.models.sql.user.User;
 import com.fps.svmes.repositories.jpaRepo.user.RoleRepository;
 import com.fps.svmes.repositories.jpaRepo.user.TeamRepository;
@@ -13,10 +12,10 @@ import com.fps.svmes.repositories.jpaRepo.user.UserRepository;
 import com.fps.svmes.services.UserService;
 import lombok.RequiredArgsConstructor;
 import org.modelmapper.ModelMapper;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -25,19 +24,15 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class UserServiceImpl implements UserService {
 
-    @Autowired
-    private UserRepository userRepository;
+    private final UserRepository userRepository;
 
-    @Autowired
-    private TeamUserRepository teamUserRepository;
+    private final TeamUserRepository teamUserRepository;
 
-    @Autowired
-    private RoleRepository roleRepository;
+    private final RoleRepository roleRepository;
 
-    @Autowired
-    private ModelMapper modelMapper;
-    @Autowired
-    private TeamRepository teamRepository;
+    private final ModelMapper modelMapper;
+
+    private final TeamRepository teamRepository;
 
     // Get all users
     // TODO: add the teams
@@ -46,12 +41,23 @@ public class UserServiceImpl implements UserService {
     public List<UserDTO> getAllUsers() {
         return userRepository.findAll()
                 .stream()
+                .filter(user -> user.getStatus().equals(1))
                 .map(user -> {
                     // Map the user entity to UserDTO
                     UserDTO userDTO = modelMapper.map(user, UserDTO.class);
 
                     // Fetch teams directly using the repository method that returns TeamForUserTableDTO
                     List<TeamForUserTableDTO> teams = teamUserRepository.findTeamsByUserId(user.getId());
+
+                    // Check if user is leader of any team, and return list of these ids.
+                    Optional<Team> optionalLeaderTeam = teamRepository.findByLeaderId(user.getId());
+                    if (optionalLeaderTeam.isPresent() && optionalLeaderTeam.get().getStatus().equals(1)){
+                        List<Integer> t = new ArrayList<Integer>();
+                        t.add(optionalLeaderTeam.get().getId());
+                        userDTO.setLeadershipTeams(t);
+                    } else {
+                        userDTO.setLeadershipTeams(null);
+                    }
 
                     // Assign the mapped teams to the UserDTO
                     userDTO.setTeams(teams);
@@ -61,6 +67,42 @@ public class UserServiceImpl implements UserService {
                 .collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
+    public UserDTO getUserById(Integer id) {
+        Optional<User> userOptional = userRepository.findById(id);
+
+        if (userOptional.isPresent() && userOptional.get().getStatus().equals(1)) {
+            User user = userOptional.get();
+            UserDTO userDTO = modelMapper.map(user, UserDTO.class);
+
+            // Fetch teams directly using the repository method that returns TeamForUserTableDTO
+            List<TeamForUserTableDTO> teams = teamUserRepository.findTeamsByUserId(user.getId());
+
+            // Check if user is leader of any team, and return list of these ids.
+            Optional<Team> optionalLeaderTeam = teamRepository.findByLeaderId(user.getId());
+
+            if (optionalLeaderTeam.isPresent() && optionalLeaderTeam.get().getStatus().equals(1)){
+                List<Integer> t = new ArrayList<Integer>();
+                t.add(optionalLeaderTeam.get().getId());
+                userDTO.setLeadershipTeams(t);
+            } else {
+                userDTO.setLeadershipTeams(null);
+            }
+
+            // Assign the mapped teams to the UserDTO
+            userDTO.setTeams(teams);
+
+            return userDTO;
+        } else {
+            throw new RuntimeException("User with id " + id  + " not found");
+        }
+    }
+
+    public List<UserDTO> getUsersByIds(List<Integer> userIds) {
+        return getAllUsers().stream()
+                .filter(user -> userIds.contains(user.getId()))
+                .toList();
+    }
 
     // Create a new user
     @Override
@@ -111,9 +153,13 @@ public class UserServiceImpl implements UserService {
             if (userDTO.getPhoneNumber() != null) {
                 existingUser.setPhoneNumber(userDTO.getPhoneNumber());
             }
-            // basic 5
+
             if (userDTO.getStatus() != null) {
                 existingUser.setStatus(userDTO.getStatus());
+            }
+
+            if (userDTO.getActivationStatus() != null) {
+                existingUser.setActivationStatus(userDTO.getActivationStatus());
             }
 
             if (userDTO.getCreatedBy() != null) {
@@ -139,15 +185,39 @@ public class UserServiceImpl implements UserService {
         }
     }
 
-
-    // Delete a user by ID
+    // Hard delete a user by ID
     @Override
     @Transactional
-    public void deleteUser(Integer id) {
+    public void hardDeleteUser(Integer id) {
         if (userRepository.existsById(id)) {
             userRepository.deleteById(id);
         } else {
             throw new RuntimeException("User with ID " + id + " not found");
+        }
+    }
+
+    // Soft delete a user by ID
+    @Override
+    @Transactional
+    public void softDeleteUser(Integer id) {
+        Optional<User> userOptional = userRepository.findById(id);
+
+        if (userOptional.isPresent()){
+            userOptional.get().setStatus(0);
+        } else {
+            throw new RuntimeException("User with ID " + id + " not found");
+        }
+
+        // Clean up team user association for this user
+        teamUserRepository.deleteByIdUserId(id);
+
+        // Clean up any team where leader is this user
+        Optional<Team> optionalTeam = teamRepository.findByLeaderId(id);
+
+        if (optionalTeam.isPresent()){
+            Team team = optionalTeam.get();
+            team.setLeader(null);
+            teamRepository.save(team);
         }
     }
 
@@ -164,6 +234,7 @@ public class UserServiceImpl implements UserService {
 
         return false;
     }
+
     @Override
     @Transactional(readOnly = true)
     public UserDTO getUserByUsername(String username) {
@@ -176,23 +247,4 @@ public class UserServiceImpl implements UserService {
             throw new RuntimeException("User with username " + username + " not found");
         }
     }
-
-    @Transactional(readOnly = true)
-    public UserDTO getUserById(Integer id) {
-        Optional<User> userOptional = userRepository.findById(id);
-
-        if (userOptional.isPresent()) {
-            User user = userOptional.get();
-            return modelMapper.map(user, UserDTO.class);
-        } else {
-            throw new RuntimeException("User with id " + id  + " not found");
-        }
-    }
-
-    public List<UserDTO> getUsersByIds(List<Integer> userIds) {
-        return getAllUsers().stream()
-                .filter(user -> userIds.contains(user.getId()))
-                .toList();
-    }
-
 }

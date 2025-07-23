@@ -8,10 +8,11 @@ import org.springframework.stereotype.Repository;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface TeamRepository extends JpaRepository<Team, Integer> {
-    Team findByLeaderId(Integer leaderId);
+    Optional<Team> findByLeaderId(Integer leaderId);
     List<Team> findByParentIsNull();
 
     @Query(value = """

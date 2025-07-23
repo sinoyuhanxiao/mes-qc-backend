@@ -3,11 +3,7 @@ package com.fps.svmes.controllers;
 import com.fps.svmes.dto.dtos.user.TeamDTO;
 import com.fps.svmes.dto.dtos.user.UserDTO;
 import com.fps.svmes.dto.responses.ResponseResult;
-import com.fps.svmes.dto.responses.ResponseStatus;
-import com.fps.svmes.models.sql.user.Team;
-import com.fps.svmes.services.TeamFormService;
-import com.fps.svmes.services.TeamService;
-import com.fps.svmes.services.UserService;
+import com.fps.svmes.services.*;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -70,7 +66,7 @@ public class UserController {
                     Short roleId = userDTO.getRole().getId();
 
                     // Get the team that this user is leader of
-                    TeamDTO leadingTeam = teamService.getTeamByTeamLeadId(id);
+                    TeamDTO leadingTeam = teamService.getTeamDTOByTeamLeadId(id);
                     teamService.verifyAndUpdateLeader(leadingTeam.getId(), roleId);
                 } catch (Exception e) {
                     // Ignore if not leading a team
@@ -86,17 +82,31 @@ public class UserController {
         }
     }
 
-    // DELETE - Delete a user by ID
-    @DeleteMapping("/{id}")
-    @Operation(summary = "Delete a user", description = "Deletes a user from the QC system")
-    public ResponseResult<Void> deleteUser(@PathVariable Integer id) {
+    // HARD DELETE - Delete a user by ID
+    @DeleteMapping("/hard-delete/{id}")
+    @Operation(summary = "Hard delete a user", description = "Hard deletes a user from the QC system")
+    public ResponseResult<Void> hardDeleteUser(@PathVariable Integer id) {
         try {
-            userService.deleteUser(id);
-            logger.info("User deleted with ID: {}", id);
+            userService.hardDeleteUser(id);
+            logger.info("User hard deleted with ID: {}", id);
             return ResponseResult.success(null);
         } catch (Exception e) {
-            logger.error("Error deleting user with ID: {}", id, e);
-            return ResponseResult.fail("Error deleting QC user", e);
+            logger.error("Error hard deleting user with ID: {}", id, e);
+            return ResponseResult.fail("Error hard deleting QC user", e);
+        }
+    }
+
+    // SOFT DELETE - Delete a user by ID
+    @DeleteMapping("/soft-delete/{id}")
+    @Operation(summary = "Soft delete a user", description = "Soft deletes a user from the QC system")
+    public ResponseResult<Void> softDeleteUser(@PathVariable Integer id) {
+        try {
+            userService.softDeleteUser(id);
+            logger.info("User soft deleted with ID: {}", id);
+            return ResponseResult.success(null);
+        } catch (Exception e) {
+            logger.error("Error soft deleting user with ID: {}", id, e);
+            return ResponseResult.fail("Error soft deleting QC user", e);
         }
     }
 
@@ -105,7 +115,7 @@ public class UserController {
     @Operation(summary = "Validate User Credentials", description = "Validates the provided username and password")
     public ResponseResult<String> validateUser(@RequestParam String username, @RequestParam String password) {
         try {
-            boolean isValid = userService.getUserByUsername(username).getStatus() == 1 && userService.validateCredentials(username, password);
+            boolean isValid = userService.getUserByUsername(username).getActivationStatus() == 1 && userService.validateCredentials(username, password);
 
             if (isValid) {
                 logger.info("User validation successful for username: {}", username);

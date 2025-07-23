@@ -111,6 +111,37 @@ public class TeamController {
     }
 
     /**
+     * Change an existing team leader, if leader or team does not exist then the operation is skip.
+     *
+     * @param teamId ID of the team to update
+     * @param leaderId user ID to set as leader of the target team
+     *
+     */
+    @PutMapping("/leadership/{teamId}/{leaderId}")
+    @Operation(summary = "Change an existing team's leader", description = "Change an existing team's leader'")
+    public ResponseResult<Void> setTeamLeader(@PathVariable Integer teamId, @PathVariable Integer leaderId) {
+        try {
+            teamService.setTeamLeader(teamId, leaderId);
+            return ResponseResult.success();
+        } catch (Exception e) {
+            logger.error("Error setting leader for team", e);
+            return ResponseResult.fail("Failed to set leader for team");
+        }
+    }
+
+    @PutMapping("/leadership/{teamId}")
+    @Operation(summary = "Set leader as null for an existing team", description = "Set leader as null for an existing team")
+    public ResponseResult<Void> clearTeamLeader(@PathVariable Integer teamId) {
+        try {
+            teamService.clearTeamLeader(teamId);
+            return ResponseResult.success();
+        } catch (Exception e) {
+            logger.error("Error clearing leader for team", e);
+            return ResponseResult.fail("Failed to clear leader for team");
+        }
+    }
+
+    /**
      * Get a specific team by ID.
      *
      * @param id Team ID
@@ -152,7 +183,7 @@ public class TeamController {
      * @param updatedBy ID of the user performing the action
      * @return Void
      */
-    @PutMapping("/deactivate/{id}")
+    @PutMapping("/soft-delete/{id}")
     @Operation(summary = "Soft delete a team", description = "Mark a team as inactive by performing a soft delete")
     public ResponseResult<Void> softDeleteTeam(@PathVariable Integer id, @RequestParam Integer updatedBy) {
         try {
@@ -165,21 +196,20 @@ public class TeamController {
     }
 
     /**
-     * Activate an inactive team.
+     * Check user's current team leadership association, remove the association if invalid
      *
-     * @param id        ID of the team to activate
-     * @param updatedBy ID of the user performing the action
+     * @param userId ID of the user to check leadership
      * @return Void
      */
-    @PutMapping("/activate/{id}")
-    @Operation(summary = "Activate an inactive team", description = "Mark an inactive team as active")
-    public ResponseResult<Void> activateTeam(@PathVariable Integer id, @RequestParam Integer updatedBy) {
+    @PostMapping("/leadership/{userId}")
+    @Operation(summary = "Check user's leading team association and remove association if invalid (ascendant team membership missing)")
+    public ResponseResult<Void> removeOrphanLeadership(@PathVariable Integer userId) {
         try {
-            teamService.activateTeam(id, updatedBy);
+            teamService.removeOrphanLeadership(userId);
             return ResponseResult.success();
         } catch (Exception e) {
-            logger.error("Error activating team", e);
-            return ResponseResult.fail("Failed to activate team", e);
+            logger.error("Error removing orphan user's team leadership", e);
+            return ResponseResult.fail("Failed to removing orphan user's team leadership", e);
         }
     }
 
@@ -206,7 +236,7 @@ public class TeamController {
     @Operation(summary = "Get team by team lead id", description = "Fetch a team by its team lead id")
     public ResponseResult<TeamDTO> getTeamByTeamLeadId(@PathVariable Integer id) {
         try {
-            TeamDTO team = teamService.getTeamByTeamLeadId(id);
+            TeamDTO team = teamService.getTeamDTOByTeamLeadId(id);
             return ResponseResult.success(team);
         } catch (Exception e) {
             logger.error("Error retrieving team by team lead id", e);
@@ -248,4 +278,7 @@ public class TeamController {
             return ResponseResult.fail("Failed to get team depth", e);
         }
     }
+
+
+
 }

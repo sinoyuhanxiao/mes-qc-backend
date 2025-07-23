@@ -51,7 +51,7 @@ public class UserServiceImpl implements UserService {
 
                     // Check if user is leader of any team, and return list of these ids.
                     Optional<Team> optionalLeaderTeam = teamRepository.findByLeaderId(user.getId());
-                    if (optionalLeaderTeam.isPresent()){
+                    if (optionalLeaderTeam.isPresent() && optionalLeaderTeam.get().getStatus().equals(1)){
                         List<Integer> t = new ArrayList<Integer>();
                         t.add(optionalLeaderTeam.get().getId());
                         userDTO.setLeadershipTeams(t);
@@ -81,7 +81,7 @@ public class UserServiceImpl implements UserService {
             // Check if user is leader of any team, and return list of these ids.
             Optional<Team> optionalLeaderTeam = teamRepository.findByLeaderId(user.getId());
 
-            if (optionalLeaderTeam.isPresent()){
+            if (optionalLeaderTeam.isPresent() && optionalLeaderTeam.get().getStatus().equals(1)){
                 List<Integer> t = new ArrayList<Integer>();
                 t.add(optionalLeaderTeam.get().getId());
                 userDTO.setLeadershipTeams(t);

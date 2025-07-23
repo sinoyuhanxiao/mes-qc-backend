@@ -5,6 +5,7 @@ import com.fps.svmes.dto.dtos.user.TeamDTO;
 import com.fps.svmes.dto.dtos.user.TeamUserDTO;
 import com.fps.svmes.dto.requests.TeamRequest;
 import com.fps.svmes.models.sql.user.Team;
+import com.fps.svmes.models.sql.user.TeamUserId;
 import com.fps.svmes.repositories.jpaRepo.user.TeamFormRepository;
 import com.fps.svmes.repositories.jpaRepo.user.TeamRepository;
 import com.fps.svmes.repositories.jpaRepo.user.TeamUserRepository;
@@ -221,17 +222,18 @@ public class TeamServiceImpl implements TeamService {
         Team team = teamRepository.findById(id).orElseThrow(() -> new RuntimeException("Team not found"));
         softDeleteRecursively(team, userId);
         teamRepository.save(team);
-
-        // Clean up team user association for this team
-        teamUserRepository.deleteByIdTeamId(id);
-
-        // Clean up team form association for this team
-        teamFormRepository.deleteByTeamId(id);
     }
 
-    // Helper to soft-delete a team and all descendant teams of it
+    // Helper to soft-delete a team's leader & member association & form associations, repeat for all descendant teams
     private void softDeleteRecursively(Team team, Integer userId) {
         team.setUpdateDetails(userId, 0);
+        team.setLeader(null);
+
+        // Clean up team user association for this team
+        teamUserRepository.deleteByIdTeamId(team.getId());
+
+        // Clean up team form association for this team
+        teamFormRepository.deleteByTeamId(team.getId());
 
         if (team.getChildren() != null && !team.getChildren().isEmpty()) {
             team.getChildren().forEach(child -> softDeleteRecursively(child, userId));
@@ -309,17 +311,24 @@ public class TeamServiceImpl implements TeamService {
         if (childTeamIds.isEmpty()) return;
 
         for (Integer childTeamId : childTeamIds) {
-            List<Integer> childUsers = teamUserRepository.findByIdTeamId(childTeamId)
+            List<Integer> childTeamUserIds = teamUserRepository.findByIdTeamId(childTeamId)
                     .stream()
                     .map(teamUser -> teamUser.getUser().getId())
                     .toList();
 
-            List<Integer> targetRemovalUserIds = childUsers.stream()
+            List<Integer> targetRemovalUserIds = childTeamUserIds.stream()
                     .filter(id -> !allowedSet.contains(id))
                     .toList();
 
             if (!targetRemovalUserIds.isEmpty()) {
-                teamUserRepository.deleteByTeamIdAndUserIdIn(childTeamId, targetRemovalUserIds);
+//                teamUserRepository.deleteByTeamIdAndUserIdIn(childTeamId, targetRemovalUserIds);
+                for (int userId: targetRemovalUserIds){
+                    // For any non-allowed user, remove its team user association and leadership
+                    teamUserRepository.deleteById(new TeamUserId(childTeamId, userId));
+
+                    Optional<Team> leadingTeam = teamRepository.findByLeaderId(userId);
+                    leadingTeam.ifPresent(team -> team.setLeader(null));
+                }
             }
         }
     }

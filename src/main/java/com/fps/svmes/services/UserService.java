@@ -1,7 +1,6 @@
 package com.fps.svmes.services;
 
 import com.fps.svmes.dto.dtos.user.UserDTO;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -12,7 +11,9 @@ public interface UserService {
 
     UserDTO updateUser(Integer id, UserDTO userDTO);
 
-    void deleteUser(Integer id);
+    void softDeleteUser(Integer id);
+
+    void hardDeleteUser(Integer id);
 
     boolean validateCredentials(String username, String password);
 

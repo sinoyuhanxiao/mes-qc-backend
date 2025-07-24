@@ -1,5 +1,5 @@
 # Use OpenJDK to run the Spring Boot application
-FROM openjdk:17-jdk-slim
+FROM openjdk:21-jdk-slim
 
 # Set the working directory
 WORKDIR /app

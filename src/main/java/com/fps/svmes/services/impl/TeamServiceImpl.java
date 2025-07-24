@@ -2,49 +2,44 @@ package com.fps.svmes.services.impl;
 
 import com.fps.svmes.dto.dtos.user.LeaderDTO;
 import com.fps.svmes.dto.dtos.user.TeamDTO;
+import com.fps.svmes.dto.dtos.user.TeamUserDTO;
 import com.fps.svmes.dto.requests.TeamRequest;
 import com.fps.svmes.models.sql.user.Team;
+import com.fps.svmes.models.sql.user.TeamUserId;
 import com.fps.svmes.repositories.jpaRepo.user.TeamFormRepository;
 import com.fps.svmes.repositories.jpaRepo.user.TeamRepository;
 import com.fps.svmes.repositories.jpaRepo.user.TeamUserRepository;
-import com.fps.svmes.services.TeamFormService;
 import com.fps.svmes.services.TeamService;
 import com.fps.svmes.services.TeamUserService;
+import com.fps.svmes.repositories.jpaRepo.user.UserRepository;
+import com.fps.svmes.models.sql.user.User;
+
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.Valid;
-import org.springframework.beans.factory.annotation.Autowired;
+
+import lombok.RequiredArgsConstructor;
+
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.modelmapper.ModelMapper;
 
 import java.util.*;
 
-import com.fps.svmes.repositories.jpaRepo.user.UserRepository;
-import com.fps.svmes.models.sql.user.User;
-import org.springframework.transaction.annotation.Transactional;
-
 @Service
+@RequiredArgsConstructor
 public class TeamServiceImpl implements TeamService {
 
-    @Autowired
-    private TeamRepository teamRepository;
+    private final TeamRepository teamRepository;
 
-    @Autowired
-    private UserRepository userRepository;
+    private final UserRepository userRepository;
 
-    @Autowired
-    private TeamUserRepository teamUserRepository;
+    private final TeamUserRepository teamUserRepository;
 
-    @Autowired
-    private TeamFormRepository teamFormRepository;
+    private final TeamFormRepository teamFormRepository;
 
-    @Autowired
-    private TeamUserService teamUserService;
+    private final TeamUserService teamUserService;
 
-    @Autowired
-    private TeamFormService teamFormService;
-
-    @Autowired
-    private ModelMapper modelMapper;
+    private final ModelMapper modelMapper;
 
     @Override
     @Transactional
@@ -66,16 +61,16 @@ public class TeamServiceImpl implements TeamService {
                     .orElseThrow(() -> new IllegalArgumentException("Leader not found with ID: " + teamRequest.getLeaderId()));
 
             // If leader is already assigned to another team, change that team's leader to null
-            Team other = teamRepository.findByLeaderId(teamRequest.getLeaderId());
+            Optional<Team> optionalOtherTeam = teamRepository.findByLeaderId(teamRequest.getLeaderId());
 
-
-            if (other != null) {
-                other.setLeader(null);
+            if (optionalOtherTeam.isPresent()) {
+                Team otherTeam = optionalOtherTeam.get();
+                otherTeam.setLeader(null);
 
                 // Remove the leader member since that leader is no longer within the team
-                teamUserService.removeUserFromTeam(leader.getId(), other.getId());
+                teamUserService.removeUserFromTeam(leader.getId(), otherTeam.getId());
 
-                other.setUpdateDetails(teamRequest.getCreatedBy(), other.getStatus());
+                otherTeam.setUpdateDetails(teamRequest.getCreatedBy(), otherTeam.getStatus());
             }
 
             team.setLeader(leader);
@@ -114,13 +109,14 @@ public class TeamServiceImpl implements TeamService {
             User oldLeader = team.getLeader();
 
             // Other team that currently has this new leader - may be null
-            Team otherTeam = teamRepository.findByLeaderId(newLeader.getId());
+            Optional<Team> optionalOtherTeam = teamRepository.findByLeaderId(newLeader.getId());
 
             if (Objects.equals(oldLeader, newLeader)) {
                 // Skip since same leader already assigned
-            } else if (otherTeam == null || otherTeam.getId().equals(team.getId())) {
+            } else if (optionalOtherTeam.isEmpty() || optionalOtherTeam.get().getId().equals(team.getId())) {
                 team.setLeader(newLeader);
             } else {
+                Team otherTeam = optionalOtherTeam.get();
                 otherTeam.setLeader(oldLeader);
 
                 // Remove previous leader from the member list
@@ -131,7 +127,6 @@ public class TeamServiceImpl implements TeamService {
                     // Add leader as a member to other team
                     teamUserService.assignUserToTeams(oldLeader.getId(), List.of(otherTeam.getId()));
                 }
-
 
                 if (teamRequest.getUpdatedBy() != null) {
                     otherTeam.setUpdateDetails(teamRequest.getUpdatedBy(), otherTeam.getStatus());
@@ -149,10 +144,65 @@ public class TeamServiceImpl implements TeamService {
 
     @Override
     @Transactional
+    public void setTeamLeader(Integer teamId, Integer leaderId) {
+        Team team = teamRepository.findById(teamId)
+                .orElseThrow(() -> new EntityNotFoundException("Team " + teamId + " not found"));
+
+        User leader = userRepository.findById(leaderId)
+                .orElseThrow(() -> new EntityNotFoundException("User " + leaderId + " not found"));
+
+        // No changes needed
+        if (leader.equals(team.getLeader())) {
+            return;
+        }
+
+        if (team.getLeader() != null) {
+            Integer oldLeaderId = team.getLeader().getId();
+            teamUserService.removeUserFromTeam(oldLeaderId, teamId);
+            team.setLeader(null);
+        }
+
+        Optional<Team> optionalOldTeam = teamRepository.findByLeaderId(leaderId);
+
+        if (optionalOldTeam.isPresent() && !optionalOldTeam.get().getId().equals(teamId)) {
+            Team oldTeam = optionalOldTeam.get();
+
+            // Clear user's leadership on the previous team (if different)
+            oldTeam.setLeader(null);
+
+            // remove that user's membership from the previous team
+            teamUserService.removeUserFromTeam(leaderId, oldTeam.getId());
+            teamRepository.save(oldTeam);
+        }
+
+        team.setLeader(leader);
+        teamUserService.assignUserToTeams(leaderId, List.of(team.getId()));
+        teamRepository.save(team);
+    }
+
+    @Transactional
+    public void clearTeamLeader(Integer teamId) {
+        Team team = teamRepository.findById(teamId).orElseThrow(()-> new EntityNotFoundException("Team " + teamId));
+
+        if (team.getLeader() != null) {
+            teamUserService.removeUserFromTeam(team.getLeader().getId(), teamId);
+            team.setLeader(null);
+            teamRepository.save(team);
+        }
+    }
+
+    @Override
+    @Transactional
     public TeamDTO getTeamById(Integer id) {
-        Team team = teamRepository.findById(id).orElseThrow(() -> new RuntimeException("Team not found"));
-        List<Integer> ids = teamRepository.findSelfAndAncestorIds(id);
-        return mapWithChildren(team, ids.size());
+        Optional<Team> optionalTeam = teamRepository.findById(id);
+        if (optionalTeam.isPresent() && optionalTeam.get().getStatus().equals(1)){
+            Team team = optionalTeam.get();
+            List<Integer> ids = teamRepository.findSelfAndAncestorIds(id);
+
+            return mapWithChildren(team, ids.size());
+        } else {
+            throw new RuntimeException("Team with id " + id + "not found");
+        }
     }
 
     @Override
@@ -160,6 +210,7 @@ public class TeamServiceImpl implements TeamService {
     public List<TeamDTO> getFullTeamTree() {
         List<Team> roots = teamRepository.findByParentIsNull();
         return roots.stream()
+                .filter(team -> team.getStatus().equals(1))
                 .sorted(Comparator.comparing(Team::getId))
                 .map(t -> mapWithChildren(t,1))
                 .toList();
@@ -173,9 +224,16 @@ public class TeamServiceImpl implements TeamService {
         teamRepository.save(team);
     }
 
-    // Helper to soft-delete a team and all descendant teams of it
+    // Helper to soft-delete a team's leader & member association & form associations, repeat for all descendant teams
     private void softDeleteRecursively(Team team, Integer userId) {
         team.setUpdateDetails(userId, 0);
+        team.setLeader(null);
+
+        // Clean up team user association for this team
+        teamUserRepository.deleteByIdTeamId(team.getId());
+
+        // Clean up team form association for this team
+        teamFormRepository.deleteByTeamId(team.getId());
 
         if (team.getChildren() != null && !team.getChildren().isEmpty()) {
             team.getChildren().forEach(child -> softDeleteRecursively(child, userId));
@@ -189,36 +247,23 @@ public class TeamServiceImpl implements TeamService {
         }
 
         teamRepository.deleteById(id); // Permanently deletes the record
+
+        // Just in case. Not necessary as team user table and team form table should already have cascade on delete
+        // foreign key constraint to automatically handle for this
+        teamUserRepository.deleteByIdTeamId(id);
+        teamFormRepository.deleteByTeamId(id);
     }
 
     @Override
     @Transactional
-    public void activateTeam(Integer id, Integer updatedBy) {
-        Team team = teamRepository.findById(id).orElseThrow(() -> new RuntimeException("Team not found"));
+    public TeamDTO getTeamDTOByTeamLeadId(Integer id) {
+        Optional<Team> optionalTeam = teamRepository.findByLeaderId(id);
 
-        if (team.getStatus() == 1) {
-            throw new RuntimeException("Team is already active");
-        }
-
-        // Prevent activating a team when it has a parent team and parent team is not activated
-        if (team.getParent() != null && team.getParent().getStatus() != 1) {
-            throw new RuntimeException("Cannot activate team: parent team is inactive");
-        }
-
-        team.setUpdateDetails(updatedBy, 1);
-        teamRepository.save(team);
-    }
-
-    @Override
-    @Transactional
-    public TeamDTO getTeamByTeamLeadId(Integer id) {
-        Team team = teamRepository.findByLeaderId(id);
-
-        if (team == null) {
+        if (optionalTeam.isEmpty()) {
             throw new EntityNotFoundException("No team found for leader ID: " + id);
         }
 
-        return modelMapper.map(team, TeamDTO.class);
+        return modelMapper.map(optionalTeam.get(), TeamDTO.class);
     }
 
     @Override
@@ -226,7 +271,7 @@ public class TeamServiceImpl implements TeamService {
     public List<LeaderDTO> getCurrentLeaders() {
         return teamRepository.findAll()
                 .stream()
-                .filter(team -> team.getLeader() != null)      // Keep only teams that have a leader
+                .filter(team -> team.getStatus().equals(1) && team.getLeader() != null)      // Keep only teams that have a leader
                 .map(team ->  new LeaderDTO(team.getLeader().getId(),
                         team.getLeader().getName(),
                         team.getId(),
@@ -266,17 +311,24 @@ public class TeamServiceImpl implements TeamService {
         if (childTeamIds.isEmpty()) return;
 
         for (Integer childTeamId : childTeamIds) {
-            List<Integer> childUsers = teamUserRepository.findByIdTeamId(childTeamId)
+            List<Integer> childTeamUserIds = teamUserRepository.findByIdTeamId(childTeamId)
                     .stream()
                     .map(teamUser -> teamUser.getUser().getId())
                     .toList();
 
-            List<Integer> targetRemovalUserIds = childUsers.stream()
+            List<Integer> targetRemovalUserIds = childTeamUserIds.stream()
                     .filter(id -> !allowedSet.contains(id))
                     .toList();
 
             if (!targetRemovalUserIds.isEmpty()) {
-                teamUserRepository.deleteByTeamIdAndUserIdIn(childTeamId, targetRemovalUserIds);
+//                teamUserRepository.deleteByTeamIdAndUserIdIn(childTeamId, targetRemovalUserIds);
+                for (int userId: targetRemovalUserIds){
+                    // For any non-allowed user, remove its team user association and leadership
+                    teamUserRepository.deleteById(new TeamUserId(childTeamId, userId));
+
+                    Optional<Team> leadingTeam = teamRepository.findByLeaderId(userId);
+                    leadingTeam.ifPresent(team -> team.setLeader(null));
+                }
             }
         }
     }
@@ -340,6 +392,33 @@ public class TeamServiceImpl implements TeamService {
         teamRepository.save(team);
     }
 
+    // Cleanup orphan leadership association: Remove this user's leadership association if exist and ascendant team's membership is missing
+    @Override
+    @Transactional
+    public void removeOrphanLeadership(Integer userId) {
+        userRepository.findById(userId).orElseThrow(() -> new EntityNotFoundException("User does not exist, skipping removeOrphanLeadership method"));
+
+        Optional<Team> optionalUserLeadingTeam = teamRepository.findByLeaderId(userId);
+
+        if (optionalUserLeadingTeam.isPresent()) {
+            Team userLeadingTeam = optionalUserLeadingTeam.get();
+
+            // all membership association team ids for this user
+            List<Integer> membershipTeamIds = teamUserService.getTeamsForUser(userId).stream().map(TeamUserDTO::getTeamId).toList();
+            List<Integer> leadingTeamAncestorIds = teamRepository.findSelfAndAncestorIds(userLeadingTeam.getId());
+
+            // if membershipTeamIds does not include leading team's ancestor id,
+            // then the userLeadingTeam association is invalid and should be removed
+            leadingTeamAncestorIds.forEach(ancestor_id -> {
+                if (!membershipTeamIds.contains(ancestor_id)) {
+                    userLeadingTeam.setLeader(null);
+                }
+            });
+
+            teamRepository.save(userLeadingTeam);
+        }
+    }
+
     /**
      * ids of *all* descendants (NOT including the team itself)
      */
@@ -362,6 +441,7 @@ public class TeamServiceImpl implements TeamService {
 
         if (entity.getChildren() != null && !entity.getChildren().isEmpty()) {
             dto.setChildren(entity.getChildren().stream()
+                    .filter(child -> child.getStatus().equals(1))
                     .sorted(Comparator.comparing(Team::getId))
                     .map(c-> mapWithChildren(c, level + 1))
                     .toList());

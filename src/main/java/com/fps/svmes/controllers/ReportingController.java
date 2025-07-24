@@ -1,9 +1,11 @@
 package com.fps.svmes.controllers;
 
+import com.fps.svmes.dto.PagedResultDTO;
 import com.fps.svmes.dto.dtos.reporting.WidgetDataDTO;
 import com.fps.svmes.services.ReportingService;
 import org.bson.Document;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -37,15 +39,40 @@ public class ReportingController {
      * Fetch QC records within a given date range, with pagination.
      */
     @GetMapping("/qc-records")
-    public List<Document> getQcRecords(
+    public PagedResultDTO<Document> getQcRecords(
             @RequestParam Long formTemplateId,
             @RequestParam String startDateTime,
             @RequestParam String endDateTime,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
-
-        return reportingService.fetchQcRecords(formTemplateId, startDateTime, endDateTime, page, size);
+            @RequestParam(defaultValue = "15") int size,
+            @RequestParam(required = false) String sort,
+            @RequestParam(required = false) String search
+    ) {
+        return reportingService.fetchQcRecordsPaged(
+                formTemplateId,
+                startDateTime,
+                endDateTime,
+                page,
+                size,
+                sort,
+                search
+        );
     }
+
+    @GetMapping("/qc-records/export")
+    public ResponseEntity<List<Document>> exportQcRecords(
+            @RequestParam Long   formTemplateId,
+            @RequestParam String startDateTime,
+            @RequestParam String endDateTime,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String sort) {
+
+        List<Document> allRecords = reportingService.fetchAllRecordsWithoutPagination(
+                formTemplateId, startDateTime, endDateTime, search, sort);
+
+        return ResponseEntity.ok(allRecords);
+    }
+
 
     /**
      * Fetch QC records filtered by created_by ID, with pagination.

@@ -15,6 +15,7 @@ import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.sql.Timestamp;
@@ -51,6 +52,9 @@ public class ReportingServiceImpl implements ReportingService {
     @Autowired
     UserService userService;
 
+    @Value("${spring.data.mongodb.database}")
+    private String mongoDatabaseName;
+
     @Autowired
     public ReportingServiceImpl(MongoClient mongoClient) {
         this.mongoClient = mongoClient;
@@ -71,7 +75,7 @@ public class ReportingServiceImpl implements ReportingService {
 
         String jsonInput = qcFormTemplateRepository.findFormTemplateJsonById(formTemplateId);
         List<WidgetDataDTO> widgetDataList = extractWidgetData(jsonInput);
-        MongoDatabase database = mongoClient.getDatabase("dev-mes-qc");
+        MongoDatabase database = mongoClient.getDatabase(mongoDatabaseName);
 
         // Use updated generateCollectionNames with default timestamps
         List<String> collectionNames = generateCollectionNames(formTemplateId, defaultStart, defaultEnd);
@@ -202,7 +206,7 @@ public class ReportingServiceImpl implements ReportingService {
 
     private List<String> generateCollectionNames(Long formTemplateId, Timestamp utcStartDateTime, Timestamp utcEndDateTime) {
         List<String> collectionNames = new ArrayList<>();
-        MongoDatabase database = mongoClient.getDatabase("dev-mes-qc");
+        MongoDatabase database = mongoClient.getDatabase(mongoDatabaseName);
 
         // Convert timestamps to YYYYMM format
         SimpleDateFormat yearMonthFormat = new SimpleDateFormat("yyyyMM");
@@ -379,7 +383,7 @@ public class ReportingServiceImpl implements ReportingService {
      */
     @Override
     public List<Document> fetchQcRecords(Long formTemplateId, String startDateTime, String endDateTime, Integer page, Integer size) {
-        MongoDatabase database = mongoClient.getDatabase("dev-mes-qc");
+        MongoDatabase database = mongoClient.getDatabase(mongoDatabaseName);
 
         // Get label mappings for formTemplateId
         HashMap<String, Object> optionItemsKeyValueMap = QcFormTemplateOptionItemsKeyValueMapping(formTemplateId);
@@ -446,7 +450,7 @@ public class ReportingServiceImpl implements ReportingService {
             String sort,
             String search
     ) {
-        MongoDatabase database = mongoClient.getDatabase("dev-mes-qc");
+        MongoDatabase database = mongoClient.getDatabase(mongoDatabaseName);
 
         // Get label mappings
         HashMap<String, Object> optionItemsKeyValueMap = QcFormTemplateOptionItemsKeyValueMapping(formTemplateId);
@@ -547,7 +551,7 @@ public class ReportingServiceImpl implements ReportingService {
                                                            String search,
                                                            String sort) {
 
-        MongoDatabase database = mongoClient.getDatabase("dev-mes-qc");
+        MongoDatabase database = mongoClient.getDatabase(mongoDatabaseName);
 
         // label / optionItems 映射
         HashMap<String, Object> optionItemsKeyValueMap = QcFormTemplateOptionItemsKeyValueMapping(formTemplateId);
@@ -618,7 +622,7 @@ public class ReportingServiceImpl implements ReportingService {
 
     @Override
     public List<Document> fetchAllVersionsByGroupId(Long formTemplateId, String versionGroupId) {
-        MongoDatabase database = mongoClient.getDatabase("dev-mes-qc");
+        MongoDatabase database = mongoClient.getDatabase(mongoDatabaseName);
 
         HashMap<String, Object> optionItemsKeyValueMap = QcFormTemplateOptionItemsKeyValueMapping(formTemplateId);
         HashMap<String, String> keyValueMap = getFormTemplateKeyValueMapping(formTemplateId);

@@ -1,8 +1,8 @@
 spring:
   datasource:
-    url: jdbc:postgresql://fps-db-pg-mes.cxsfb8x5xnpi.us-east-2.rds.amazonaws.com:5432/mes
+    url: jdbc:postgresql://fps-db-pg-mes.cxsfb8x5xnpi.us-east-2.rds.amazonaws.com:5432/qc_demo
     username: fps_controls
-    password: Trump&Fps(Potato)
+    password: "Trump&Fps(Potato)"
     driver-class-name: org.postgresql.Driver
 
   jpa:
@@ -18,9 +18,8 @@ spring:
 
   data:
     mongodb:
-      uri: mongodb+srv://fps_controls:Trump&Fps%40Potato@cluster14082.cy975.mongodb.net/dev-mes-qc?retryWrites=true&w=majority&appName=Cluster14082
-      database: dev-mes-qc
-
+      uri: mongodb+srv://fps_controls:Trump%26Fps%40Potato@cluster14082.cy975.mongodb.net/demo-qc?retryWrites=true&w=majority&appName=Cluster14082
+      database: demo-qc
   security:
     user:
       name: fps-control

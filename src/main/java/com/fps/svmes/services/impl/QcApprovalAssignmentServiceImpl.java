@@ -17,6 +17,7 @@ import org.bson.Document;
 import org.bson.types.ObjectId;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -47,6 +48,9 @@ public class QcApprovalAssignmentServiceImpl implements QcApprovalAssignmentServ
 
     @Autowired
     private final UserRepository userRepository;
+
+    @Value("${spring.data.mongodb.database}")
+    private String mongoDatabaseName;
 
     @Override
     public void insertIfNotExists(QcApprovalAssignmentDTO dto) {
@@ -100,7 +104,7 @@ public class QcApprovalAssignmentServiceImpl implements QcApprovalAssignmentServ
     @Override
     public List<Document> getVersionHistory(String submissionId, String collectionName) {
         // Step 1: Connect to the collection
-        MongoDatabase database = mongoClient.getDatabase("dev-mes-qc");
+        MongoDatabase database = mongoClient.getDatabase(mongoDatabaseName);
         MongoCollection<Document> collection = database.getCollection(collectionName);
 
         // Step 2: Find the initial document by submission ID
@@ -140,7 +144,7 @@ public class QcApprovalAssignmentServiceImpl implements QcApprovalAssignmentServ
     @Transactional
     @Override
     public void approveAction(String submissionId, String collectionName, String approverRole, Integer approverId, String comment, boolean suggestRetest, String eSignatureBase64) {
-        MongoDatabase database = mongoClient.getDatabase("dev-mes-qc");
+        MongoDatabase database = mongoClient.getDatabase(mongoDatabaseName);
         MongoCollection<Document> collection = database.getCollection(collectionName);
 
         // Step 1: Find the document
@@ -226,7 +230,7 @@ public class QcApprovalAssignmentServiceImpl implements QcApprovalAssignmentServ
 
     @Override
     public List<Document> getApprovalInfo(String submissionId, String collectionName) {
-        MongoDatabase database = mongoClient.getDatabase("dev-mes-qc");
+        MongoDatabase database = mongoClient.getDatabase(mongoDatabaseName);
         MongoCollection<Document> collection = database.getCollection(collectionName);
 
         Document doc = collection.find(Filters.eq("_id", new ObjectId(submissionId))).first();

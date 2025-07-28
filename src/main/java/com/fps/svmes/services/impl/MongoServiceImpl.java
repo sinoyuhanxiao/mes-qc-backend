@@ -6,6 +6,7 @@ import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 import org.bson.Document;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.stereotype.Service;
 import com.mongodb.client.model.ReplaceOptions;
@@ -19,6 +20,9 @@ public class MongoServiceImpl implements MongoService {
 
     @Autowired
     private MongoClient mongoClient;
+
+    @Value("${spring.data.mongodb.database}")
+    private String mongoDatabaseName;
 
     @Override
     public void createCollection(String collectionName) {
@@ -39,7 +43,7 @@ public class MongoServiceImpl implements MongoService {
 
     @Override
     public void replaceOne(String collectionName, Document filter, Document newDoc) {
-        MongoDatabase db = mongoClient.getDatabase("dev-mes-qc"); // ✅ your real DB name
+        MongoDatabase db = mongoClient.getDatabase(mongoDatabaseName); // ✅ your real DB name
         MongoCollection<Document> collection = db.getCollection(collectionName);
         collection.replaceOne(filter, newDoc, new ReplaceOptions().upsert(true));
     }

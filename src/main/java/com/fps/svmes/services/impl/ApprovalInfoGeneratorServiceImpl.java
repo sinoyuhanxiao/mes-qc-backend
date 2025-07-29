@@ -19,19 +19,19 @@ public class ApprovalInfoGeneratorServiceImpl implements ApprovalInfoGeneratorSe
         List<Map<String, Object>> flow = new ArrayList<>();
 
         // Always add the submitter with current timestamp
-        flow.add(createNode("submitter", createdBy, "填报员", "completed", Date.from(Instant.now())));
+        flow.add(createNode("submitter", createdBy, "QC Worker", "completed", Date.from(Instant.now())));
 
         if ("flow_2".equals(approvalType)) {
-            flow.add(createNode("leader", null, "班长签字", "pending", null));
+            flow.add(createNode("leader", null, "Leader Sign", "pending", null));
         } else if ("flow_3".equals(approvalType)) {
-            flow.add(createNode("supervisor", null, "主管签字", "pending", null));
+            flow.add(createNode("supervisor", null, "Supervisor Sign", "pending", null));
         } else if ("flow_4".equals(approvalType)) {
-            flow.add(createNode("leader", null, "班长签字", "pending", null));
-            flow.add(createNode("supervisor", null, "主管签字", "not_started", null));
+            flow.add(createNode("leader", null, "Leader Sign", "pending", null));
+            flow.add(createNode("supervisor", null, "Supervisor Sign", "not_started", null));
         }
 
         // Final archive node
-        flow.add(createNode("archive", null, "归档", "not_started", null));
+        flow.add(createNode("archive", null, "Archived", "not_started", null));
         return flow;
     }
 

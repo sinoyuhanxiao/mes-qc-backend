@@ -1,12 +1,12 @@
 # Use OpenJDK to run the Spring Boot application
-FROM openjdk:21-jdk-slim
+FROM azul/zulu-openjdk:21
 
 # Set the working directory
 WORKDIR /app
 
 # Expose port 8085
-EXPOSE 8091
-# EXPOSE 8090
+# EXPOSE 8091
+EXPOSE 8090
 
 # Accept an argument to set the active profile
 ARG SPRING_PROFILES_ACTIVE

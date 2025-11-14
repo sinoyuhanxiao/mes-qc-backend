@@ -1,8 +1,8 @@
 spring:
   datasource:
-    url: jdbc:postgresql://10.10.12.10:5432/mes
-    username: postgres
-    password: postgres
+    url: jdbc:postgresql://fps-db-pg-mes.cxsfb8x5xnpi.us-east-2.rds.amazonaws.com:5432/qc_demo
+    username: fps_controls
+    password: "Trump&Fps(Potato)"
     driver-class-name: org.postgresql.Driver
 
   jpa:
@@ -12,18 +12,18 @@ spring:
     open-in-view: false
     properties:
       hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
         transaction.jta.platform: org.hibernate.engine.transaction.jta.platform.internal.NoJtaPlatform
 
   data:
     mongodb:
-      uri: mongodb://root:password@10.10.12.10:27017/dev-mes-qc?authSource=admin
-      database: dev-mes-qc
-
+      uri: mongodb+srv://fps_controls:Trump%26Fps%40Potato@cluster14082.cy975.mongodb.net/demo-qc?retryWrites=true&w=majority&appName=Cluster14082
+      database: demo-qc
   security:
     user:
       name: fps-control
-      password: fpscontrols12#
+      password: fpscontrols123
 
 feign:
   client:

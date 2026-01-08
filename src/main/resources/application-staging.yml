@@ -23,7 +23,7 @@ spring:
   security:
     user:
       name: fps-control
-      password: fpscontrols12#
+      password: fpscontrols123
 
 feign:
   client:

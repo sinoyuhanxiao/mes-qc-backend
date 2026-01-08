@@ -24,7 +24,7 @@ services:
       # - "8090:8090"
     environment:
       # For demo environment use:
-      - SPRING_PROFILES_ACTIVE=demo
+      - SPRING_PROFILES_ACTIVE=staging
       # For dev and sgb environment use:
       # - SPRING_PROFILES_ACTIVE=dev
 

@@ -12,6 +12,7 @@ import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.Projections;
 import org.apache.commons.math3.exception.NoDataException;
+import org.apache.coyote.BadRequestException;
 import org.bson.Document;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -79,7 +80,7 @@ public class SPCServiceImpl implements SPCService {
 
         // if no valid fields, throw exception
         if (wantedLimits.isEmpty()) {
-            throw new IllegalArgumentException("No valid control limits found for formTemplateId: " + request.getFormTemplateId());
+            return spcList;
         }
 
         Map<String, List<TimeSeriesDTO>> timeSeriesMap = new HashMap<>();

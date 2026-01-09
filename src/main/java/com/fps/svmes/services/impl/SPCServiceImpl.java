@@ -78,7 +78,7 @@ public class SPCServiceImpl implements SPCService {
             }
         }
 
-        // if no valid fields, throw exception
+        // if no valid fields, return empty list
         if (wantedLimits.isEmpty()) {
             return spcList;
         }

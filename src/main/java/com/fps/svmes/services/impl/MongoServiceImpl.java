@@ -48,4 +48,11 @@ public class MongoServiceImpl implements MongoService {
         collection.replaceOne(filter, newDoc, new ReplaceOptions().upsert(true));
     }
 
+    @Override
+    public void deleteOne(String collectionName, Document filter) {
+        MongoDatabase db = mongoClient.getDatabase(mongoDatabaseName);
+        MongoCollection<Document> collection = db.getCollection(collectionName);
+        collection.deleteOne(filter);
+    }
+
 }

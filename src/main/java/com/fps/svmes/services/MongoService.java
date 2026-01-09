@@ -27,7 +27,21 @@ public interface MongoService {
      */
     void insertOne(String collectionName, org.bson.Document document);
 
-
+    /**
+     * Replaces one document in a MongoDB collection (upsert if not exists).
+     *
+     * @param collectionName Name of the collection
+     * @param filter Filter to find the document
+     * @param newDoc The new document to replace with
+     */
     void replaceOne(String collectionName, Document filter, Document newDoc);
+
+    /**
+     * Deletes one document from a MongoDB collection.
+     *
+     * @param collectionName Name of the collection
+     * @param filter Filter to find the document to delete
+     */
+    void deleteOne(String collectionName, Document filter);
 
 }

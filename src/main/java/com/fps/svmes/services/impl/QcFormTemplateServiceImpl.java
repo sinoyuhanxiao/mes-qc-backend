@@ -67,11 +67,14 @@ public class QcFormTemplateServiceImpl implements QcFormTemplateService {
     public QcFormTemplateDTO updateTemplate(Long id, QcFormTemplateDTO dto) {
         QcFormTemplate template = qcFormTemplateRepository.findById(id).orElseThrow(() -> new RuntimeException("Template not found"));
 
+        boolean formStructureChanged = false;
+
         if (dto.getName() != null) {
             template.setName(dto.getName());
         }
         if (dto.getFormTemplateJson() != null) {
             template.setFormTemplateJson(dto.getFormTemplateJson());
+            formStructureChanged = true;
         } else {
             template.setFormTemplateJson(template.getFormTemplateJson());
         }
@@ -81,7 +84,24 @@ public class QcFormTemplateServiceImpl implements QcFormTemplateService {
         template.setUpdatedAt(OffsetDateTime.now());
         template.setUpdatedBy(dto.getUpdatedBy());
 
-        return modelMapper.map(qcFormTemplateRepository.save(template), QcFormTemplateDTO.class);
+        QcFormTemplateDTO updatedTemplate = modelMapper.map(qcFormTemplateRepository.save(template), QcFormTemplateDTO.class);
+
+        // If form structure changed, update MongoDB documents
+        if (formStructureChanged) {
+            try {
+                // Update key-label pairs with type field
+                extractAndStoreKeyLabelPairs(updatedTemplate);
+                // Update control limit settings
+                // Note: We delete and recreate to handle removed fields
+                mongoService.deleteOne("control_limit_setting", new Document("qc_form_template_id", id));
+                createControlLimitSetting(updatedTemplate);
+            } catch (Exception e) {
+                // Log error but don't fail the update operation
+                throw new RuntimeException("Failed to update MongoDB documents after template update", e);
+            }
+        }
+
+        return updatedTemplate;
     }
 
     @Override
@@ -227,9 +247,13 @@ public class QcFormTemplateServiceImpl implements QcFormTemplateService {
                 if (options != null && options.has("name") && options.has("label")) {
                     String key = options.get("name").asText();
                     String label = options.get("label").asText();
+                    String widgetType = widget.has("type") ? widget.get("type").asText() : "input";
+                    String fieldType = inferFieldType(widgetType, options);
+
                     Map<String, String> entry = new HashMap<>();
                     entry.put("key", key);
                     entry.put("label", label);
+                    entry.put("type", fieldType);
                     result.add(entry);
                 }
             }
@@ -245,6 +269,47 @@ public class QcFormTemplateServiceImpl implements QcFormTemplateService {
                     }
                 }
             }
+        }
+    }
+
+    /**
+     * Infer field type category from widget type
+     *
+     * WHITELIST APPROACH: Only validatable field types are explicitly returned.
+     * All other types return "other" (non-validatable).
+     *
+     * Validatable types (have control limits and validation rules):
+     *   - number:   Numeric fields with upper/lower control limits
+     *   - radio:    Radio buttons with valid option keys
+     *   - checkbox: Checkboxes with valid option keys
+     *   - select:   Dropdown/select with valid option keys
+     *
+     * Any other widget type (text, date, textarea, file-upload, etc.) returns "other".
+     * This is future-proof - new widget types will automatically be non-validatable.
+     */
+    private String inferFieldType(String widgetType, JsonNode options) {
+        switch (widgetType) {
+            case "number":
+                return "number";
+            case "select":
+                return "select";
+            case "radio":
+                return "radio";
+            case "checkbox":
+                return "checkbox";
+            case "input":
+                // Special case: input widget can be type=number (validatable)
+                if (options != null && options.has("type")) {
+                    String inputType = options.get("type").asText();
+                    if ("number".equals(inputType)) {
+                        return "number";
+                    }
+                }
+                // Input with type=text/email/tel/etc. are non-validatable
+                return "other";
+            default:
+                // All other widget types (date, textarea, file-upload, etc.) are non-validatable
+                return "other";
         }
     }
 

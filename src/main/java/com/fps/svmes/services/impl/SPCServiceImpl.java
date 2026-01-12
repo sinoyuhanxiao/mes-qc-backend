@@ -10,10 +10,12 @@ import com.fps.svmes.services.SPCService;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
+import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 import org.apache.commons.math3.exception.NoDataException;
 import org.apache.coyote.BadRequestException;
 import org.bson.Document;
+import org.bson.conversions.Bson;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -47,10 +49,12 @@ public class SPCServiceImpl implements SPCService {
             throw new IllegalArgumentException("startDateTime: " + request.getStartDateTime() + " must not exceed endDateTime: " + request.getEndDateTime());
         }
         List<SPCDTO> spcList = new ArrayList<>();
+        Timestamp start = Timestamp.from(request.getStartDateTime().toInstant());
+        Timestamp end = Timestamp.from(request.getEndDateTime().toInstant());
         List<String> collectionNames = generateCollectionNames(
                 request.getFormTemplateId(),
-                Timestamp.from(request.getStartDateTime().toInstant()),
-                Timestamp.from(request.getEndDateTime().toInstant()));
+                start,
+                end);
         MongoDatabase database = mongoClient.getDatabase(mongoDatabaseName);
 
         Optional<ControlLimitSetting> controlLimits = controlLimitSettingRepository.findByQcFormTemplateId(request.getFormTemplateId());
@@ -88,10 +92,16 @@ public class SPCServiceImpl implements SPCService {
             timeSeriesMap.put(fieldName, new ArrayList<>());
         }
 
+        // Mongo filter
+        Bson filter = Filters.and(
+                Filters.gte("created_at", start),
+                Filters.lte("created_at", end)
+        );
+
         // build time series map using field as keys
         for (String collectionName : collectionNames) {
             MongoCollection<Document> collection = database.getCollection(collectionName);
-            for (Document doc : collection.find()) {
+            for (Document doc : collection.find(filter)) {
                 Timestamp createdAt = Timestamp.from(doc.getDate("created_at").toInstant());
                 for (String wantedField : wantedLimits) {
                     if (doc.get(wantedField) != null) {

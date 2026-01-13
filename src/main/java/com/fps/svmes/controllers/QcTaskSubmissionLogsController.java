@@ -157,17 +157,23 @@ public class QcTaskSubmissionLogsController {
     public ResponseEntity<?> getRawMongoDocument(
             @RequestParam String submissionId,
             @RequestParam Long qcFormTemplateId,
-            @RequestParam String createdAt // expected: 2025-05-01 16:50:52.427519100
+            @RequestParam String createdAt, // expected: 2025-05-01 16:50:52.427519100
+            @RequestParam(required = false) String collectionName
     ) {
         try {
-            // Format: "form_template_{templateId}_{yyyyMM}"
-            String collectionSuffix = createdAt.substring(0, 7).replace("-", "");
-            String collectionName = "form_template_" + qcFormTemplateId + "_" + collectionSuffix;
+            String targetCollectionName;
+            if (collectionName != null && !collectionName.isEmpty()) {
+                targetCollectionName = collectionName;
+            } else {
+                // Format: "form_template_{templateId}_{yyyyMM}"
+                String collectionSuffix = createdAt.substring(0, 7).replace("-", "");
+                targetCollectionName = "form_template_" + qcFormTemplateId + "_" + collectionSuffix;
+            }
 
-            Document rawDoc = qcTaskSubmissionLogsService.getRawDocumentBySubmissionId(submissionId, collectionName);
+            Document rawDoc = qcTaskSubmissionLogsService.getRawDocumentBySubmissionId(submissionId, targetCollectionName);
 
             if (rawDoc == null) {
-                return ResponseEntity.status(404).body("Document not found in collection: " + collectionName);
+                return ResponseEntity.status(404).body("Document not found in collection: " + targetCollectionName);
             }
 
             return ResponseEntity.ok(rawDoc);

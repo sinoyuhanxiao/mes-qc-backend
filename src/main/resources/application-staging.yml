@@ -1,6 +1,6 @@
 spring:
   datasource:
-    url: jdbc:postgresql://10.10.12.11:5432/mes
+    url: jdbc:postgresql://10.10.12.11:5432/mes_dev
     username: postgres
     password: postgres
     driver-class-name: org.postgresql.Driver
@@ -23,7 +23,7 @@ spring:
   security:
     user:
       name: fps-control
-      password: fpscontrols12#
+      password: fpscontrols123
 
 feign:
   client:

@@ -703,7 +703,11 @@ public class AlertRecordServiceImpl implements AlertRecordService {
 //                        .ifPresent(level -> dto.setRiskLevel(modelMapper.map(level, RiskLevelDTO.class)));
 //            }
 //
-//            return dto;
-//        });
-    // }
+    @Override
+    @Transactional
+    public void deleteBySubmissionIds(List<String> submissionIds) {
+        if (submissionIds != null && !submissionIds.isEmpty()) {
+            alertRecordRepository.deleteBySubmissionIdIn(submissionIds);
+        }
+    }
 }

@@ -10,5 +10,7 @@ import java.util.List;
 @Repository
 public interface AlertRecordRepository extends JpaRepository<AlertRecord, Long>, JpaSpecificationExecutor<AlertRecord> {
     List<AlertRecord> findByStatus(Integer status);
+    void deleteBySubmissionId(String submissionId);
+    void deleteBySubmissionIdIn(List<String> submissionIds);
 }
 

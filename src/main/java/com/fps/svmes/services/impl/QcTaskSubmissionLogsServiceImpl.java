@@ -4,8 +4,10 @@ import com.fps.svmes.dto.dtos.qcForm.QcTaskSubmissionLogsDTO;
 import com.fps.svmes.models.sql.qcForm.QcTaskSubmissionLogs;
 import com.fps.svmes.repositories.jpaRepo.qcForm.QcFormTemplateRepository;
 import com.fps.svmes.repositories.jpaRepo.qcForm.QcTaskSubmissionLogsRepository;
+import com.fps.svmes.services.AlertRecordService;
 import com.fps.svmes.services.QcTaskSubmissionLogsService;
 import com.fps.svmes.services.UserService;
+import com.fps.svmes.services.QcSnapshotSubmissionService;
 import com.itextpdf.text.Paragraph;
 
 import com.itextpdf.text.pdf.BaseFont;
@@ -33,6 +35,7 @@ import java.time.*;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.*;
+import java.util.Collections;
 
 import org.bson.Document;
 
@@ -60,6 +63,12 @@ public class QcTaskSubmissionLogsServiceImpl implements QcTaskSubmissionLogsServ
 
     @Autowired
     private UserService userService;
+
+    @Autowired
+    private AlertRecordService alertRecordService;
+
+    @Autowired
+    private QcSnapshotSubmissionService qcSnapshotSubmissionService;
 
     @Override
     public QcTaskSubmissionLogsDTO insertLog(QcTaskSubmissionLogsDTO dto) {
@@ -532,7 +541,8 @@ public class QcTaskSubmissionLogsServiceImpl implements QcTaskSubmissionLogsServ
         }
 
         // 2. Find the document by _id
-        Query idQuery = new Query(Criteria.where("_id").is(submissionId));
+        ObjectId oid = new ObjectId(submissionId);
+        Query idQuery = new Query(Criteria.where("_id").is(oid));
         Document document = mongoTemplate.findOne(idQuery, Document.class, collectionName);
 
         // 3. Check if it exists
@@ -544,10 +554,31 @@ public class QcTaskSubmissionLogsServiceImpl implements QcTaskSubmissionLogsServ
         Object versionGroupId = document.get("version_group_id");
 
         if (versionGroupId != null) {
+            // Find all submission IDs in this group to delete from snapshot service
+            Query groupQuery = new Query(Criteria.where("version_group_id").is(versionGroupId));
+            groupQuery.fields().include("_id");
+            List<Document> docs = mongoTemplate.find(groupQuery, Document.class, collectionName);
+
+            List<String> idsToDelete = docs.stream()
+                    .map(d -> d.getObjectId("_id").toString())
+                    .collect(Collectors.toList());
+
+            // Delete from snapshot service
+            qcSnapshotSubmissionService.deleteBySubmissionIds(idsToDelete);
+
+            // Delete associated alert records
+            alertRecordService.deleteBySubmissionIds(idsToDelete);
+
             // Delete all documents with the same version_group_id
             Query deleteGroupQuery = new Query(Criteria.where("version_group_id").is(versionGroupId));
             mongoTemplate.remove(deleteGroupQuery, collectionName);
         } else {
+            // Delete from snapshot service
+            qcSnapshotSubmissionService.deleteBySubmissionId(submissionId);
+
+            // Delete associated alert records
+            alertRecordService.deleteBySubmissionIds(Collections.singletonList(submissionId));
+
             // Delete only this document
             mongoTemplate.remove(idQuery, collectionName);
         }
@@ -570,11 +601,11 @@ public class QcTaskSubmissionLogsServiceImpl implements QcTaskSubmissionLogsServ
             return null;
         }
 
-        // 🔥 清洗掉不需要的 key
+        // 🔥 清洗掉不需要的 key (keep related_* fields for form edit pre-population)
         Document cleanedDocument = new Document();
         for (Map.Entry<String, Object> entry : rawDocument.entrySet()) {
             String key = entry.getKey();
-            if (key.startsWith("related_") || key.equals("exceeded_info") || key.equals("e-signature") || key.equals("approval_info") || key.equals("_id") || key.equals("created_at") || key.equals("created_by")) {
+            if (key.equals("exceeded_info") || key.equals("e-signature") || key.equals("approval_info") || key.equals("_id") || key.equals("created_at") || key.equals("created_by")) {
                 continue; // 跳过
             }
             cleanedDocument.put(key, entry.getValue());

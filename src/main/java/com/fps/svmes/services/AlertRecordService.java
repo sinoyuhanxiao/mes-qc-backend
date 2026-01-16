@@ -7,6 +7,8 @@ import com.fps.svmes.dto.requests.alert.AlertRecordFilterRequest;
 import com.fps.svmes.models.sql.alert.AlertRecord;
 import org.springframework.data.domain.Page;
 
+import java.util.List;
+
 public interface AlertRecordService {
     AlertRecordDTO create(AlertRecordDTO dto);
     Page<DetailedAlertRecordDTO> getDetailedList(int page, int size);
@@ -14,5 +16,6 @@ public interface AlertRecordService {
     AlertRecordDTO deleteRecord(Long alertId, Integer userId);
     AlertSummaryDTO getAlertSummary();
     Page<DetailedAlertRecordDTO> filterAlertRecords(AlertRecordFilterRequest request);
+    void deleteBySubmissionIds(List<String> submissionIds);
 
 }

@@ -46,6 +46,9 @@ public class QcFormDataController {
     @Autowired
     private QcApprovalAssignmentService qcApprovalAssignmentService;
 
+    @Autowired
+    private QcSnapshotSubmissionService qcSnapshotSubmissionService;
+
     @PostMapping("/insert-form/{userId}/{collectionName}")
     public ResponseEntity<?> insertFormData(
             @PathVariable String collectionName,
@@ -175,6 +178,9 @@ public class QcFormDataController {
             // Update the approval assignment to point to the new submission id
             qcApprovalAssignmentService.updateSubmissionId(parentSubmissionId, newSubmissionId);
 
+            // Delete the old snapshot submission to prevent duplication (the new one will be picked up by the next snapshot run)
+            qcSnapshotSubmissionService.deleteBySubmissionId(parentSubmissionId);
+
             // 3. Trigger alerts if needed
             controlLimitEvaluationService.evaluateAndTriggerAlerts(formTemplateId, userId, newDoc, newSubmissionId);
 
@@ -190,19 +196,28 @@ public class QcFormDataController {
         }
     }
 
+    /**
+     * Enrich new document with data from parent document.
+     *
+     * For related_* fields (basic fields): Only copy from parent if NOT already present in newDoc.
+     * This allows the frontend to pass updated basic field values when editing.
+     *
+     * For approval_info: Always copy from parent to maintain approval workflow state.
+     */
     private void enrichNewDocWithParentData(Map<String, Object> newDoc, Document parent) {
         for (Map.Entry<String, Object> entry : parent.entrySet()) {
             String key = entry.getKey();
             Object value = entry.getValue();
 
-            if (key.startsWith("related_")) {
+            // Only copy related_* fields from parent if NOT already provided in the request
+            if (key.startsWith("related_") && !newDoc.containsKey(key)) {
                 newDoc.put(key, value);
             }
         }
 
+        // Always copy approval_info from parent to maintain approval workflow
         if (parent.containsKey("approval_info")) {
             newDoc.put("approval_info", parent.get("approval_info"));
-            parent.remove("approval_info"); // optional: only if you want to clean it from parent
         }
     }
 

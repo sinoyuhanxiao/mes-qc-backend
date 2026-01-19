@@ -393,6 +393,8 @@ public class ReportingServiceImpl implements ReportingService {
         List<String> collectionNames = getRelevantCollections(database, formTemplateId, startDateTime, endDateTime);
 
         Map<String, Document> latestVersionMap = new HashMap<>();
+        Set<Integer> userIds = new HashSet<>();
+
         for (String collectionName : collectionNames) {
             MongoCollection<Document> collection = database.getCollection(collectionName);
             List<Document> collectionRecords = queryRecords(collection, startDateTime, endDateTime, page, size);
@@ -400,6 +402,10 @@ public class ReportingServiceImpl implements ReportingService {
             for (Document doc : collectionRecords) {
                 String groupId = doc.getString("version_group_id");
                 Integer version = doc.getInteger("version", 0);
+
+                if (doc.containsKey("created_by") && doc.get("created_by") instanceof Number) {
+                    userIds.add(((Number) doc.get("created_by")).intValue());
+                }
 
                 if (groupId != null) {
                     Document existing = latestVersionMap.get(groupId);
@@ -413,9 +419,13 @@ public class ReportingServiceImpl implements ReportingService {
             }
         }
 
+        // Bulk fetch user names
+        Map<Integer, String> userNameMap = userService.getUsersByIds(new ArrayList<>(userIds)).stream()
+                .collect(Collectors.toMap(u -> u.getId(), u -> u.getName()));
+
         // Convert and return only the latest versions
         return latestVersionMap.values().stream()
-                .map(doc -> formattedResult(doc, optionItemsKeyValueMap, keyValueMap))
+                .map(doc -> formattedResult(doc, optionItemsKeyValueMap, keyValueMap, userNameMap))
                 .collect(Collectors.toList());
     }
 
@@ -460,6 +470,7 @@ public class ReportingServiceImpl implements ReportingService {
         List<String> collectionNames = getRelevantCollections(database, formTemplateId, startDateTime, endDateTime);
 
         Map<String, Document> latestVersionMap = new HashMap<>();
+        Set<Integer> userIds = new HashSet<>();
 
         for (String collectionName : collectionNames) {
             MongoCollection<Document> collection = database.getCollection(collectionName);
@@ -468,6 +479,10 @@ public class ReportingServiceImpl implements ReportingService {
             for (Document doc : allDocs) {
                 String groupId = doc.getString("version_group_id");
                 Integer version = doc.getInteger("version", 0);
+
+                if (doc.containsKey("created_by") && doc.get("created_by") instanceof Number) {
+                    userIds.add(((Number) doc.get("created_by")).intValue());
+                }
 
                 if (groupId != null) {
                     Document existing = latestVersionMap.get(groupId);
@@ -480,20 +495,24 @@ public class ReportingServiceImpl implements ReportingService {
             }
         }
 
-        // Filtering (search)
-        Stream<Document> stream = latestVersionMap.values().stream();
+        // Bulk fetch user names
+        Map<Integer, String> userNameMap = userService.getUsersByIds(new ArrayList<>(userIds)).stream()
+                .collect(Collectors.toMap(u -> u.getId(), u -> u.getName()));
+
+        // Stream Pipeline: Format -> Filter -> Sort
+        Stream<Document> stream = latestVersionMap.values().parallelStream()
+                .map(doc -> formattedResult(doc, optionItemsKeyValueMap, keyValueMap, userNameMap));
+
+        // 2. Filter (search) on visible field values only (excluding metadata fields)
         if (search != null && !search.isEmpty()) {
             String lower = search.toLowerCase();
-            stream = stream.filter(doc ->
-                    doc.values().stream().anyMatch(v ->
-                            v != null && v.toString().toLowerCase().contains(lower)
-                    )
-            );
+            stream = stream.filter(doc -> containsSearchInVisibleFields(doc, lower));
         }
 
-        // Sorting
-        if (sort != null && sort.contains(",")) {
-            String[] parts = sort.split(",", 2);
+        // 3. Sorting (default to created_at descending if no sort specified)
+        String effectiveSort = (sort == null || sort.isEmpty()) ? "created_at,desc" : sort;
+        if (effectiveSort.contains(",")) {
+            String[] parts = effectiveSort.split(",", 2);
             String field = parts[0];
             boolean desc = "desc".equalsIgnoreCase(parts[1]);
             Comparator<Document> cmp;
@@ -506,7 +525,7 @@ public class ReportingServiceImpl implements ReportingService {
             stream = stream.sorted(cmp);
         }
 
-        // Pagination
+        // 4. Pagination
         List<Document> filtered = stream.collect(Collectors.toList());
         long total = filtered.size();
         int from = page * size;
@@ -515,14 +534,9 @@ public class ReportingServiceImpl implements ReportingService {
                 ? Collections.emptyList()
                 : filtered.subList(from, to);
 
-        // Final formatting
-        List<Document> formattedDocs = pageContent.stream()
-                .map(doc -> formattedResult(doc, optionItemsKeyValueMap, keyValueMap))
-                .collect(Collectors.toList());
-
         int totalPages = (int) Math.ceil((double) total / size);
         return new PagedResultDTO<>(
-                formattedDocs,
+                pageContent,
                 total,
                 totalPages,
                 page,
@@ -563,6 +577,7 @@ public class ReportingServiceImpl implements ReportingService {
 
         /** ---------- 1. 取最新版本 ---------- */
         Map<String, Document> latestVersionMap = new HashMap<>();
+        Set<Integer> userIds = new HashSet<>();
 
         for (String colName : collectionNames) {
             MongoCollection<Document> col = database.getCollection(colName);
@@ -573,6 +588,10 @@ public class ReportingServiceImpl implements ReportingService {
             for (Document d : docs) {
                 String gid      = d.getString("version_group_id");
                 Integer version = d.getInteger("version", 0);
+
+                if (d.containsKey("created_by") && d.get("created_by") instanceof Number) {
+                    userIds.add(((Number) d.get("created_by")).intValue());
+                }
 
                 if (gid != null) {
                     Document existing = latestVersionMap.get(gid);
@@ -585,20 +604,23 @@ public class ReportingServiceImpl implements ReportingService {
             }
         }
 
-        /** ---------- 2. 关键词过滤 ---------- */
-        Stream<Document> stream = latestVersionMap.values().stream();
+        // Bulk fetch user names
+        Map<Integer, String> userNameMap = userService.getUsersByIds(new ArrayList<>(userIds)).stream()
+                .collect(Collectors.toMap(u -> u.getId(), u -> u.getName()));
+
+        /** ---------- 2. Pipeline: Format -> Filter -> Sort ---------- */
+        Stream<Document> stream = latestVersionMap.values().parallelStream()
+                .map(doc -> formattedResult(doc, optionItemsKeyValueMap, keyValueMap, userNameMap));
+
         if (search != null && !search.isEmpty()) {
             String kw = search.toLowerCase();
-            stream = stream.filter(doc ->
-                    doc.values().stream().anyMatch(v ->
-                            v != null && v.toString().toLowerCase().contains(kw)
-                    )
-            );
+            stream = stream.filter(doc -> containsSearchInVisibleFields(doc, kw));
         }
 
-        /** ---------- 3. 排序 ---------- */
-        if (sort != null && sort.contains(",")) {
-            String[] parts   = sort.split(",", 2);
+        /** ---------- 3. 排序 (default to created_at descending if no sort specified) ---------- */
+        String effectiveSort = (sort == null || sort.isEmpty()) ? "created_at,desc" : sort;
+        if (effectiveSort.contains(",")) {
+            String[] parts   = effectiveSort.split(",", 2);
             String field     = parts[0];
             boolean desc     = "desc".equalsIgnoreCase(parts[1]);
 
@@ -614,10 +636,8 @@ public class ReportingServiceImpl implements ReportingService {
             stream = stream.sorted(cmp);
         }
 
-        /** ---------- 4. 最终格式化 ---------- */
-        return stream
-                .map(doc -> formattedResult(doc, optionItemsKeyValueMap, keyValueMap))
-                .collect(Collectors.toList());
+        /** ---------- 4. 最终结果 ---------- */
+        return stream.collect(Collectors.toList());
     }
 
     @Override
@@ -628,6 +648,7 @@ public class ReportingServiceImpl implements ReportingService {
         HashMap<String, String> keyValueMap = getFormTemplateKeyValueMapping(formTemplateId);
 
         List<Document> versionedDocs = new ArrayList<>();
+        Set<Integer> userIds = new HashSet<>();
 
         // Loop over all relevant collections in here
         for (String collectionName : database.listCollectionNames()) {
@@ -636,6 +657,11 @@ public class ReportingServiceImpl implements ReportingService {
             MongoCollection<Document> collection = database.getCollection(collectionName);
 
             List<Document> matches = collection.find(eq("version_group_id", versionGroupId)).into(new ArrayList<>());
+            for (Document d : matches) {
+                if (d.containsKey("created_by") && d.get("created_by") instanceof Number) {
+                    userIds.add(((Number) d.get("created_by")).intValue());
+                }
+            }
             versionedDocs.addAll(matches);
         }
 
@@ -645,8 +671,12 @@ public class ReportingServiceImpl implements ReportingService {
             return v2.compareTo(v1); // latest first
         });
 
+        // Bulk fetch user names
+        Map<Integer, String> userNameMap = userService.getUsersByIds(new ArrayList<>(userIds)).stream()
+                .collect(Collectors.toMap(u -> u.getId(), u -> u.getName()));
+
         return versionedDocs.stream()
-                .map(doc -> formattedResult(doc, optionItemsKeyValueMap, keyValueMap))
+                .map(doc -> formattedResult(doc, optionItemsKeyValueMap, keyValueMap, userNameMap))
                 .collect(Collectors.toList());
     }
 
@@ -706,7 +736,7 @@ public class ReportingServiceImpl implements ReportingService {
     }
 
     // TODO: use MongoFormTemplateUtils
-    private Document formattedResult(Document document, HashMap<String, Object> optionItemsKeyValueMap, HashMap<String, String> keyValueMap) {
+    private Document formattedResult(Document document, HashMap<String, Object> optionItemsKeyValueMap, HashMap<String, String> keyValueMap, Map<Integer, String> userNameMap) {
         Document formattedDocument = new Document();
 
         for (String key : document.keySet()) {
@@ -739,17 +769,12 @@ public class ReportingServiceImpl implements ReportingService {
                 formattedDocument.put(formattedKey, value);
             }
 
-            // 获取 `created_by` 并添加 `created_by_name`
-            if (document.containsKey("created_by") && document.get("created_by") instanceof Long) {
-                Long createdById = document.getLong("created_by"); // ✅ 直接获取 Long 类型
-                try {
-                    String creatorName = userService.getUserById(Math.toIntExact(createdById)).getName(); // ✅ Long 转 Integer
-                    formattedDocument.put("提交人", creatorName); // 添加 `created_by_name`
-                } catch (ArithmeticException e) {
-                    formattedDocument.put("created_by_name", "ID 超出 Integer 范围");
-                } catch (Exception e) {
-                    formattedDocument.put("提交人", "未知用户"); // 兜底方案
-                }
+            // 获取 `created_by` 并添加 `created_by_name` using bulk map
+            if (document.containsKey("created_by") && document.get("created_by") instanceof Number) {
+                Number createdByIdNum = (Number) document.get("created_by");
+                Integer createdById = createdByIdNum.intValue();
+                String creatorName = userNameMap.getOrDefault(createdById, "未知用户");
+                formattedDocument.put("提交人", creatorName); // 添加 `created_by_name`
             }
         }
 
@@ -767,6 +792,51 @@ public class ReportingServiceImpl implements ReportingService {
         }
 
         return formattedDocument;
+    }
+
+    /**
+     * Check if any visible field in the document contains the search keyword.
+     * Excludes metadata fields like created_by, created_at, exceeded_info, approval_info, e-signature,
+     * and fields ending with _id or _ids (like related_team_id, related_inspector_ids).
+     * Note: _id (Submission ID) is searchable as it's displayed in the table.
+     */
+    private boolean containsSearchInVisibleFields(Document doc, String searchLower) {
+        Set<String> excludedFields = Set.of(
+                "created_by", "created_at", "exceeded_info", "approval_info", "e-signature",
+                "version", "version_group_id", "approver_updated_at"
+        );
+
+        for (String key : doc.keySet()) {
+            // Skip excluded fields
+            if (excludedFields.contains(key)) {
+                continue;
+            }
+            // Skip fields ending with _id or _ids (like related_team_id, related_inspector_ids)
+            // But allow "_id" itself (Submission ID is searchable)
+            if (!key.equals("_id") && (key.endsWith("_id") || key.endsWith("_ids"))) {
+                continue;
+            }
+
+            Object value = doc.get(key);
+            if (value == null) {
+                continue;
+            }
+
+            // Convert value to string and check if it contains the search term
+            String valueStr;
+            if (value instanceof List) {
+                valueStr = ((List<?>) value).stream()
+                        .map(Object::toString)
+                        .collect(Collectors.joining(" "));
+            } else {
+                valueStr = value.toString();
+            }
+
+            if (valueStr.toLowerCase().contains(searchLower)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     // TODO: use MongoFormTemplateUtils

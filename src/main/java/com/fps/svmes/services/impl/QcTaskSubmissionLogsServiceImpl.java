@@ -4,6 +4,7 @@ import com.fps.svmes.dto.dtos.qcForm.QcTaskSubmissionLogsDTO;
 import com.fps.svmes.models.sql.qcForm.QcTaskSubmissionLogs;
 import com.fps.svmes.repositories.jpaRepo.qcForm.QcFormTemplateRepository;
 import com.fps.svmes.repositories.jpaRepo.qcForm.QcTaskSubmissionLogsRepository;
+import com.fps.svmes.repositories.jpaRepo.qcForm.QcApprovalAssignmentRepository;
 import com.fps.svmes.services.AlertRecordService;
 import com.fps.svmes.services.QcTaskSubmissionLogsService;
 import com.fps.svmes.services.UserService;
@@ -69,6 +70,9 @@ public class QcTaskSubmissionLogsServiceImpl implements QcTaskSubmissionLogsServ
 
     @Autowired
     private QcSnapshotSubmissionService qcSnapshotSubmissionService;
+
+    @Autowired
+    private QcApprovalAssignmentRepository qcApprovalAssignmentRepository;
 
     @Override
     public QcTaskSubmissionLogsDTO insertLog(QcTaskSubmissionLogsDTO dto) {
@@ -534,6 +538,7 @@ public class QcTaskSubmissionLogsServiceImpl implements QcTaskSubmissionLogsServ
     }
 
     @Override
+    @org.springframework.transaction.annotation.Transactional("transactionManager")
     public void deleteSubmissionLog(String submissionId, String collectionName) {
         // 1. Check if collection exists
         if (!mongoTemplate.collectionExists(collectionName)) {
@@ -569,6 +574,11 @@ public class QcTaskSubmissionLogsServiceImpl implements QcTaskSubmissionLogsServ
             // Delete associated alert records
             alertRecordService.deleteBySubmissionIds(idsToDelete);
 
+            // Delete associated approval assignments
+            for (String id : idsToDelete) {
+                qcApprovalAssignmentRepository.deleteBySubmissionId(id);
+            }
+
             // Delete all documents with the same version_group_id
             Query deleteGroupQuery = new Query(Criteria.where("version_group_id").is(versionGroupId));
             mongoTemplate.remove(deleteGroupQuery, collectionName);
@@ -578,6 +588,9 @@ public class QcTaskSubmissionLogsServiceImpl implements QcTaskSubmissionLogsServ
 
             // Delete associated alert records
             alertRecordService.deleteBySubmissionIds(Collections.singletonList(submissionId));
+
+            // Delete associated approval assignments
+            qcApprovalAssignmentRepository.deleteBySubmissionId(submissionId);
 
             // Delete only this document
             mongoTemplate.remove(idQuery, collectionName);

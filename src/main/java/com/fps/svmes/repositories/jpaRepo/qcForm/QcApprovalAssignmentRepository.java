@@ -12,4 +12,5 @@ public interface QcApprovalAssignmentRepository extends
         JpaRepository<QcApprovalAssignment, Long>,
         JpaSpecificationExecutor<QcApprovalAssignment> {
     Optional<QcApprovalAssignment> findBySubmissionId(String submissionId);
+    void deleteBySubmissionId(String submissionId);
 }

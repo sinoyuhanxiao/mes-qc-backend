@@ -33,3 +33,8 @@ feign:
         url: http://s3-adapter-service:8083
         connect-timeout: 5000
         read-timeout: 5000
+
+qc:
+  snapshot:
+    api:
+      url: ${QC_SNAPSHOT_API_URL:http://localhost:8081}

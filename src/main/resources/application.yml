@@ -2,6 +2,19 @@ spring:
   profiles:
     active: local
 
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${MAIL_USERNAME:erikyu.98414@gmail.com}
+    password: ${MAIL_PASSWORD:zaha mkbx kjmk gbal}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+
   datasource:
     hikari:
       minimum-idle: 10
@@ -35,3 +48,8 @@ management:
   endpoint:
     health:
       show-details: always
+
+qc:
+  snapshot:
+    api:
+      url: ${QC_SNAPSHOT_API_URL:http://localhost:8081}

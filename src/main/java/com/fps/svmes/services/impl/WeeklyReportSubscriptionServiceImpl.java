@@ -91,6 +91,38 @@ public class WeeklyReportSubscriptionServiceImpl implements WeeklyReportSubscrip
     }
 
     @Override
+    @Transactional
+    public WeeklyReportSubscriptionDTO updateSubscription(Integer id, WeeklyReportSubscriptionDTO dto) {
+        Optional<WeeklyReportSubscription> optional = subscriptionRepository.findById(id);
+        if (optional.isEmpty()) {
+            throw new RuntimeException("Subscription not found: " + id);
+        }
+
+        WeeklyReportSubscription sub = optional.get();
+
+        // If email is changing, check uniqueness
+        if (dto.getEmail() != null && !dto.getEmail().equals(sub.getEmail())) {
+            if (subscriptionRepository.existsByEmailAndStatus(dto.getEmail(), 1)) {
+                throw new RuntimeException("Email already subscribed: " + dto.getEmail());
+            }
+            sub.setEmail(dto.getEmail());
+        }
+
+        if (dto.getLanguage() != null) {
+            sub.setLanguage(dto.getLanguage());
+        }
+        
+        if (dto.getUserId() != null) {
+            sub.setUserId(dto.getUserId());
+        }
+
+        sub.setUpdateDetails(dto.getUpdatedBy(), 1);
+        WeeklyReportSubscription saved = subscriptionRepository.save(sub);
+        log.info("Updated subscription id: {}", id);
+        return mapToDTO(saved);
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public boolean isEmailSubscribed(String email) {
         return subscriptionRepository.existsByEmailAndStatus(email, 1);

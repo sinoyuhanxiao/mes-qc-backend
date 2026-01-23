@@ -36,7 +36,7 @@ public class WeeklyReportSubscriptionController {
 
     @PostMapping("/trigger-test")
     @Operation(summary = "Trigger test send", description = "Manually trigger the weekly report email job for all active subscribers")
-    public ResponseResult<String> triggerTestSend(@RequestParam(required = false, defaultValue = "zh") String lang) {
+    public ResponseResult<String> triggerTestSend(@RequestParam(required = false, defaultValue = "en") String lang) {
         try {
             log.info("Manually triggering weekly report test send with language: {}...", lang);
             weeklyReportScheduler.sendWeeklyReportsManual(lang);
@@ -44,6 +44,19 @@ public class WeeklyReportSubscriptionController {
         } catch (Exception e) {
             log.error("Error triggering test send", e);
             return ResponseResult.fail("Error triggering test send: " + e.getMessage(), e);
+        }
+    }
+
+    @PostMapping("/{id}/send-now")
+    @Operation(summary = "Send report immediately", description = "Trigger sending the weekly report to a specific subscriber immediately")
+    public ResponseResult<String> sendNow(@PathVariable Integer id) {
+        try {
+            log.info("Manually sending report to subscriber id: {}...", id);
+            weeklyReportScheduler.sendReportToSubscriber(id);
+            return ResponseResult.success("Report sent successfully.");
+        } catch (Exception e) {
+            log.error("Error sending report to subscriber", e);
+            return ResponseResult.fail("Error sending report: " + e.getMessage(), e);
         }
     }
 
@@ -57,6 +70,19 @@ public class WeeklyReportSubscriptionController {
         } catch (Exception e) {
             log.error("Error adding subscription", e);
             return ResponseResult.fail("Error adding subscription: " + e.getMessage(), e);
+        }
+    }
+
+    @PutMapping("/{id}")
+    @Operation(summary = "Update subscription", description = "Update email or language for a subscription")
+    public ResponseResult<WeeklyReportSubscriptionDTO> updateSubscription(@PathVariable Integer id, @RequestBody WeeklyReportSubscriptionDTO dto) {
+        try {
+            WeeklyReportSubscriptionDTO updated = subscriptionService.updateSubscription(id, dto);
+            log.info("Subscription updated, id: {}", id);
+            return ResponseResult.success(updated);
+        } catch (Exception e) {
+            log.error("Error updating subscription", e);
+            return ResponseResult.fail("Error updating subscription: " + e.getMessage(), e);
         }
     }
 

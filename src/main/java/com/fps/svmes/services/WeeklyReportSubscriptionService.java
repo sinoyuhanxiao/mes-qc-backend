@@ -16,5 +16,7 @@ public interface WeeklyReportSubscriptionService {
 
     void toggleSubscriptionStatus(Integer id, Boolean isActive);
 
+    WeeklyReportSubscriptionDTO updateSubscription(Integer id, WeeklyReportSubscriptionDTO dto);
+
     boolean isEmailSubscribed(String email);
 }

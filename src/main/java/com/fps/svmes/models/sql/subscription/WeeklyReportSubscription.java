@@ -24,7 +24,12 @@ public class WeeklyReportSubscription extends Common {
     @Column(name = "email", nullable = false)
     private String email;
 
-    @JsonProperty("is_active")
+    @Column(name = "status")
+    private Integer status = 1;
+
     @Column(name = "is_active")
     private Boolean isActive = true;
+
+    @Column(name = "language")
+    private String language = "en";
 }

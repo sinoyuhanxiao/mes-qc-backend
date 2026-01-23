@@ -25,4 +25,10 @@ public class WeeklyReportSubscriptionDTO extends CommonDTO {
 
     @JsonProperty("is_active")
     private Boolean isActive;
+
+    @JsonProperty("status")
+    private Integer status;
+
+    @JsonProperty("language")
+    private String language;
 }

@@ -1,6 +1,8 @@
 package com.fps.svmes.schedulers;
 
 import com.fps.svmes.dto.dtos.subscription.WeeklyReportSubscriptionDTO;
+import com.fps.svmes.models.sql.subscription.WeeklyReportSubscription;
+import com.fps.svmes.repositories.jpaRepo.subscription.WeeklyReportSubscriptionRepository;
 import com.fps.svmes.services.EmailService;
 import com.fps.svmes.services.WeeklyReportSubscriptionService;
 import lombok.RequiredArgsConstructor;
@@ -12,8 +14,11 @@ import org.springframework.web.client.RestTemplate;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Component
 @RequiredArgsConstructor
@@ -21,6 +26,7 @@ import java.util.Map;
 public class WeeklyReportScheduler {
 
     private final WeeklyReportSubscriptionService subscriptionService;
+    private final WeeklyReportSubscriptionRepository subscriptionRepository; // Needed for direct access to check language if not in DTO or just to fetch by ID
     private final EmailService emailService;
     private final RestTemplate restTemplate;
 
@@ -33,14 +39,17 @@ public class WeeklyReportScheduler {
      */
     @Scheduled(cron = "0 0 8 * * MON")
     public void sendWeeklyReports() {
-        sendWeeklyReports("zh"); // Default to Chinese for scheduled jobs
+        // Pass null to use per-subscriber language preference
+        sendWeeklyReports(null);
     }
 
     /**
-     * Internal method to send reports with a specific language
+     * Internal method to send reports.
+     * @param langOverride If provided, forces this language for ALL subscribers (for testing).
+     *                     If null, uses each subscriber's preferred language.
      */
-    public void sendWeeklyReports(String lang) {
-        log.info("Starting weekly report email job with language: {}...", lang);
+    public void sendWeeklyReports(String langOverride) {
+        log.info("Starting weekly report email job (Override Language: {})...", langOverride);
 
         List<WeeklyReportSubscriptionDTO> subscriptions = subscriptionService.getActiveSubscriptions();
 
@@ -55,16 +64,68 @@ public class WeeklyReportScheduler {
         String startDateStr = startDate.format(DateTimeFormatter.ISO_DATE);
         String endDateStr = endDate.format(DateTimeFormatter.ISO_DATE);
 
-        // Generate AI summary report content
-        String reportContent = generateWeeklyReportContent(startDateStr, endDateStr, lang);
-        String subject = lang.equalsIgnoreCase("en") 
-            ? String.format("QC Weekly Report: %s ~ %s", startDateStr, endDateStr)
-            : String.format("QC质检周报: %s ~ %s", startDateStr, endDateStr);
+        if (langOverride != null && !langOverride.isEmpty()) {
+            // Case 1: Override language provided (Test mode)
+            log.info("Sending weekly report to ALL subscribers in language: {}", langOverride);
+            sendBatch(subscriptions, startDateStr, endDateStr, langOverride);
+        } else {
+            // Case 2: Use per-subscriber language preference
+            log.info("Sending weekly report using subscriber preferences");
+            
+            // Group by language (default to 'en' if null)
+            Map<String, List<WeeklyReportSubscriptionDTO>> byLang = subscriptions.stream()
+                    .collect(Collectors.groupingBy(s -> s.getLanguage() != null ? s.getLanguage() : "en"));
 
-        // Send to all subscribers
+            for (Map.Entry<String, List<WeeklyReportSubscriptionDTO>> entry : byLang.entrySet()) {
+                String lang = entry.getKey();
+                List<WeeklyReportSubscriptionDTO> recipients = entry.getValue();
+                log.info("Processing batch for language: {} ({} recipients)", lang, recipients.size());
+                sendBatch(recipients, startDateStr, endDateStr, lang);
+            }
+        }
+    }
+
+    /**
+     * Sends report to a specific subscriber immediately
+     */
+    public void sendReportToSubscriber(Integer subscriptionId) {
+        Optional<WeeklyReportSubscription> subOpt = subscriptionRepository.findById(subscriptionId);
+        if (subOpt.isEmpty()) {
+            throw new RuntimeException("Subscription not found: " + subscriptionId);
+        }
+        WeeklyReportSubscription sub = subOpt.get();
+        if (!Boolean.TRUE.equals(sub.getIsActive())) {
+             log.warn("Sending report to INACTIVE subscriber: {}", sub.getEmail());
+        }
+
+        // Calculate date range (last 7 days)
+        LocalDate endDate = LocalDate.now();
+        LocalDate startDate = endDate.minusDays(7);
+        String startDateStr = startDate.format(DateTimeFormatter.ISO_DATE);
+        String endDateStr = endDate.format(DateTimeFormatter.ISO_DATE);
+
+        String lang = sub.getLanguage() != null ? sub.getLanguage() : "en";
+        String reportContent = generateWeeklyReportContent(startDateStr, endDateStr, lang);
+        
+        String subject = lang.equalsIgnoreCase("en")
+                ? String.format("QC Weekly Report: %s ~ %s", startDateStr, endDateStr)
+                : String.format("QC质检周报: %s ~ %s", startDateStr, endDateStr);
+
+        emailService.sendWeeklyReport(sub.getEmail(), subject, reportContent);
+        log.info("Sent immediate report to subscriber: {} (Language: {})", sub.getEmail(), lang);
+    }
+
+    private void sendBatch(List<WeeklyReportSubscriptionDTO> recipients, String startDate, String endDate, String lang) {
+        // Generate content ONCE for this language
+        String reportContent = generateWeeklyReportContent(startDate, endDate, lang);
+        String subject = lang.equalsIgnoreCase("en")
+                ? String.format("QC Weekly Report: %s ~ %s", startDate, endDate)
+                : String.format("QC质检周报: %s ~ %s", startDate, endDate);
+
         int successCount = 0;
         int failCount = 0;
-        for (WeeklyReportSubscriptionDTO sub : subscriptions) {
+
+        for (WeeklyReportSubscriptionDTO sub : recipients) {
             try {
                 emailService.sendWeeklyReport(sub.getEmail(), subject, reportContent);
                 successCount++;
@@ -74,8 +135,7 @@ public class WeeklyReportScheduler {
                 log.error("Failed to send report to: {}", sub.getEmail(), e);
             }
         }
-
-        log.info("Weekly report job completed. Success: {}, Failed: {}", successCount, failCount);
+        log.info("Batch completed for language {}. Success: {}, Failed: {}", lang, successCount, failCount);
     }
 
     /**
@@ -89,7 +149,6 @@ public class WeeklyReportScheduler {
     private String generateWeeklyReportContent(String startDate, String endDate, String lang) {
         try {
             // Try to get HTML report from qc-snapshot-service
-            // Pass language via lang query param
             String htmlReportUrl = String.format("%s/summary/weekly-email-report?start_date=%s&end_date=%s&lang=%s",
                     qcSnapshotApiUrl, startDate, endDate, lang);
 
@@ -116,7 +175,7 @@ public class WeeklyReportScheduler {
     }
 
     private String buildBasicHtmlReport(String startDate, String endDate, Map<String, Object> cardStats, String lang) {
-        boolean isEn = lang.equalsIgnoreCase("en");
+        boolean isEn = "en".equalsIgnoreCase(lang);
         StringBuilder html = new StringBuilder();
         html.append("<!DOCTYPE html>");
         html.append("<html><head>");
@@ -163,7 +222,7 @@ public class WeeklyReportScheduler {
     }
 
     private String buildErrorReport(String startDate, String endDate, String lang) {
-        boolean isEn = lang.equalsIgnoreCase("en");
+        boolean isEn = "en".equalsIgnoreCase(lang);
         return String.format(
                 "<!DOCTYPE html><html><body>" +
                         "<h2>%s</h2>" +

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fps.svmes.dto.PagedResultDTO;
 import com.fps.svmes.dto.dtos.reporting.OptionItemDTO;
+import com.fps.svmes.dto.dtos.reporting.TimeBucketedOptionDTO;
 import com.fps.svmes.dto.dtos.reporting.WidgetDataDTO;
 import com.fps.svmes.repositories.jpaRepo.qcForm.QcFormTemplateRepository;
 import com.fps.svmes.services.ReportingService;
@@ -23,9 +24,11 @@ import java.text.SimpleDateFormat;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -69,9 +72,10 @@ public class ReportingServiceImpl implements ReportingService {
 
     @Override
     public List<WidgetDataDTO> extractWidgetDataWithCounts(Long formTemplateId, String startDateTime, String endDateTime) {
-        // Set default start and end timestamps
-        Timestamp defaultStart = Timestamp.valueOf(startDateTime);
-        Timestamp defaultEnd = Timestamp.valueOf(endDateTime);
+        // Set default start and end timestamps (Parse as UTC)
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+        Timestamp defaultStart = Timestamp.from(LocalDateTime.parse(startDateTime, formatter).atZone(ZoneOffset.UTC).toInstant());
+        Timestamp defaultEnd = Timestamp.from(LocalDateTime.parse(endDateTime, formatter).atZone(ZoneOffset.UTC).toInstant());
 
         String jsonInput = qcFormTemplateRepository.findFormTemplateJsonById(formTemplateId);
         List<WidgetDataDTO> widgetDataList = extractWidgetData(jsonInput);
@@ -146,6 +150,32 @@ public class ReportingServiceImpl implements ReportingService {
                             .collect(Collectors.toList());
 
                     existingWidget.setOptionItems(updatedOptions);
+
+                    // ✅ MERGE Time-Bucketed Data
+                    if (existingWidget.getTimeBucketedData() == null || existingWidget.getTimeBucketedData().isEmpty()) {
+                        existingWidget.setTimeBucketedData(newWidget.getTimeBucketedData());
+                        existingWidget.setBucketLabels(newWidget.getBucketLabels());
+                        existingWidget.setBucketType(newWidget.getBucketType());
+                    } else if (newWidget.getTimeBucketedData() != null && !newWidget.getTimeBucketedData().isEmpty()) {
+                        // Merge counts for each option
+                        Map<Integer, TimeBucketedOptionDTO> existingMap = existingWidget.getTimeBucketedData().stream()
+                                .collect(Collectors.toMap(TimeBucketedOptionDTO::getValue, d -> d));
+
+                        for (TimeBucketedOptionDTO newData : newWidget.getTimeBucketedData()) {
+                            TimeBucketedOptionDTO existingData = existingMap.get(newData.getValue());
+                            if (existingData != null) {
+                                // Sum up the counts element-wise
+                                List<Integer> existingCounts = existingData.getCounts();
+                                List<Integer> newCounts = newData.getCounts();
+                                int len = Math.min(existingCounts.size(), newCounts.size());
+                                for (int i = 0; i < len; i++) {
+                                    existingCounts.set(i, existingCounts.get(i) + newCounts.get(i));
+                                }
+                            } else {
+                                existingWidget.getTimeBucketedData().add(newData);
+                            }
+                        }
+                    }
                 }
             } else {
                 originalList.add(newWidget);
@@ -286,6 +316,23 @@ public class ReportingServiceImpl implements ReportingService {
             if (!widget.getOptionItems().isEmpty()) {
                 Map<Integer, Integer> optionCounts = countOptionOccurrences(collection, widget.getName(), widget.getOptionItems(), startDateTime, endDateTime);
 
+                // Calculate time buckets
+                String bucketType = determineBucketType(startDateTime, endDateTime);
+                List<String> bucketLabels = generateBucketLabels(startDateTime, endDateTime, bucketType);
+
+                Map<Integer, List<Integer>> timeBucketedCounts = countOptionOccurrencesByTimeBucket(
+                        collection, widget.getName(), widget.getOptionItems(),
+                        startDateTime, endDateTime, bucketType, bucketLabels.size()
+                );
+
+                List<TimeBucketedOptionDTO> timeBucketedData = widget.getOptionItems().stream()
+                        .map(option -> new TimeBucketedOptionDTO(
+                                option.getLabel(),
+                                option.getValue(),
+                                timeBucketedCounts.getOrDefault(option.getValue(), Collections.emptyList())
+                        ))
+                        .collect(Collectors.toList());
+
                 // ✅ Instead of modifying `widget.getOptionItems()`, create a NEW WidgetDataDTO and store it in `updatedWidgets`
                 List<OptionItemDTO> updatedOptions = widget.getOptionItems().stream()
                         .map(option -> new OptionItemDTO(
@@ -294,8 +341,13 @@ public class ReportingServiceImpl implements ReportingService {
                                 optionCounts.getOrDefault(option.getValue(), 0)))  // Correctly apply new count values
                         .collect(Collectors.toList());
 
-                updatedWidgets.add(new WidgetDataDTO(widget.getName(), widget.getLabel(), widget.getType(),
-                        updatedOptions, null, null));  // Store it correctly
+                WidgetDataDTO newWidget = new WidgetDataDTO(widget.getName(), widget.getLabel(), widget.getType(),
+                        updatedOptions, null, null);
+                newWidget.setTimeBucketedData(timeBucketedData);
+                newWidget.setBucketLabels(bucketLabels);
+                newWidget.setBucketType(bucketType);
+
+                updatedWidgets.add(newWidget);  // Store it correctly
             }
         }
 
@@ -344,10 +396,6 @@ public class ReportingServiceImpl implements ReportingService {
             Timestamp endDateTime
     ) {
         Map<Integer, Integer> countMap = new HashMap<>();
-
-        // TODO: what should be the correct counting for this part
-        startDateTime = Timestamp.valueOf(startDateTime.toLocalDateTime().atZone(ZoneId.systemDefault()).withZoneSameInstant(ZoneId.of("Asia/Shanghai")).toLocalDateTime());
-        endDateTime = Timestamp.valueOf(endDateTime.toLocalDateTime().atZone(ZoneId.systemDefault()).withZoneSameInstant(ZoneId.of("Asia/Shanghai")).toLocalDateTime());
 
         List<Document> allDocs = collection.find(exists(fieldName, true)).into(new ArrayList<>());
         List<Document> filteredDocs = new ArrayList<>();
@@ -923,6 +971,113 @@ public class ReportingServiceImpl implements ReportingService {
         return targetCollections;
     }
 
+    private String determineBucketType(Timestamp start, Timestamp end) {
+        long diffDays = ChronoUnit.DAYS.between(
+                start.toLocalDateTime().toLocalDate(),
+                end.toLocalDateTime().toLocalDate()
+        );
+
+        if (diffDays < 7) {
+            return "hourly";
+        } else if (diffDays <= 30) {
+            return "daily";
+        } else {
+            return "weekly";
+        }
+    }
+
+    private List<String> generateBucketLabels(Timestamp start, Timestamp end, String bucketType) {
+        List<String> labels = new ArrayList<>();
+        ZonedDateTime current = start.toInstant().atZone(ZoneOffset.UTC);
+        ZonedDateTime endTime = end.toInstant().atZone(ZoneOffset.UTC);
+
+        while (!current.isAfter(endTime)) {
+            labels.add(current.format(DateTimeFormatter.ISO_INSTANT));
+
+            switch (bucketType) {
+                case "hourly": current = current.plusHours(1); break;
+                case "daily": current = current.plusDays(1); break;
+                case "weekly": current = current.plusWeeks(1); break;
+            }
+        }
+
+        return labels;
+    }
+
+    private Map<Integer, List<Integer>> countOptionOccurrencesByTimeBucket(
+            MongoCollection<Document> collection,
+            String fieldName,
+            List<OptionItemDTO> options,
+            Timestamp startDateTime,
+            Timestamp endDateTime,
+            String bucketType,
+            int bucketCount
+    ) {
+        Map<Integer, List<Integer>> result = new HashMap<>();
+        for (OptionItemDTO option : options) {
+            List<Integer> counts = new ArrayList<>(Collections.nCopies(bucketCount, 0));
+            result.put(option.getValue(), counts);
+        }
+
+        for (Document doc : collection.find(exists(fieldName, true))) {
+            Date rawDate = doc.getDate("created_at");
+            if (rawDate == null) continue;
+
+            Instant createdAt = rawDate.toInstant();
+            if (createdAt.isBefore(startDateTime.toInstant()) ||
+                    createdAt.isAfter(endDateTime.toInstant())) {
+                continue;
+            }
+
+            int bucketIndex = calculateBucketIndex(
+                    createdAt, startDateTime.toInstant(), bucketType
+            );
+            if (bucketIndex < 0 || bucketIndex >= bucketCount) continue;
+
+            Object value = doc.get(fieldName);
+            if (value instanceof Integer) {
+                List<Integer> counts = result.get((Integer) value);
+                if (counts != null) {
+                    counts.set(bucketIndex, counts.get(bucketIndex) + 1);
+                }
+            } else if (value instanceof List<?>) {
+                for (Object item : (List<?>) value) {
+                    if (item instanceof Integer || item instanceof String) {
+                        int intVal = Integer.parseInt(item.toString());
+                        List<Integer> counts = result.get(intVal);
+                        if (counts != null) {
+                            counts.set(bucketIndex, counts.get(bucketIndex) + 1);
+                        }
+                    }
+                }
+            }
+        }
+
+        return result;
+    }
+
+    private int calculateBucketIndex(Instant timestamp, Instant start, String bucketType) {
+        long diff;
+        // Convert to ZonedDateTime for correct ChronoUnit calculation, especially for WEEKS
+        ZonedDateTime startTime = start.atZone(ZoneId.systemDefault());
+        ZonedDateTime targetTime = timestamp.atZone(ZoneId.systemDefault());
+
+        switch (bucketType) {
+            case "hourly":
+                diff = ChronoUnit.HOURS.between(startTime, targetTime);
+                break;
+            case "daily":
+                diff = ChronoUnit.DAYS.between(startTime, targetTime);
+                break;
+            case "weekly":
+                diff = ChronoUnit.WEEKS.between(startTime, targetTime);
+                break;
+            default:
+                diff = ChronoUnit.DAYS.between(startTime, targetTime);
+        }
+        return (int) diff;
+    }
+
     private List<Document> queryRecords(MongoCollection<Document> collection, String startDateTime, String endDateTime, int page, int size) {
         Instant startInstant = convertStringToInstant(startDateTime);
         Instant endInstant = convertStringToInstant(endDateTime);
@@ -952,7 +1107,7 @@ public class ReportingServiceImpl implements ReportingService {
             // Expected format: "yyyy-MM-dd HH:mm:ss"
             DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
             LocalDateTime localDateTime = LocalDateTime.parse(dateTime, formatter);
-            return localDateTime.atZone(ZoneId.systemDefault()).toInstant();
+            return localDateTime.atZone(ZoneOffset.UTC).toInstant();
         } catch (DateTimeParseException e) {
             // Fallback if Swagger or frontend passes "2025-06-01T14:00:00Z"
             return Instant.parse(dateTime);

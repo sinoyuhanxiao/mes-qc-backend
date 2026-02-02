@@ -1228,4 +1228,146 @@ public class ReportingServiceImpl implements ReportingService {
 //        return utcDateTime.format(formatter);
 //    }
 
+    @Override
+    public PagedResultDTO<Document> fetchDrilldownRecords(
+            Long formTemplateId,
+            String fieldName,
+            Integer optionValue,
+            String startDateTime,
+            String endDateTime,
+            String bucketStart,
+            String bucketEnd,
+            Integer page,
+            Integer size,
+            String sort,
+            String search
+    ) {
+        MongoDatabase database = mongoClient.getDatabase(mongoDatabaseName);
+
+        // Get label mappings
+        HashMap<String, Object> optionItemsKeyValueMap = QcFormTemplateOptionItemsKeyValueMapping(formTemplateId);
+        HashMap<String, String> keyValueMap = getFormTemplateKeyValueMapping(formTemplateId);
+
+        // Determine the effective time range for filtering
+        String effectiveStartDateTime = (bucketStart != null && !bucketStart.isEmpty()) ? bucketStart : startDateTime;
+        String effectiveEndDateTime = (bucketEnd != null && !bucketEnd.isEmpty()) ? bucketEnd : endDateTime;
+
+        // Identify relevant collections
+        List<String> collectionNames = getRelevantCollections(database, formTemplateId, startDateTime, endDateTime);
+
+        Map<String, Document> latestVersionMap = new HashMap<>();
+        Set<Integer> userIds = new HashSet<>();
+
+        Instant filterStart = convertStringToInstant(effectiveStartDateTime);
+        Instant filterEnd = convertStringToInstant(effectiveEndDateTime);
+
+        for (String collectionName : collectionNames) {
+            MongoCollection<Document> collection = database.getCollection(collectionName);
+
+            // Get all documents and filter by date range and field value
+            List<Document> allDocs = collection.find().into(new ArrayList<>());
+            for (Document doc : allDocs) {
+                Date rawDate = doc.getDate("created_at");
+                if (rawDate == null) continue;
+
+                Instant createdAt = rawDate.toInstant();
+
+                // Filter by effective time range
+                if (createdAt.isBefore(filterStart) || createdAt.isAfter(filterEnd)) {
+                    continue;
+                }
+
+                // Filter by field value if optionValue is provided
+                if (optionValue != null && fieldName != null && !fieldName.isEmpty()) {
+                    Object fieldValue = doc.get(fieldName);
+                    boolean matches = false;
+
+                    if (fieldValue instanceof Integer) {
+                        matches = fieldValue.equals(optionValue);
+                    } else if (fieldValue instanceof List<?>) {
+                        for (Object item : (List<?>) fieldValue) {
+                            if (item instanceof Integer && item.equals(optionValue)) {
+                                matches = true;
+                                break;
+                            } else if (item instanceof String && Integer.parseInt((String) item) == optionValue) {
+                                matches = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (!matches) {
+                        continue;
+                    }
+                }
+
+                // Collect user IDs for name lookup
+                if (doc.containsKey("created_by") && doc.get("created_by") instanceof Number) {
+                    userIds.add(((Number) doc.get("created_by")).intValue());
+                }
+
+                // Keep only latest version
+                String groupId = doc.getString("version_group_id");
+                Integer version = doc.getInteger("version", 0);
+
+                if (groupId != null) {
+                    Document existing = latestVersionMap.get(groupId);
+                    if (existing == null || version > existing.getInteger("version", 0)) {
+                        latestVersionMap.put(groupId, doc);
+                    }
+                } else {
+                    latestVersionMap.put(doc.getObjectId("_id").toString(), doc);
+                }
+            }
+        }
+
+        // Bulk fetch user names
+        Map<Integer, String> userNameMap = userService.getUsersByIds(new ArrayList<>(userIds)).stream()
+                .collect(Collectors.toMap(u -> u.getId(), u -> u.getName()));
+
+        // Stream Pipeline: Format -> Filter -> Sort
+        Stream<Document> stream = latestVersionMap.values().parallelStream()
+                .map(doc -> formattedResult(doc, optionItemsKeyValueMap, keyValueMap, userNameMap));
+
+        // Apply search filter on visible fields
+        if (search != null && !search.isEmpty()) {
+            String lower = search.toLowerCase();
+            stream = stream.filter(doc -> containsSearchInVisibleFields(doc, lower));
+        }
+
+        // Sorting (default to created_at descending if no sort specified)
+        String effectiveSort = (sort == null || sort.isEmpty()) ? "created_at,desc" : sort;
+        if (effectiveSort.contains(",")) {
+            String[] parts = effectiveSort.split(",", 2);
+            String field = parts[0];
+            boolean desc = "desc".equalsIgnoreCase(parts[1]);
+            Comparator<Document> cmp;
+            if ("created_at".equals(field)) {
+                cmp = Comparator.comparing(d -> Optional.ofNullable(d.getDate("created_at")).orElse(new Date(0)));
+            } else {
+                cmp = Comparator.comparing(d -> Optional.ofNullable(d.get(field)).map(Object::toString).orElse(""));
+            }
+            if (desc) cmp = cmp.reversed();
+            stream = stream.sorted(cmp);
+        }
+
+        // Pagination
+        List<Document> filtered = stream.collect(Collectors.toList());
+        long total = filtered.size();
+        int from = page * size;
+        int to = Math.min(from + size, filtered.size());
+        List<Document> pageContent = (from >= filtered.size())
+                ? Collections.emptyList()
+                : filtered.subList(from, to);
+
+        int totalPages = (int) Math.ceil((double) total / size);
+        return new PagedResultDTO<>(
+                pageContent,
+                total,
+                totalPages,
+                page,
+                size
+        );
+    }
+
 }

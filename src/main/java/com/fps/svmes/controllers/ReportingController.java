@@ -97,5 +97,50 @@ public class ReportingController {
         return reportingService.fetchAllVersionsByGroupId(formTemplateId, versionGroupId);
     }
 
+    /**
+     * Fetch drill-down records filtered by a specific field value.
+     * Used for chart drill-down (pie chart slices, trend chart data points).
+     *
+     * @param formTemplateId the form template ID
+     * @param fieldName the field name (widget name) to filter on
+     * @param optionValue the option value to filter for (optional - null skips value filter)
+     * @param startDateTime global start date time (yyyy-MM-dd HH:mm:ss)
+     * @param endDateTime global end date time (yyyy-MM-dd HH:mm:ss)
+     * @param bucketStart optional bucket start time for trend drill-down (yyyy-MM-dd HH:mm:ss)
+     * @param bucketEnd optional bucket end time for trend drill-down (yyyy-MM-dd HH:mm:ss)
+     * @param page page number (0-indexed)
+     * @param size page size
+     * @param sort sort field and direction (e.g., "created_at,desc")
+     * @param search optional search keyword
+     * @return paged result of filtered documents
+     */
+    @GetMapping("/qc-records/drilldown")
+    public PagedResultDTO<Document> getDrilldownRecords(
+            @RequestParam Long formTemplateId,
+            @RequestParam String fieldName,
+            @RequestParam(required = false) Integer optionValue,
+            @RequestParam String startDateTime,
+            @RequestParam String endDateTime,
+            @RequestParam(required = false) String bucketStart,
+            @RequestParam(required = false) String bucketEnd,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "15") int size,
+            @RequestParam(required = false) String sort,
+            @RequestParam(required = false) String search
+    ) {
+        return reportingService.fetchDrilldownRecords(
+                formTemplateId,
+                fieldName,
+                optionValue,
+                startDateTime,
+                endDateTime,
+                bucketStart,
+                bucketEnd,
+                page,
+                size,
+                sort,
+                search
+        );
+    }
 
 }

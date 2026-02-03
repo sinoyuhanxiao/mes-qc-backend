@@ -271,8 +271,35 @@ public class ReportingServiceImpl implements ReportingService {
         MongoCollection<Document> collection = database.getCollection(collectionName);
         List<WidgetDataDTO> updatedWidgets = new ArrayList<>();
 
-        // Update formatter to support nanoseconds (9-digit precision)
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSSSSSSS");
+        // Fetch all documents in range and filter for latest versions
+        List<Document> allDocs = collection.find().into(new ArrayList<>());
+        Map<String, Document> latestVersionMap = new HashMap<>();
+
+        for (Document doc : allDocs) {
+             Date rawDate = doc.getDate("created_at");
+             Instant createdAt = rawDate != null ? rawDate.toInstant() : null;
+
+             if (createdAt == null ||
+                 createdAt.isBefore(startDateTime.toInstant()) ||
+                 createdAt.isAfter(endDateTime.toInstant())) {
+                 continue;
+             }
+
+             String groupId = doc.getString("version_group_id");
+             Integer version = doc.getInteger("version", 0);
+
+             if (groupId != null) {
+                Document existing = latestVersionMap.get(groupId);
+                if (existing == null || version > existing.getInteger("version", 0)) {
+                    latestVersionMap.put(groupId, doc);
+                }
+             } else {
+                latestVersionMap.put(doc.getObjectId("_id").toString(), doc);
+             }
+        }
+        
+        List<Document> validDocs = new ArrayList<>(latestVersionMap.values());
+        validDocs.sort(Comparator.comparing(d -> d.getDate("created_at")));
 
         for (WidgetDataDTO widget : widgetDataList) {
             if (widget.getOptionItems().isEmpty() && !widget.getType().equals("number")) {
@@ -284,45 +311,37 @@ public class ReportingServiceImpl implements ReportingService {
                 List<Double> chartData = new ArrayList<>();
                 List<String> xaxisData = new ArrayList<>();
 
-                for (Document doc : collection.find()) {
-                    Date rawDate = doc.getDate("created_at");
-                    Instant createdAt = rawDate != null ? rawDate.toInstant() : null;
-
-                    if (createdAt != null &&
-                            !createdAt.isBefore(startDateTime.toInstant()) &&
-                            !createdAt.isAfter(endDateTime.toInstant())) {
-
-                        if (doc.containsKey(widget.getName())) {
-                            Object value = doc.get(widget.getName());
-                            if (value instanceof Integer) {
-                                chartData.add(((Integer) value).doubleValue());
-                            } else if (value instanceof Double) {
-                                chartData.add((Double) value);
-                            }
+                for (Document doc : validDocs) {
+                    if (doc.containsKey(widget.getName())) {
+                        Object value = doc.get(widget.getName());
+                        if (value instanceof Integer) {
+                            chartData.add(((Integer) value).doubleValue());
+                        } else if (value instanceof Double) {
+                            chartData.add((Double) value);
                         }
-
-                        // 格式化时间为 "yyyy-MM-dd HH:mm:ss"
-                        String formattedDate = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
-                                .withZone(ZoneId.systemDefault())
-                                .format(createdAt);
-                        xaxisData.add(formattedDate);
+                        
+                        Date rawDate = doc.getDate("created_at");
+                        if (rawDate != null) {
+                             String formattedDate = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
+                                     .withZone(ZoneId.systemDefault())
+                                     .format(rawDate.toInstant());
+                             xaxisData.add(formattedDate);
+                        }
                     }
                 }
                 updatedWidgets.add(new WidgetDataDTO(widget.getName(), widget.getLabel(), widget.getType(),
                         new ArrayList<>(), chartData, xaxisData));
             }
 
-            // If the widget has optionItems (for select fields), count occurrences in MongoDB
             if (!widget.getOptionItems().isEmpty()) {
-                Map<Integer, Integer> optionCounts = countOptionOccurrences(collection, widget.getName(), widget.getOptionItems(), startDateTime, endDateTime);
+                Map<Integer, Integer> optionCounts = countOptionOccurrences(validDocs, widget.getName(), widget.getOptionItems());
 
-                // Calculate time buckets
                 String bucketType = determineBucketType(startDateTime, endDateTime);
                 List<String> bucketLabels = generateBucketLabels(startDateTime, endDateTime, bucketType);
 
                 Map<Integer, List<Integer>> timeBucketedCounts = countOptionOccurrencesByTimeBucket(
-                        collection, widget.getName(), widget.getOptionItems(),
-                        startDateTime, endDateTime, bucketType, bucketLabels.size()
+                        validDocs, widget.getName(), widget.getOptionItems(),
+                        startDateTime, bucketType, bucketLabels.size()
                 );
 
                 List<TimeBucketedOptionDTO> timeBucketedData = widget.getOptionItems().stream()
@@ -333,12 +352,11 @@ public class ReportingServiceImpl implements ReportingService {
                         ))
                         .collect(Collectors.toList());
 
-                // ✅ Instead of modifying `widget.getOptionItems()`, create a NEW WidgetDataDTO and store it in `updatedWidgets`
                 List<OptionItemDTO> updatedOptions = widget.getOptionItems().stream()
                         .map(option -> new OptionItemDTO(
                                 option.getLabel(),
                                 option.getValue(),
-                                optionCounts.getOrDefault(option.getValue(), 0)))  // Correctly apply new count values
+                                optionCounts.getOrDefault(option.getValue(), 0))) 
                         .collect(Collectors.toList());
 
                 WidgetDataDTO newWidget = new WidgetDataDTO(widget.getName(), widget.getLabel(), widget.getType(),
@@ -347,7 +365,7 @@ public class ReportingServiceImpl implements ReportingService {
                 newWidget.setBucketLabels(bucketLabels);
                 newWidget.setBucketType(bucketType);
 
-                updatedWidgets.add(newWidget);  // Store it correctly
+                updatedWidgets.add(newWidget); 
             }
         }
 
@@ -389,33 +407,22 @@ public class ReportingServiceImpl implements ReportingService {
     }
 
     private Map<Integer, Integer> countOptionOccurrences(
-            MongoCollection<Document> collection,
+            List<Document> documents,
             String fieldName,
-            List<OptionItemDTO> options,
-            Timestamp startDateTime,
-            Timestamp endDateTime
+            List<OptionItemDTO> options
     ) {
         Map<Integer, Integer> countMap = new HashMap<>();
 
-        List<Document> allDocs = collection.find(exists(fieldName, true)).into(new ArrayList<>());
-        List<Document> filteredDocs = new ArrayList<>();
+        for (Document doc : documents) {
+            if (!doc.containsKey(fieldName)) continue;
 
-        for (Document doc : allDocs) {
-            Date rawDate = doc.getDate("created_at");
-            Instant createdAt = rawDate != null ? rawDate.toInstant() : null;
-            if (createdAt != null &&
-                    !createdAt.isBefore(startDateTime.toInstant()) &&
-                    !createdAt.isAfter(endDateTime.toInstant())) {
-                filteredDocs.add(doc);
-            }
-        }
-
-        for (Document doc : filteredDocs) {
             Object val = doc.get(fieldName);
             if (val instanceof List<?>) {
                 for (Object item : (List<?>) val) {
-                    int intVal = Integer.parseInt(item.toString());
-                    countMap.put(intVal, countMap.getOrDefault(intVal, 0) + 1);
+                    try {
+                        int intVal = Integer.parseInt(item.toString());
+                        countMap.put(intVal, countMap.getOrDefault(intVal, 0) + 1);
+                    } catch (NumberFormatException ignored) {}
                 }
             } else if (val instanceof Integer) {
                 int intVal = (Integer) val;
@@ -1005,11 +1012,10 @@ public class ReportingServiceImpl implements ReportingService {
     }
 
     private Map<Integer, List<Integer>> countOptionOccurrencesByTimeBucket(
-            MongoCollection<Document> collection,
+            List<Document> documents,
             String fieldName,
             List<OptionItemDTO> options,
             Timestamp startDateTime,
-            Timestamp endDateTime,
             String bucketType,
             int bucketCount
     ) {
@@ -1019,16 +1025,15 @@ public class ReportingServiceImpl implements ReportingService {
             result.put(option.getValue(), counts);
         }
 
-        for (Document doc : collection.find(exists(fieldName, true))) {
+        for (Document doc : documents) {
+            if (!doc.containsKey(fieldName)) continue;
+
             Date rawDate = doc.getDate("created_at");
             if (rawDate == null) continue;
 
             Instant createdAt = rawDate.toInstant();
-            if (createdAt.isBefore(startDateTime.toInstant()) ||
-                    createdAt.isAfter(endDateTime.toInstant())) {
-                continue;
-            }
-
+            // Start/End date check assumed done in caller, but bucket calculation needs startDateTime
+            
             int bucketIndex = calculateBucketIndex(
                     createdAt, startDateTime.toInstant(), bucketType
             );
@@ -1042,13 +1047,13 @@ public class ReportingServiceImpl implements ReportingService {
                 }
             } else if (value instanceof List<?>) {
                 for (Object item : (List<?>) value) {
-                    if (item instanceof Integer || item instanceof String) {
+                    try {
                         int intVal = Integer.parseInt(item.toString());
                         List<Integer> counts = result.get(intVal);
                         if (counts != null) {
                             counts.set(bucketIndex, counts.get(bucketIndex) + 1);
                         }
-                    }
+                    } catch (NumberFormatException ignored) {}
                 }
             }
         }
